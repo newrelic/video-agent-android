@@ -8,15 +8,29 @@ import java.util.Map;
 
 public class BackendActions {
 
-    private Map generalOptions = new HashMap();
+    private Map<String, Object> generalOptions = new HashMap<>();
+    private Map<String, Map<String, Object>> actionOptions = new HashMap<>();
 
-    public Map getGeneralOptions() {
+    // Getters and Setters
+
+    public Map<String, Object> getGeneralOptions() {
         return generalOptions;
     }
 
-    public void setGeneralOptions(Map generalOptions) {
+    public void setGeneralOptions(Map<String, Object> generalOptions) {
         this.generalOptions = generalOptions;
     }
+
+
+    public Map<String, Map<String, Object>> getActionOptions() {
+        return actionOptions;
+    }
+
+    public void setActionOptions(Map<String, Map<String, Object>> actionOptions) {
+        this.actionOptions = actionOptions;
+    }
+
+    // Senders
 
     public void sendAction(String name) {
         sendAction(name, null);
@@ -27,8 +41,7 @@ public class BackendActions {
         attr = (attr == null) ? new HashMap() : attr;
         attr.put("actionName", name);
         attr.putAll(generalOptions);
-
-        // TODO: implement action specific options
+        attr.putAll(filteredActionOptions(name));
 
         if (NewRelic.currentSessionId() != null) {
             NewRelic.recordCustomEvent(EventDefs.VIDEO_EVENT, attr);
@@ -164,5 +177,33 @@ public class BackendActions {
 
     public void sendDownload() {
         sendAction(EventDefs.DOWNLOAD);
+    }
+
+    private Map<String, Object> filteredActionOptions(String filter) {
+
+        Map<String, Object> dict = new HashMap<>();
+
+        for (Map.Entry<String, Map<String, Object>> entry : actionOptions.entrySet()) {
+            String key = entry.getKey();
+
+            if (key.endsWith("_")) {
+                // "key" is a Prefix
+                if (filter.startsWith(key)) {
+                    dict.putAll(actionOptions.get(key));
+                }
+            }
+            else if (key.startsWith("_")) {
+                // "key" is a Suffix
+                if (filter.endsWith(key)) {
+                    dict.putAll(actionOptions.get(key));
+                }
+            }
+            else {
+                // "key" is just a normal action name
+                dict.putAll(actionOptions.get(key));
+            }
+        }
+
+        return dict;
     }
 }

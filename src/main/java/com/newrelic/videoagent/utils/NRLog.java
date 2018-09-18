@@ -2,9 +2,11 @@ package com.newrelic.videoagent.utils;
 
 import android.util.Log;
 
+import com.newrelic.videoagent.NewRelicVideoAgent;
+
 public class NRLog {
 
-    private static String TAG = NRLog.class.getPackage().getName();
+    private static String TAG = NewRelicVideoAgent.class.getPackage().getName();
 
     // TODO: for "d" check for a config flag (where??), just like plist in iOS.
 
