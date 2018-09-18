@@ -1,11 +1,11 @@
 package com.newrelic.videoagent.backend;
 
 import com.newrelic.agent.android.NewRelic;
-import com.newrelic.videoagent.AVLog;
+import com.newrelic.videoagent.utils.NRLog;
+
 import java.util.HashMap;
 import java.util.Map;
 
-// TODO: remove "public" for this class
 public class BackendActions {
 
     private Map generalOptions = new HashMap();
@@ -34,10 +34,10 @@ public class BackendActions {
             NewRelic.recordCustomEvent(EventDefs.VIDEO_EVENT, attr);
         }
         else {
-            AVLog.e("⚠️ The NewRelicAgent is not initialized, you need to do it before using the NewRelicVideo. ⚠️");
+            NRLog.e("⚠️ The NewRelicAgent is not initialized, you need to do it before using the NewRelicVideo. ⚠️");
         }
 
-        AVLog.d("sendAction name = " + name + " attr = " + attr);
+        NRLog.d("sendAction name = " + name + " attr = " + attr);
     }
 
     // Contents senders
