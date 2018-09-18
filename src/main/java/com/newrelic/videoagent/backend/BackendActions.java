@@ -43,5 +43,48 @@ public class BackendActions {
     public void sendRequest() {
         sendAction(EventDefs.CONTENT_REQUEST.toString());
     }
-}
 
+    public void sendStart() {
+        sendAction(EventDefs.CONTENT_START.toString());
+    }
+
+    public void sendEnd() {
+        sendAction(EventDefs.CONTENT_END.toString());
+    }
+
+    public void sendPause() {
+        sendAction(EventDefs.CONTENT_PAUSE.toString());
+    }
+
+    public void sendResume() {
+        sendAction(EventDefs.CONTENT_RESUME.toString());
+    }
+
+    public void sendSeekStart() {
+        sendAction(EventDefs.CONTENT_SEEK_START.toString());
+    }
+
+    public void sendSeekEnd() {
+        sendAction(EventDefs.CONTENT_SEEK_END.toString());
+    }
+
+    public void sendBufferStart() {
+        sendAction(EventDefs.CONTENT_BUFFER_START.toString());
+    }
+
+    public void sendBufferEnd() {
+        sendAction(EventDefs.CONTENT_BUFFER_END.toString());
+    }
+
+    public void sendHeartbeat() {
+        sendAction(EventDefs.CONTENT_HEARTBEAT.toString());
+    }
+
+    public void sendRenditionChange() {
+        sendAction(EventDefs.CONTENT_RENDITION_CHANGE.toString());
+    }
+
+    public void sendError() {
+        sendAction(EventDefs.CONTENT_ERROR.toString());
+    }
+}
