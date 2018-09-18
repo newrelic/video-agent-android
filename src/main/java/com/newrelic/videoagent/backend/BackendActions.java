@@ -40,6 +40,8 @@ public class BackendActions {
         AVLog.d("sendAction name = " + name + " attr = " + attr);
     }
 
+    // Contents senders
+
     public void sendRequest() {
         sendAction(EventDefs.CONTENT_REQUEST.toString());
     }
@@ -86,5 +88,81 @@ public class BackendActions {
 
     public void sendError() {
         sendAction(EventDefs.CONTENT_ERROR.toString());
+    }
+
+    // Ads senders
+
+    public void sendAdRequest() {
+        sendAction(EventDefs.AD_REQUEST.toString());
+    }
+
+    public void sendAdStart() {
+        sendAction(EventDefs.AD_START.toString());
+    }
+
+    public void sendAdEnd() {
+        sendAction(EventDefs.AD_END.toString());
+    }
+
+    public void sendAdPause() {
+        sendAction(EventDefs.AD_PAUSE.toString());
+    }
+
+    public void sendAdResume() {
+        sendAction(EventDefs.AD_RESUME.toString());
+    }
+
+    public void sendAdSeekStart() {
+        sendAction(EventDefs.AD_SEEK_START.toString());
+    }
+
+    public void sendAdSeekEnd() {
+        sendAction(EventDefs.AD_SEEK_END.toString());
+    }
+
+    public void sendAdBufferStart() {
+        sendAction(EventDefs.AD_BUFFER_START.toString());
+    }
+
+    public void sendAdBufferEnd() {
+        sendAction(EventDefs.AD_BUFFER_END.toString());
+    }
+
+    public void sendAdHeartbeat() {
+        sendAction(EventDefs.AD_HEARTBEAT.toString());
+    }
+
+    public void sendAdRenditionChange() {
+        sendAction(EventDefs.AD_RENDITION_CHANGE.toString());
+    }
+
+    public void sendAdError() {
+        sendAction(EventDefs.AD_ERROR.toString());
+    }
+
+    public void sendAdBreakStart() {
+        sendAction(EventDefs.AD_BREAK_START.toString());
+    }
+
+    public void sendAdBreakEnd() {
+        sendAction(EventDefs.AD_BREAK_END.toString());
+    }
+
+    public void sendAdQuartile() {
+        sendAction(EventDefs.AD_QUARTILE.toString());
+    }
+
+    public void sendAdClick() {
+        sendAction(EventDefs.AD_CLICK.toString());
+    }
+
+    // Misc senders
+
+    public void sendPlayerReady() {
+        sendAction(EventDefs.PLAYER_READY.toString());
+    }
+
+    public void sendDownload() {
+        sendAction(EventDefs.DOWNLOAD.toString());
     }
 }
