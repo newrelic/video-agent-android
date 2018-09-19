@@ -64,7 +64,6 @@ public class TrackerAutomat {
 
     // Transitions and States
 
-    // TODO: perform transitions
     public void doTransition(Transition tran) {
         NRLog.d(">>>> TRANSITION " + tran);
 
@@ -72,32 +71,32 @@ public class TrackerAutomat {
             switch (state) {
                 default:
                 case Stopped: {
-                //[self performTransitionInStateStopped:tt];
+                    performTransitionInStateStopped(tran);
                     break;
                 }
 
                 case Starting: {
-                //[self performTransitionInStateStarting:tt];
+                    performTransitionInStateStarting(tran);
                     break;
                 }
 
                 case Paused: {
-                //[self performTransitionInStatePaused:tt];
+                    performTransitionInStatePaused(tran);
                     break;
                 }
 
                 case Playing: {
-                //[self performTransitionInStatePlaying:tt];
+                    performTransitionInStatePlaying(tran);
                     break;
                 }
 
                 case Seeking: {
-                //[self performTransitionInStateSeeking:tt];
+                    performTransitionInStateSeeking(tran);
                     break;
                 }
 
                 case Buffering: {
-                //[self performTransitionInStateBuffering:tt];
+                    performTransitionInStateBuffering(tran);
                     break;
                 }
             }
@@ -149,6 +148,48 @@ public class TrackerAutomat {
 
             default:
                 return false;
+        }
+    }
+
+    private void performTransitionInStateStopped(Transition tran) {
+        if (tran == Transition.Autoplay || tran == Transition.ClickPlay) {
+            sendRequest();
+            moveState(State.Starting);
+        }
+    }
+
+    private void performTransitionInStateStarting(Transition tran) {
+        if (tran == Transition.FrameShown) {
+            sendStart();
+            moveState(State.Playing);
+        }
+    }
+
+    private void performTransitionInStatePlaying(Transition tran) {
+        if (tran == Transition.ClickPause) {
+            sendPause();
+            moveState(State.Paused);
+        }
+    }
+
+    private void performTransitionInStatePaused(Transition tran) {
+        if (tran == Transition.ClickPlay) {
+            sendResume();
+            moveState(State.Playing);
+        }
+    }
+
+    private void performTransitionInStateSeeking(Transition tran) {
+        if (tran == Transition.EndDraggingSlider) {
+            sendSeekEnd();
+            backToState();
+        }
+    }
+
+    private void performTransitionInStateBuffering(Transition tran) {
+        if (tran == Transition.EndBuffering) {
+            sendBufferEnd();
+            backToState();
         }
     }
 
