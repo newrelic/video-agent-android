@@ -42,6 +42,7 @@ public class TrackerAutomat {
         actions = new BackendActions();
         state = State.Stopped;
         stateStack = new Stack<>();
+        isAd = false;
     }
 
     // Getters and setters
