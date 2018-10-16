@@ -64,7 +64,8 @@ public class PlaybackAutomat {
         if (transition(Transition.ClickPlay)) {
             if (this.isAd) {
                 this.actions.sendAdRequest();
-            } else {
+            }
+            else {
                 this.actions.sendRequest();
             }
         }
@@ -74,7 +75,8 @@ public class PlaybackAutomat {
         if (transition(Transition.FrameShown)) {
             if (this.isAd) {
                 this.actions.sendAdStart();
-            } else {
+            }
+            else {
                 this.actions.sendStart();
             }
         }
@@ -96,7 +98,8 @@ public class PlaybackAutomat {
         if (transition(Transition.ClickPause)) {
             if (this.isAd) {
                 this.actions.sendAdPause();
-            } else {
+            }
+            else {
                 this.actions.sendPause();
             }
         }
@@ -106,7 +109,8 @@ public class PlaybackAutomat {
         if (transition(Transition.ClickPlay)) {
             if (this.isAd) {
                 this.actions.sendAdResume();
-            } else {
+            }
+            else {
                 this.actions.sendResume();
             }
         }
@@ -127,7 +131,8 @@ public class PlaybackAutomat {
         if (transition(Transition.EndDraggingSlider)) {
             if (this.isAd) {
                 this.actions.sendAdSeekEnd();
-            } else {
+            }
+            else {
                 this.actions.sendSeekEnd();
             }
         }
@@ -148,7 +153,8 @@ public class PlaybackAutomat {
         if (transition(Transition.EndBuffering)) {
             if (this.isAd) {
                 this.actions.sendAdBufferEnd();
-            } else {
+            }
+            else {
                 this.actions.sendBufferEnd();
             }
         }
@@ -279,8 +285,10 @@ public class PlaybackAutomat {
     }
 
     private void moveStateAndPush(State newState) {
-        stateStack.push(state);
-        this.state = newState;
+        if (newState != this.state) {
+            stateStack.push(state);
+            this.state = newState;
+        }
     }
 
     private void backToState() {
