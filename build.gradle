@@ -13,7 +13,14 @@ android {
 
         externalNativeBuild {
             cmake {
-                cppFlags "-DPRODUCT_VERSION_STR=\"\\\"0.1.0\\\"\" -std=c++11 -I/Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/cpp/Core/ -I/Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/cpp/Core/Automat/ -I/Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/cpp/Core/Backend/ -I/Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/cpp/Core/Time/ -I/Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/cpp/Core/Trackers/ -I/Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/cpp/Core/Utils/DictionaryMerge/ -I/Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/cpp/Core/Utils/ValueHolder/"
+                cppFlags "-DPRODUCT_VERSION_STR=\"\\\"0.1.0\\\"\" -std=c++11"
+                cppFlags += "-I" + file("src/main/cpp/Core/").absolutePath
+                cppFlags += "-I" + file("src/main/cpp/Core/Automat/").absolutePath
+                cppFlags += "-I" + file("src/main/cpp/Core/Backend/").absolutePath
+                cppFlags += "-I" + file("src/main/cpp/Core/Time/").absolutePath
+                cppFlags += "-I" + file("src/main/cpp/Core/Trackers/").absolutePath
+                cppFlags += "-I" + file("src/main/cpp/Core/Utils/DictionaryMerge/").absolutePath
+                cppFlags += "-I" + file("src/main/cpp/Core/Utils/ValueHolder/").absolutePath
             }
         }
 
