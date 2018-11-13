@@ -13,7 +13,8 @@ android {
 
         externalNativeBuild {
             cmake {
-                cppFlags "-DPRODUCT_VERSION_STR=\"\\\"0.1.0\\\"\" -std=c++11"
+                cppFlags "-DPRODUCT_VERSION_STR=\"\\\"" + versionName + "\\\"\""
+                cppFlags += "-std=c++11"
                 cppFlags += "-I" + file("src/main/cpp/Core/").absolutePath
                 cppFlags += "-I" + file("src/main/cpp/Core/Automat/").absolutePath
                 cppFlags += "-I" + file("src/main/cpp/Core/Backend/").absolutePath
