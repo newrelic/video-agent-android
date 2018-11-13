@@ -14,13 +14,13 @@ android {
         externalNativeBuild {
             cmake {
                 // Enable C++ 11
-                cppFlags "-std=c++11"
+                cppFlags "-DPRODUCT_VERSION_STR=\"\\\"0.1.0\\\"\" -std=c++11 -I/Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/cpp/Core/ -I/Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/cpp/Core/Automat/ -I/Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/cpp/Core/Backend/ -I/Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/cpp/Core/Time/ -I/Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/cpp/Core/Trackers/ -I/Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/cpp/Core/Utils/DictionaryMerge/ -I/Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/cpp/Core/Utils/ValueHolder/"
             }
         }
 
         // This determines the .so filename
         ndk {
-            moduleName "test-jni"
+            moduleName "Core"
         }
     }
 

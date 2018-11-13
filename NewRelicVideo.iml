@@ -34,6 +34,12 @@
     <exclude-output />
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/src/main/cpp" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src/main/cpp/Core/Automat" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src/main/cpp/Core/Backend" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src/main/cpp/Core/Time" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src/main/cpp/Core/Trackers" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src/main/cpp/Core/Utils/DictionaryMerge" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src/main/cpp/Core/Utils/ValueHolder" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/build/generated/source/apt/debug" isTestSource="false" generated="true" />
       <sourceFolder url="file://$MODULE_DIR$/build/generated/not_namespaced_r_class_sources/debug/generateDebugRFile/out" isTestSource="false" generated="true" />
       <sourceFolder url="file://$MODULE_DIR$/build/generated/source/aidl/debug" isTestSource="false" generated="true" />

@@ -2,10 +2,19 @@ cmake_minimum_required(VERSION 3.4.1)
 
 add_library(
         # Lib name
-        test-jni
+        Core
         # Type (SHARED or STATIC)
         SHARED
-        # List of source files
-        src/main/cpp/test.cpp)
 
-include_directories(src/main/cpp/)
+        # List of source files
+        src/main/cpp/test.cpp
+        src/main/cpp/CAL.cpp
+        src/main/cpp/Core/Automat/PlaybackAutomatCore.cpp
+        src/main/cpp/Core/Backend/BackendActionsCore.cpp
+        src/main/cpp/Core/Time/TimestampHolder.cpp
+        src/main/cpp/Core/Trackers/AdsTrackerCore.cpp
+        src/main/cpp/Core/Trackers/ContentsTrackerCore.cpp
+        src/main/cpp/Core/Trackers/TrackerCore.cpp
+        src/main/cpp/Core/Utils/DictionaryMerge/DictionaryMerge.cpp
+        src/main/cpp/Core/Utils/ValueHolder/ValueHolder.cpp
+)

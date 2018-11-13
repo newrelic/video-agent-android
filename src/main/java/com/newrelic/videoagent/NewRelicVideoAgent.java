@@ -6,7 +6,7 @@ import com.newrelic.videoagent.utils.NRLog;
 public class NewRelicVideoAgent {
 
     static {
-        System.loadLibrary("test-jni");
+        System.loadLibrary("Core");
     }
 
     public static native String testHello(String name);
