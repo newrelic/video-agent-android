@@ -7,7 +7,8 @@ add_library(
         SHARED
 
         # List of source files
-        src/main/cpp/test.cpp
+        src/main/cpp/StupidTest.cpp
+        src/main/cpp/StupidTest_Wrapper_wrap.cxx
         src/main/cpp/CAL.cpp
         src/main/cpp/Core/Automat/PlaybackAutomatCore.cpp
         src/main/cpp/Core/Backend/BackendActionsCore.cpp

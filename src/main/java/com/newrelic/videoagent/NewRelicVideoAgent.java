@@ -9,10 +9,10 @@ public class NewRelicVideoAgent {
         System.loadLibrary("Core");
     }
 
-    public static native String testHello(String name);
-
     public static void startWithPlayer(SimpleExoPlayer player) {
         NRLog.d("Starting Video Agent with player");
-        NRLog.d(testHello("Joanet"));
+
+        StupidTest stupidTest = new StupidTest();
+        NRLog.d(stupidTest.returnHello("Andreu"));
     }
 }
