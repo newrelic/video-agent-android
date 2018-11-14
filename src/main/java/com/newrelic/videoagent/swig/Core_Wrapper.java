@@ -6,7 +6,7 @@
  * the SWIG interface file instead.
  * ----------------------------------------------------------------------------- */
 
-package com.newrelic.videoagent;
+package com.newrelic.videoagent.swig;
 
-public class StupidTest_Wrapper {
+public class Core_Wrapper implements Core_WrapperConstants {
 }

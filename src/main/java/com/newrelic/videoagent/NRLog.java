@@ -1,4 +1,4 @@
-package com.newrelic.videoagent.utils;
+package com.newrelic.videoagent;
 
 import android.util.Log;
 

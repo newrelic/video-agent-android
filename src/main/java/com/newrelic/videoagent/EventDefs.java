@@ -1,4 +1,4 @@
-package com.newrelic.videoagent.backend;
+package com.newrelic.videoagent;
 
 public class EventDefs {
     public static String VIDEO_EVENT                 = "VideoEvent";

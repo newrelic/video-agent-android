@@ -7,8 +7,7 @@ add_library(
         SHARED
 
         # List of source files
-        src/main/cpp/StupidTest.cpp
-        src/main/cpp/StupidTest_Wrapper_wrap.cxx
+        src/main/cpp/Core_Wrapper.cxx
         src/main/cpp/CAL.cpp
         src/main/cpp/Core/Automat/PlaybackAutomatCore.cpp
         src/main/cpp/Core/Backend/BackendActionsCore.cpp
@@ -19,3 +18,6 @@ add_library(
         src/main/cpp/Core/Utils/DictionaryMerge/DictionaryMerge.cpp
         src/main/cpp/Core/Utils/ValueHolder/ValueHolder.cpp
 )
+
+# To generate Swig code from the terminal, go to Core/Trackers dir and run:
+# swig -c++ -java -package com.newrelic.videoagent.swig -outdir /Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/java/com/newrelic/videoagent/swig -o ../../Core_Wrapper.cxx ../../Core_Wrapper.i
