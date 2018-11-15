@@ -20,15 +20,62 @@ Java_com_newrelic_videoagent_NewRelicVideoAgent_initJNIEnv(JNIEnv *e, jclass typ
 }
 
 bool recordCustomEvent(std::string name, std::map<std::string, ValueHolder> attr) {
-    // TODO: implement
-    /*
-    std::string a = name;
-    std::map<std::string, ValueHolder> b = attr;
     jclass cls = env->FindClass("com/newrelic/videoagent/CAL");
-    jmethodID mid = env->GetStaticMethodID(cls, "hello", "()V");
-    env->CallStaticVoidMethod(cls, mid);
-     */
-    return true;
+    jmethodID mid = env->GetStaticMethodID(cls, "recordCustomEvent", "(Ljava/lang/String;Ljava/util/Map;)V");
+    jstring jname = env->NewStringUTF(name.c_str());
+
+    // Create the map
+    jclass mapClass = env->FindClass("java/util/HashMap");
+    jmethodID init = env->GetMethodID(mapClass, "<init>", "(I)V");
+    jsize map_len = 1;
+    jobject hashMap = env->NewObject(mapClass, init, map_len);
+    jmethodID put = env->GetMethodID(mapClass, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+
+    // fill the map
+    for (auto& kv : attr) {
+        std::string key = kv.first;
+        ValueHolder val = kv.second;
+
+        jstring jkey = env->NewStringUTF(key.c_str());
+        jobject jval;
+
+        switch (val.getValueType()) {
+            case ValueHolder::ValueHolderTypeString: {
+                jval = env->NewStringUTF(val.getValueString().c_str());
+                break;
+            }
+            case ValueHolder::ValueHolderTypeInt: {
+                jclass intClass = env->FindClass("java/lang/Long");
+                jmethodID intInit = env->GetMethodID(intClass, "<init>", "(J)V");
+                jval = env->NewObject(intClass, intInit, (jlong)val.getValueInt());
+                break;
+            }
+            case ValueHolder::ValueHolderTypeFloat: {
+                jclass doubleClass = env->FindClass("java/lang/Double");
+                jmethodID doubleInit = env->GetMethodID(doubleClass, "<init>", "(D)V");
+                jval = env->NewObject(doubleClass, doubleInit, (jdouble)val.getValueFloat());
+                break;
+            }
+            default: {
+                jval = nullptr;
+            }
+        }
+
+        if (jval != nullptr) {
+            env->CallObjectMethod(hashMap, put, jkey, jval);
+        }
+
+        env->DeleteLocalRef(jkey);
+        env->DeleteLocalRef(jval);
+    }
+
+    // Call recordCustomEvent
+    env->CallStaticVoidMethod(cls, mid, jname, hashMap);
+
+    env->DeleteLocalRef(jname);
+    env->DeleteLocalRef(hashMap);
+
+    return !currentSessionId().empty();
 }
 
 std::string currentSessionId() {

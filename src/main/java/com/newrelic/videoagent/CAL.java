@@ -1,12 +1,18 @@
 package com.newrelic.videoagent;
 
 import com.newrelic.agent.android.NewRelic;
+
+import java.util.HashMap;
 import java.util.Map;
 
 public class CAL {
 
     public static void recordCustomEvent(String name, Map attr) {
         if (NewRelic.currentSessionId() != null) {
+            if (attr == null) {
+                attr = new HashMap();
+            }
+            attr.put("actionName", name);
             NewRelic.recordCustomEvent(EventDefs.VIDEO_EVENT, attr);
         }
         else {
