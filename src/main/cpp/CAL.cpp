@@ -80,4 +80,5 @@ void AV_LOG(const char *format, ...) {
     env->CallStaticVoidMethod(cls, mid, jstr);
 
     free(str);
+    env->DeleteLocalRef(jstr);
 }
