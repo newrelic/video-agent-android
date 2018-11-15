@@ -42,8 +42,10 @@ std::string currentSessionId() {
 }
 
 double systemTimestamp() {
-    // TODO: implement
-    return 0.0;
+    jclass cls = env->FindClass("com/newrelic/videoagent/CAL");
+    jmethodID mid = env->GetStaticMethodID(cls, "systemTimestamp", "()D");
+    jdouble ret = env->CallStaticDoubleMethod(cls, mid);
+    return ret;
 }
 
 ValueHolder callGetter(std::string name, void *origin) {
