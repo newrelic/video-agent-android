@@ -6,6 +6,10 @@
 #include "ValueHolder.hpp"
 #include "TrackerCore.hpp"
 #include <jni.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <string.h>
+#include <malloc.h>
 
 JNIEnv *env;
 
@@ -49,5 +53,22 @@ void abortTimer() {
 }
 
 void AV_LOG(const char *format, ...) {
-    // TODO: implement
+    char *str = (char *)malloc(1000);
+    if (!str)
+        return;
+
+    jstring jstr;
+
+    va_list args;
+    va_start(args, format);
+    vsnprintf(str, 1000, format, args);
+    va_end(args);
+
+    jstr = env->NewStringUTF(str);
+
+    jclass cls = env->FindClass("com/newrelic/videoagent/CAL");
+    jmethodID mid = env->GetStaticMethodID(cls, "AV_LOG", "(Ljava/lang/String;)V");
+    env->CallStaticVoidMethod(cls, mid, jstr);
+
+    free(str);
 }

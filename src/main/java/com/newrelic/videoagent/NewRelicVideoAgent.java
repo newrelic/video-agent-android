@@ -16,9 +16,13 @@ public class NewRelicVideoAgent {
 
         initJNIEnv();
 
+        // TEST
         ContentsTrackerCore contentsTracker = new ContentsTrackerCore();
         contentsTracker.setup();
         contentsTracker.reset();
+        contentsTracker.sendRequest();
+        contentsTracker.sendStart();
         contentsTracker.sendHeartbeat();
+        contentsTracker.sendEnd();
     }
 }
