@@ -21,17 +21,24 @@ Java_com_newrelic_videoagent_NewRelicVideoAgent_initJNIEnv(JNIEnv *e, jclass typ
 
 bool recordCustomEvent(std::string name, std::map<std::string, ValueHolder> attr) {
     // TODO: implement
+    /*
     std::string a = name;
     std::map<std::string, ValueHolder> b = attr;
     jclass cls = env->FindClass("com/newrelic/videoagent/CAL");
     jmethodID mid = env->GetStaticMethodID(cls, "hello", "()V");
     env->CallStaticVoidMethod(cls, mid);
+     */
     return true;
 }
 
 std::string currentSessionId() {
-    // TODO: implement
-    return "";
+    jclass cls = env->FindClass("com/newrelic/videoagent/CAL");
+    jmethodID mid = env->GetStaticMethodID(cls, "currentSessionId", "()Ljava/lang/String;");
+    jstring jstr = (jstring)env->CallStaticObjectMethod(cls, mid);
+    const char *strReturn = env->GetStringUTFChars(jstr, 0);
+    std::string ret = std::string(strReturn);
+    env->ReleaseStringUTFChars(jstr, strReturn);
+    return ret;
 }
 
 double systemTimestamp() {

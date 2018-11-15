@@ -5,10 +5,6 @@ import java.util.Map;
 
 public class CAL {
 
-    public static void hello() {
-        NRLog.d("hello from CAL");
-    }
-
     public static void recordCustomEvent(String name, Map attr) {
         if (NewRelic.currentSessionId() != null) {
             NewRelic.recordCustomEvent(EventDefs.VIDEO_EVENT, attr);
