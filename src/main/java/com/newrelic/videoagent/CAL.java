@@ -55,17 +55,33 @@ public class CAL {
 
     public static Object callGetter(String name, Long pointerToOrigin) {
 
-        // TODO: find callback, execute and return result
+        Map<String, Pair<Object, Method>> callbacks = getInstance().callbacksTree.get(pointerToOrigin);
 
-        Object target = null;
-        Method method = null;
+        if (callbacks != null) {
 
-        try {
-            Object ret = method.invoke(target);
+            Object ret = null;
+
+            Pair<Object, Method> pair = callbacks.get(name);
+
+            if (pair != null) {
+                Object target = pair.first;
+                Method method = pair.second;
+                try {
+                    ret = method.invoke(target);
+                }
+                catch (Exception e) {
+                    return null;
+                }
+            }
+            else {
+                return null;
+            }
+
+            return ret;
         }
-        catch (Exception e) { }
-
-        return null;
+        else {
+            return null;
+        }
     }
 
     public static void registerGetter(String name, Object target, Method method, Long pointerToOrigin) {
