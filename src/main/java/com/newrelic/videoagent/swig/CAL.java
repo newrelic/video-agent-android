@@ -1,8 +1,11 @@
-package com.newrelic.videoagent;
+package com.newrelic.videoagent.swig;
 
 import android.support.annotation.Nullable;
 import android.util.Pair;
 import com.newrelic.agent.android.NewRelic;
+import com.newrelic.videoagent.EventDefs;
+import com.newrelic.videoagent.NRLog;
+
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;

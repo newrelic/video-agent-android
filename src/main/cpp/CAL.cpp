@@ -20,7 +20,7 @@ Java_com_newrelic_videoagent_NewRelicVideoAgent_initJNIEnv(JNIEnv *e, jclass typ
 }
 
 bool recordCustomEvent(std::string name, std::map<std::string, ValueHolder> attr) {
-    jclass cls = env->FindClass("com/newrelic/videoagent/CAL");
+    jclass cls = env->FindClass("com/newrelic/videoagent/swig/CAL");
     jmethodID mid = env->GetStaticMethodID(cls, "recordCustomEvent", "(Ljava/lang/String;Ljava/util/Map;)V");
     jstring jname = env->NewStringUTF(name.c_str());
 
@@ -79,7 +79,7 @@ bool recordCustomEvent(std::string name, std::map<std::string, ValueHolder> attr
 }
 
 std::string currentSessionId() {
-    jclass cls = env->FindClass("com/newrelic/videoagent/CAL");
+    jclass cls = env->FindClass("com/newrelic/videoagent/swig/CAL");
     jmethodID mid = env->GetStaticMethodID(cls, "currentSessionId", "()Ljava/lang/String;");
     jstring jstr = (jstring)env->CallStaticObjectMethod(cls, mid);
     const char *strReturn = env->GetStringUTFChars(jstr, 0);
@@ -89,14 +89,14 @@ std::string currentSessionId() {
 }
 
 double systemTimestamp() {
-    jclass cls = env->FindClass("com/newrelic/videoagent/CAL");
+    jclass cls = env->FindClass("com/newrelic/videoagent/swig/CAL");
     jmethodID mid = env->GetStaticMethodID(cls, "systemTimestamp", "()D");
     jdouble ret = env->CallStaticDoubleMethod(cls, mid);
     return ret;
 }
 
 ValueHolder callGetter(std::string name, void *origin) {
-    jclass cls = env->FindClass("com/newrelic/videoagent/CAL");
+    jclass cls = env->FindClass("com/newrelic/videoagent/swig/CAL");
     jmethodID mid = env->GetStaticMethodID(cls, "callGetter", "(Ljava/lang/String;Ljava/lang/Long;)Ljava/lang/Object;");
 
     // init name(String)
@@ -171,7 +171,7 @@ void AV_LOG(const char *format, ...) {
 
     jstr = env->NewStringUTF(str);
 
-    jclass cls = env->FindClass("com/newrelic/videoagent/CAL");
+    jclass cls = env->FindClass("com/newrelic/videoagent/swig/CAL");
     jmethodID mid = env->GetStaticMethodID(cls, "AV_LOG", "(Ljava/lang/String;)V");
     env->CallStaticVoidMethod(cls, mid, jstr);
 
