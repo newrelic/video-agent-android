@@ -102,9 +102,6 @@ ValueHolder callGetter(std::string name, void *origin) {
     // init name(String)
     jstring jstr = env->NewStringUTF(name.c_str());;
 
-    // TEST: fake origin to check it works
-    origin = (void *)11111;
-
     // init origin(Long)
     jclass longClass = env->FindClass("java/lang/Long");
     jmethodID longInit = env->GetMethodID(longClass, "<init>", "(J)V");
