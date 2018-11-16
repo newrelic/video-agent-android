@@ -16,6 +16,10 @@ public class NewRelicVideoAgent {
 
         initJNIEnv();
 
+        // TODO: create a ContentsTracker class, subclass of ContentsTracker
+        // TODO: make ContentsTrackerCore's swigCPtr protected, to be able to access it, This is the "origin" to register callbacks
+        // TODO: register callbacks to test (getTrackeName, etc)
+
         // TEST
         ContentsTrackerCore contentsTracker = new ContentsTrackerCore();
         contentsTracker.setup();

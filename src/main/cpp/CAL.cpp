@@ -96,8 +96,60 @@ double systemTimestamp() {
 }
 
 ValueHolder callGetter(std::string name, void *origin) {
-    // TODO: implement
-    return ValueHolder();
+    jclass cls = env->FindClass("com/newrelic/videoagent/CAL");
+    jmethodID mid = env->GetStaticMethodID(cls, "callGetter", "(Ljava/lang/String;Ljava/lang/Long;)Ljava/lang/Object;");
+
+    // init name(String)
+    jstring jstr = env->NewStringUTF(name.c_str());;
+
+    // TEST: fake origin to check it works
+    origin = (void *)11111;
+
+    // init origin(Long)
+    jclass longClass = env->FindClass("java/lang/Long");
+    jmethodID longInit = env->GetMethodID(longClass, "<init>", "(J)V");
+    jobject jobj = env->NewObject(longClass, longInit, (jlong)origin);;
+
+    // Call callGetter and obtain the response
+    jobject jret = env->CallStaticObjectMethod(cls, mid, jstr, jobj);
+
+    // convert jobject to ValueHolder
+    ValueHolder retValue;
+    jclass doubleClass = env->FindClass("java/lang/Double");
+    jclass stringClass = env->FindClass("java/lang/String");
+
+    if (jret != nullptr) {
+        if (env->IsInstanceOf(jret, stringClass)) {
+            const char *strReturn = env->GetStringUTFChars((jstring)jret, 0);
+            std::string retString = std::string(strReturn);
+            env->ReleaseStringUTFChars(jstr, strReturn);
+
+            retValue = ValueHolder(retString);
+        }
+        else if (env->IsInstanceOf(jret, longClass)) {
+            jmethodID getLongMet = env->GetMethodID(longClass, "longValue", "()J");
+            jlong retLong = env->CallLongMethod(jret, getLongMet);
+
+            retValue = ValueHolder((long)retLong);
+        }
+        else if (env->IsInstanceOf(jret, doubleClass)) {
+            jmethodID getDoubleMet = env->GetMethodID(doubleClass, "doubleValue", "()D");
+            jdouble retDouble = env->CallDoubleMethod(jret, getDoubleMet);
+
+            retValue = ValueHolder((double)retDouble);
+        }
+        else {
+            retValue = ValueHolder();
+        }
+    }
+    else {
+        retValue = ValueHolder();
+    }
+
+    env->DeleteLocalRef(jstr);
+    env->DeleteLocalRef(jobj);
+
+    return retValue;
 }
 
 void startTimer(TrackerCore *trackerCore, double timeInterval) {

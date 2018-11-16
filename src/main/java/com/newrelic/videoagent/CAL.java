@@ -1,5 +1,6 @@
 package com.newrelic.videoagent;
 
+import android.support.annotation.Nullable;
 import android.util.Pair;
 import com.newrelic.agent.android.NewRelic;
 import java.lang.reflect.Method;
@@ -53,13 +54,14 @@ public class CAL {
         NRLog.d(str);
     }
 
+    @Nullable
     public static Object callGetter(String name, Long pointerToOrigin) {
 
         Map<String, Pair<Object, Method>> callbacks = getInstance().callbacksTree.get(pointerToOrigin);
 
         if (callbacks != null) {
 
-            Object ret = null;
+            Object ret;
 
             Pair<Object, Method> pair = callbacks.get(name);
 
