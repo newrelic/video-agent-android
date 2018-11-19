@@ -6,7 +6,9 @@
  * the SWIG interface file instead.
  * ----------------------------------------------------------------------------- */
 
-package com.newrelic.videoagent.swig;
+package com.newrelic.videoagent.jni.swig;
 
-public class Core_Wrapper implements Core_WrapperConstants {
+public interface Core_WrapperConstants {
+  public final static double OBSERVATION_TIME = Core_WrapperJNI.OBSERVATION_TIME_get();
+  public final static double HEARTBEAT_COUNT = Core_WrapperJNI.HEARTBEAT_COUNT_get();
 }

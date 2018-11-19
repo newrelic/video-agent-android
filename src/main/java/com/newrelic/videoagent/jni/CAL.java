@@ -1,4 +1,4 @@
-package com.newrelic.videoagent.swig;
+package com.newrelic.videoagent.jni;
 
 import android.support.annotation.Nullable;
 import android.util.Pair;

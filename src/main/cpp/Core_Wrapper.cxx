@@ -251,7 +251,7 @@ static void SWIGUNUSED SWIG_JavaThrowException(JNIEnv *jenv, SWIG_JavaExceptionC
 extern "C" {
 #endif
 
-SWIGEXPORT jdouble JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_OBSERVATION_1TIME_1get(JNIEnv *jenv, jclass jcls) {
+SWIGEXPORT jdouble JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_OBSERVATION_1TIME_1get(JNIEnv *jenv, jclass jcls) {
   jdouble jresult = 0 ;
   double result;
   
@@ -263,7 +263,7 @@ SWIGEXPORT jdouble JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_OB
 }
 
 
-SWIGEXPORT jdouble JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_HEARTBEAT_1COUNT_1get(JNIEnv *jenv, jclass jcls) {
+SWIGEXPORT jdouble JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_HEARTBEAT_1COUNT_1get(JNIEnv *jenv, jclass jcls) {
   jdouble jresult = 0 ;
   double result;
   
@@ -275,7 +275,7 @@ SWIGEXPORT jdouble JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_HE
 }
 
 
-SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_new_1TrackerCore(JNIEnv *jenv, jclass jcls) {
+SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_new_1TrackerCore(JNIEnv *jenv, jclass jcls) {
   jlong jresult = 0 ;
   TrackerCore *result = 0 ;
   
@@ -287,7 +287,7 @@ SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_new_
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_delete_1TrackerCore(JNIEnv *jenv, jclass jcls, jlong jarg1) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_delete_1TrackerCore(JNIEnv *jenv, jclass jcls, jlong jarg1) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -297,7 +297,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_delet
 }
 
 
-SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1state(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1state(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   jlong jresult = 0 ;
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   CoreTrackerState result;
@@ -312,7 +312,7 @@ SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Trac
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1updateAttribute_1_1SWIG_10(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3, jstring jarg4) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1updateAttribute_1_1SWIG_10(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3, jstring jarg4) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   std::string arg2 ;
   ValueHolder arg3 ;
@@ -349,7 +349,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1updateAttribute_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1updateAttribute_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   std::string arg2 ;
   ValueHolder arg3 ;
@@ -377,7 +377,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1reset(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1reset(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -388,7 +388,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1setup(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1setup(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -399,7 +399,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT jstring JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1getViewId(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT jstring JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1getViewId(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   jstring jresult = 0 ;
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   std::string result;
@@ -414,7 +414,7 @@ SWIGEXPORT jstring JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Tr
 }
 
 
-SWIGEXPORT jint JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1getNumberOfVideos(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT jint JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1getNumberOfVideos(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   jint jresult = 0 ;
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   int result;
@@ -429,7 +429,7 @@ SWIGEXPORT jint JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT jstring JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1getCoreVersion(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT jstring JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1getCoreVersion(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   jstring jresult = 0 ;
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   std::string result;
@@ -444,7 +444,7 @@ SWIGEXPORT jstring JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Tr
 }
 
 
-SWIGEXPORT jstring JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1getViewSession(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT jstring JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1getViewSession(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   jstring jresult = 0 ;
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   std::string result;
@@ -459,7 +459,7 @@ SWIGEXPORT jstring JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Tr
 }
 
 
-SWIGEXPORT jint JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1getNumberOfErrors(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT jint JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1getNumberOfErrors(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   jint jresult = 0 ;
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   int result;
@@ -474,7 +474,7 @@ SWIGEXPORT jint JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1sendRequest(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendRequest(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -485,7 +485,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1sendStart(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendStart(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -496,7 +496,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1sendEnd(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendEnd(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -507,7 +507,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1sendPause(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendPause(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -518,7 +518,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1sendResume(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendResume(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -529,7 +529,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1sendSeekStart(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendSeekStart(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -540,7 +540,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1sendSeekEnd(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendSeekEnd(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -551,7 +551,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1sendBufferStart(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendBufferStart(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -562,7 +562,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1sendBufferEnd(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendBufferEnd(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -573,7 +573,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1sendHeartbeat(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendHeartbeat(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -584,7 +584,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1sendRenditionChange(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendRenditionChange(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -595,7 +595,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1sendError(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendError(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   std::string arg2 ;
   
@@ -615,7 +615,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1sendPlayerReady(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendPlayerReady(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -626,7 +626,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1sendDownload(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendDownload(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -637,7 +637,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1sendCustomAction_1_1SWIG_10(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendCustomAction_1_1SWIG_10(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   std::string arg2 ;
   
@@ -657,7 +657,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1sendCustomAction_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendCustomAction_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   std::string arg2 ;
   SwigValueWrapper< std::map< std::string,ValueHolder > > arg3 ;
@@ -685,7 +685,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1setOptions_1_1SWIG_10(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jlong jarg2) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1setOptions_1_1SWIG_10(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jlong jarg2) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   SwigValueWrapper< std::map< std::string,ValueHolder > > arg2 ;
   std::map< std::string,ValueHolder > *argp2 ;
@@ -704,7 +704,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1setOptions_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jlong jarg2, jstring jarg3) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1setOptions_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jlong jarg2, jstring jarg3) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   SwigValueWrapper< std::map< std::string,ValueHolder > > arg2 ;
   std::string arg3 ;
@@ -732,7 +732,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1startTimerEvent(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1startTimerEvent(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -743,7 +743,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1abortTimerEvent(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1abortTimerEvent(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -754,7 +754,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1trackerTimeEvent(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1trackerTimeEvent(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   
   (void)jenv;
@@ -765,7 +765,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Track
 }
 
 
-SWIGEXPORT jboolean JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_TrackerCore_1setTimestamp(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jdouble jarg2, jstring jarg3) {
+SWIGEXPORT jboolean JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1setTimestamp(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jdouble jarg2, jstring jarg3) {
   jboolean jresult = 0 ;
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   double arg2 ;
@@ -791,7 +791,7 @@ SWIGEXPORT jboolean JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_T
 }
 
 
-SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_new_1ContentsTrackerCore(JNIEnv *jenv, jclass jcls) {
+SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_new_1ContentsTrackerCore(JNIEnv *jenv, jclass jcls) {
   jlong jresult = 0 ;
   ContentsTrackerCore *result = 0 ;
   
@@ -803,7 +803,7 @@ SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_new_
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_delete_1ContentsTrackerCore(JNIEnv *jenv, jclass jcls, jlong jarg1) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_delete_1ContentsTrackerCore(JNIEnv *jenv, jclass jcls, jlong jarg1) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   
   (void)jenv;
@@ -813,7 +813,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_delet
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1reset(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1reset(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   
   (void)jenv;
@@ -824,7 +824,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1setup(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1setup(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   
   (void)jenv;
@@ -835,7 +835,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendRequest(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendRequest(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   
   (void)jenv;
@@ -846,7 +846,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendStart(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendStart(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   
   (void)jenv;
@@ -857,7 +857,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendEnd(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendEnd(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   
   (void)jenv;
@@ -868,7 +868,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendPause(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendPause(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   
   (void)jenv;
@@ -879,7 +879,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendResume(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendResume(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   
   (void)jenv;
@@ -890,7 +890,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendSeekStart(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendSeekStart(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   
   (void)jenv;
@@ -901,7 +901,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendSeekEnd(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendSeekEnd(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   
   (void)jenv;
@@ -912,7 +912,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendBufferStart(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendBufferStart(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   
   (void)jenv;
@@ -923,7 +923,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendBufferEnd(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendBufferEnd(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   
   (void)jenv;
@@ -934,7 +934,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendHeartbeat(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendHeartbeat(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   
   (void)jenv;
@@ -945,7 +945,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendRenditionChange(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendRenditionChange(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   
   (void)jenv;
@@ -956,7 +956,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendError(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendError(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   std::string arg2 ;
   
@@ -976,7 +976,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendPlayerReady(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendPlayerReady(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   
   (void)jenv;
@@ -987,7 +987,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendDownload(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendDownload(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   
   (void)jenv;
@@ -998,7 +998,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendCustomAction_1_1SWIG_10(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendCustomAction_1_1SWIG_10(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   std::string arg2 ;
   
@@ -1018,7 +1018,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendCustomAction_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendCustomAction_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   std::string arg2 ;
   SwigValueWrapper< std::map< std::string,ValueHolder > > arg3 ;
@@ -1046,7 +1046,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT jboolean JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1setTimestamp(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jdouble jarg2, jstring jarg3) {
+SWIGEXPORT jboolean JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1setTimestamp(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jdouble jarg2, jstring jarg3) {
   jboolean jresult = 0 ;
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   double arg2 ;
@@ -1072,7 +1072,7 @@ SWIGEXPORT jboolean JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_C
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1adHappened(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jdouble jarg2) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1adHappened(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jdouble jarg2) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   double arg2 ;
   
@@ -1085,7 +1085,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_Conte
 }
 
 
-SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_swig_Core_1WrapperJNI_ContentsTrackerCore_1SWIGUpcast(JNIEnv *jenv, jclass jcls, jlong jarg1) {
+SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1SWIGUpcast(JNIEnv *jenv, jclass jcls, jlong jarg1) {
     jlong baseptr = 0;
     (void)jenv;
     (void)jcls;

@@ -6,7 +6,7 @@
  * the SWIG interface file instead.
  * ----------------------------------------------------------------------------- */
 
-package com.newrelic.videoagent.swig;
+package com.newrelic.videoagent.jni.swig;
 
 public class ContentsTrackerCore extends TrackerCore {
   private transient long swigCPtr;

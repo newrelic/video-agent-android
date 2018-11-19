@@ -6,7 +6,7 @@
  * the SWIG interface file instead.
  * ----------------------------------------------------------------------------- */
 
-package com.newrelic.videoagent.swig;
+package com.newrelic.videoagent.jni.swig;
 
 public class SWIGTYPE_p_std__mapT_std__string_ValueHolder_t {
   private transient long swigCPtr;

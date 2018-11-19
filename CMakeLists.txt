@@ -20,4 +20,4 @@ add_library(
 )
 
 # To generate Swig code from the terminal, go to Core/Trackers dir and run:
-# swig -c++ -java -package com.newrelic.videoagent.swig -outdir /Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/java/com/newrelic/videoagent/swig -o ../../Core_Wrapper.cxx ../../Core_Wrapper.i
+# swig -c++ -java -package com.newrelic.videoagent.jni.swig -outdir /Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/java/com/newrelic/videoagent/jni/swig -o ../../Core_Wrapper.cxx ../../Core_Wrapper.i

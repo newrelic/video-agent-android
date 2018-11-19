@@ -1,8 +1,8 @@
 package com.newrelic.videoagent.tracker;
 
 import com.newrelic.videoagent.NRLog;
-import com.newrelic.videoagent.swig.CAL;
-import com.newrelic.videoagent.swig.ContentsTrackerCore;
+import com.newrelic.videoagent.jni.CAL;
+import com.newrelic.videoagent.jni.swig.ContentsTrackerCore;
 
 public class ContentsTracker extends ContentsTrackerCore {
 

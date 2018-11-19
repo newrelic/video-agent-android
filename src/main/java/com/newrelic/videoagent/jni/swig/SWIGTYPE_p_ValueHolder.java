@@ -6,20 +6,20 @@
  * the SWIG interface file instead.
  * ----------------------------------------------------------------------------- */
 
-package com.newrelic.videoagent.swig;
+package com.newrelic.videoagent.jni.swig;
 
-public class SWIGTYPE_p_CoreTrackerState {
+public class SWIGTYPE_p_ValueHolder {
   private transient long swigCPtr;
 
-  protected SWIGTYPE_p_CoreTrackerState(long cPtr, @SuppressWarnings("unused") boolean futureUse) {
+  protected SWIGTYPE_p_ValueHolder(long cPtr, @SuppressWarnings("unused") boolean futureUse) {
     swigCPtr = cPtr;
   }
 
-  protected SWIGTYPE_p_CoreTrackerState() {
+  protected SWIGTYPE_p_ValueHolder() {
     swigCPtr = 0;
   }
 
-  protected static long getCPtr(SWIGTYPE_p_CoreTrackerState obj) {
+  protected static long getCPtr(SWIGTYPE_p_ValueHolder obj) {
     return (obj == null) ? 0 : obj.swigCPtr;
   }
 }
