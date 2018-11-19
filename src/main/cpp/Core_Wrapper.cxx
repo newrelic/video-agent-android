@@ -233,6 +233,7 @@ static void SWIGUNUSED SWIG_JavaThrowException(JNIEnv *jenv, SWIG_JavaExceptionC
 #include "ValueHolder.hpp"
 #include "TrackerCore.hpp"
 #include "ContentsTrackerCore.hpp"
+#include "AdsTrackerCore.hpp"
 
 
 #include <string>
@@ -1085,11 +1086,374 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_C
 }
 
 
+SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_new_1AdsTrackerCore_1_1SWIG_10(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  jlong jresult = 0 ;
+  ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
+  AdsTrackerCore *result = 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(ContentsTrackerCore **)&jarg1; 
+  result = (AdsTrackerCore *)new AdsTrackerCore(arg1);
+  *(AdsTrackerCore **)&jresult = result; 
+  return jresult;
+}
+
+
+SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_new_1AdsTrackerCore_1_1SWIG_11(JNIEnv *jenv, jclass jcls) {
+  jlong jresult = 0 ;
+  AdsTrackerCore *result = 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  result = (AdsTrackerCore *)new AdsTrackerCore();
+  *(AdsTrackerCore **)&jresult = result; 
+  return jresult;
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_delete_1AdsTrackerCore(JNIEnv *jenv, jclass jcls, jlong jarg1) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  delete arg1;
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1reset(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->reset();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1setup(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->setup();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendRequest(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->sendRequest();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendStart(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->sendStart();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendEnd(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->sendEnd();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendPause(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->sendPause();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendResume(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->sendResume();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendSeekStart(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->sendSeekStart();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendSeekEnd(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->sendSeekEnd();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendBufferStart(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->sendBufferStart();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendBufferEnd(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->sendBufferEnd();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendHeartbeat(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->sendHeartbeat();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendRenditionChange(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->sendRenditionChange();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendError(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  std::string arg2 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  if(!jarg2) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null string");
+    return ;
+  } 
+  const char *arg2_pstr = (const char *)jenv->GetStringUTFChars(jarg2, 0); 
+  if (!arg2_pstr) return ;
+  (&arg2)->assign(arg2_pstr);
+  jenv->ReleaseStringUTFChars(jarg2, arg2_pstr); 
+  (arg1)->sendError(arg2);
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendPlayerReady(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->sendPlayerReady();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendDownload(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->sendDownload();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendCustomAction_1_1SWIG_10(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  std::string arg2 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  if(!jarg2) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null string");
+    return ;
+  } 
+  const char *arg2_pstr = (const char *)jenv->GetStringUTFChars(jarg2, 0); 
+  if (!arg2_pstr) return ;
+  (&arg2)->assign(arg2_pstr);
+  jenv->ReleaseStringUTFChars(jarg2, arg2_pstr); 
+  (arg1)->sendCustomAction(arg2);
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendCustomAction_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  std::string arg2 ;
+  SwigValueWrapper< std::map< std::string,ValueHolder > > arg3 ;
+  std::map< std::string,ValueHolder > *argp3 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  if(!jarg2) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null string");
+    return ;
+  } 
+  const char *arg2_pstr = (const char *)jenv->GetStringUTFChars(jarg2, 0); 
+  if (!arg2_pstr) return ;
+  (&arg2)->assign(arg2_pstr);
+  jenv->ReleaseStringUTFChars(jarg2, arg2_pstr); 
+  argp3 = *(std::map< std::string,ValueHolder > **)&jarg3; 
+  if (!argp3) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "Attempt to dereference null std::map< std::string,ValueHolder >");
+    return ;
+  }
+  arg3 = *argp3; 
+  (arg1)->sendCustomAction(arg2,arg3);
+}
+
+
+SWIGEXPORT jboolean JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1setTimestamp(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jdouble jarg2, jstring jarg3) {
+  jboolean jresult = 0 ;
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  double arg2 ;
+  std::string arg3 ;
+  bool result;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  arg2 = (double)jarg2; 
+  if(!jarg3) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null string");
+    return 0;
+  } 
+  const char *arg3_pstr = (const char *)jenv->GetStringUTFChars(jarg3, 0); 
+  if (!arg3_pstr) return 0;
+  (&arg3)->assign(arg3_pstr);
+  jenv->ReleaseStringUTFChars(jarg3, arg3_pstr); 
+  result = (bool)(arg1)->setTimestamp(arg2,arg3);
+  jresult = (jboolean)result; 
+  return jresult;
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendAdBreakStart(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->sendAdBreakStart();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendAdBreakEnd(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->sendAdBreakEnd();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendAdQuartile(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->sendAdQuartile();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendAdClick(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  (arg1)->sendAdClick();
+}
+
+
+SWIGEXPORT jint JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1getNumberOfAds(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  jint jresult = 0 ;
+  AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
+  int result;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(AdsTrackerCore **)&jarg1; 
+  result = (int)(arg1)->getNumberOfAds();
+  jresult = (jint)result; 
+  return jresult;
+}
+
+
 SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1SWIGUpcast(JNIEnv *jenv, jclass jcls, jlong jarg1) {
     jlong baseptr = 0;
     (void)jenv;
     (void)jcls;
     *(TrackerCore **)&baseptr = *(ContentsTrackerCore **)&jarg1;
+    return baseptr;
+}
+
+SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1SWIGUpcast(JNIEnv *jenv, jclass jcls, jlong jarg1) {
+    jlong baseptr = 0;
+    (void)jenv;
+    (void)jcls;
+    *(TrackerCore **)&baseptr = *(AdsTrackerCore **)&jarg1;
     return baseptr;
 }
 
