@@ -26,7 +26,7 @@ public class CAL {
         @Override
         public void run() {
             // NOTE: we MUST run it in the main thread, because the JNIEnv pointer we stored is the main thread one and in Java JNI every thread has ts own JNIEnv.
-            // mixing up JNIEnv causes a crash.
+            // Mixing up different JNIEnv instances causes a crash.
             new Handler(Looper.getMainLooper()).post(new Runnable () {
                 @Override
                 public void run () {
