@@ -30,7 +30,11 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     @Override
     public void reset() {
         super.reset();
+        this.videoDurationSeconds = 0;
+        this.videoIsPlaying = false;
     }
+
+    // Getters
 
     public Object getIsAd() {
         return new Long(0);

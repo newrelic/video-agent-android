@@ -1,5 +1,7 @@
 package com.newrelic.videoagent.jni;
 
+import android.os.Handler;
+import android.os.Looper;
 import android.support.annotation.Nullable;
 import android.util.Pair;
 import com.newrelic.agent.android.NewRelic;
@@ -9,12 +11,32 @@ import com.newrelic.videoagent.NRLog;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class CAL {
+    private static CAL instance = null;
 
     private Map<Long, Map<String, Pair<Object, Method>>> callbacksTree;
+    private ScheduledExecutorService scheduler;
+    private long trackerPointer;
 
-    private static CAL instance = null;
+    private Runnable runnable = new Runnable() {
+        @Override
+        public void run() {
+            // NOTE: we MUST run it in the main thread, because the JNIEnv pointer we stored is the main thread one and in Java JNI every thread has ts own JNIEnv.
+            // mixing up JNIEnv causes a crash.
+            new Handler(Looper.getMainLooper()).post(new Runnable () {
+                @Override
+                public void run () {
+                    callTrackerTimeEvent(trackerPointer);
+                }
+            });
+        }
+    };
+
+    public static native void callTrackerTimeEvent(long trackerPointer);
 
     protected CAL() {
         callbacksTree = new HashMap<>();
@@ -103,5 +125,24 @@ public class CAL {
 
         // Store the new callback indexed by "name" (getter name)
         callbacks.put(name, new Pair<>(target, method));
+    }
+
+    public static void startTimer(long trackerPointer, double timeInterval) {
+        getInstance().trackerPointer = trackerPointer;
+
+        if (getInstance().scheduler == null) {
+            getInstance().scheduler = Executors.newScheduledThreadPool(1);
+        }
+        else {
+            getInstance().scheduler.shutdownNow();
+        }
+
+        getInstance().scheduler.scheduleAtFixedRate(getInstance().runnable, (long)timeInterval, (long)timeInterval, TimeUnit.SECONDS);
+    }
+
+    public static void abortTimer() {
+        if (getInstance().scheduler != null) {
+            getInstance().scheduler.shutdown();
+        }
     }
 }

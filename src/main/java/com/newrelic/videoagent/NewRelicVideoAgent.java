@@ -28,7 +28,7 @@ public class NewRelicVideoAgent {
         // TEST
         tracker.sendRequest();
         tracker.sendStart();
-        tracker.sendHeartbeat();
-        tracker.sendEnd();
+//        tracker.sendHeartbeat();
+//        tracker.sendEnd();
     }
 }
