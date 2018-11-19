@@ -133,9 +133,6 @@ public class CAL {
         if (getInstance().scheduler == null) {
             getInstance().scheduler = Executors.newScheduledThreadPool(1);
         }
-        else {
-            getInstance().scheduler.shutdownNow();
-        }
 
         getInstance().scheduler.scheduleAtFixedRate(getInstance().runnable, (long)timeInterval, (long)timeInterval, TimeUnit.SECONDS);
     }
