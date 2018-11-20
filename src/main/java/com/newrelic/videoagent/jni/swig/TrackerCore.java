@@ -39,8 +39,8 @@ public class TrackerCore {
     this(Core_WrapperJNI.new_TrackerCore(), true);
   }
 
-  public SWIGTYPE_p_CoreTrackerState state() {
-    return new SWIGTYPE_p_CoreTrackerState(Core_WrapperJNI.TrackerCore_state(swigCPtr, this), true);
+  public CoreTrackerState state() {
+    return CoreTrackerState.swigToEnum(Core_WrapperJNI.TrackerCore_state(swigCPtr, this));
   }
 
   public void updateAttribute(String name, SWIGTYPE_p_ValueHolder value, String filter) {

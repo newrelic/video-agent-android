@@ -234,6 +234,7 @@ static void SWIGUNUSED SWIG_JavaThrowException(JNIEnv *jenv, SWIG_JavaExceptionC
 #include "TrackerCore.hpp"
 #include "ContentsTrackerCore.hpp"
 #include "AdsTrackerCore.hpp"
+#include "PlaybackAutomatCore.hpp"
 
 
 #include <string>
@@ -298,8 +299,8 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_d
 }
 
 
-SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1state(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
-  jlong jresult = 0 ;
+SWIGEXPORT jint JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1state(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  jint jresult = 0 ;
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   CoreTrackerState result;
   
@@ -307,8 +308,8 @@ SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_
   (void)jcls;
   (void)jarg1_;
   arg1 = *(TrackerCore **)&jarg1; 
-  result = (arg1)->state();
-  *(CoreTrackerState **)&jresult = new CoreTrackerState((const CoreTrackerState &)result); 
+  result = (CoreTrackerState)(arg1)->state();
+  jresult = (jint)result; 
   return jresult;
 }
 
@@ -1436,6 +1437,18 @@ SWIGEXPORT jint JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_A
   (void)jarg1_;
   arg1 = *(AdsTrackerCore **)&jarg1; 
   result = (int)(arg1)->getNumberOfAds();
+  jresult = (jint)result; 
+  return jresult;
+}
+
+
+SWIGEXPORT jint JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_CoreTrackerStateStopped_1get(JNIEnv *jenv, jclass jcls) {
+  jint jresult = 0 ;
+  CoreTrackerState result;
+  
+  (void)jenv;
+  (void)jcls;
+  result = (CoreTrackerState)CoreTrackerStateStopped;
   jresult = (jint)result; 
   return jresult;
 }

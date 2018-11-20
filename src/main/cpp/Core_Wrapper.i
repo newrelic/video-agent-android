@@ -7,6 +7,7 @@
 #include "TrackerCore.hpp"
 #include "ContentsTrackerCore.hpp"
 #include "AdsTrackerCore.hpp"
+#include "PlaybackAutomatCore.hpp"
 %}
 
 // The prototypes to convert
@@ -15,3 +16,4 @@
 %include "TrackerCore.hpp"
 %include "ContentsTrackerCore.hpp"
 %include "AdsTrackerCore.hpp"
+%include "../CoreDefs.hpp"

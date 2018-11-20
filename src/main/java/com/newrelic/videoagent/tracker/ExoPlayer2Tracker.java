@@ -9,13 +9,11 @@ import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 import com.newrelic.videoagent.BuildConfig;
 import com.newrelic.videoagent.NRLog;
+import com.newrelic.videoagent.jni.swig.CoreTrackerState;
 
 public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventListener {
 
     protected SimpleExoPlayer player;
-
-    private double videoDurationSeconds;
-    private Boolean videoIsPlaying = false;
 
     public ExoPlayer2Tracker(SimpleExoPlayer player) {
         this.player = player;
@@ -30,8 +28,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     @Override
     public void reset() {
         super.reset();
-        this.videoDurationSeconds = 0;
-        this.videoIsPlaying = false;
     }
 
     // Getters
@@ -71,54 +67,54 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     @Override
     public void onLoadingChanged(boolean isLoading) {
         NRLog.d("onLoadingChanged, Is Loading = " + isLoading);
-
-        /*
-        BackendActions ba = new BackendActions();
-
-        Map<String, Object> attributes = new HashMap<>();
-        attributes.put("state", isLoading);
-        attributes.put("hi", "x");
-        attributes.put("ho", "y");
-        //ba.setGeneralOptions(attributes);
-
-        Map<String, Map<String, Object>> actionAttributes = new HashMap<>();
-        actionAttributes.put("_CLICK", attributes);
-        ba.setActionOptions(actionAttributes);
-
-        ba.sendRequest();
-        ba.sendAdClick();
-        */
-
-        //ba.sendAction("ON_LOADING_CHANGED", attributes);
     }
 
     @Override
     public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
-        NRLog.d("onPlayerStateChanged, payback state = " + playbackState);
+
+        NRLog.d("onPlayerStateChanged, payback state = " + playbackState + " {");
 
         if (playbackState == Player.STATE_READY) {
-            this.videoDurationSeconds = (double) player.getDuration() / 1000.0;
-            NRLog.d("Saved Video Duration = " + this.videoDurationSeconds);
+            NRLog.d("\tVideo Is Ready");
+
+            if (state() == CoreTrackerState.CoreTrackerStateBuffering) {
+                sendBufferEnd();
+            }
         }
         else if (playbackState == Player.STATE_ENDED) {
-            NRLog.d("Video Ended Playing");
+            NRLog.d("\tVideo Ended Playing");
+
+            sendEnd();
         }
         else if (playbackState == Player.STATE_BUFFERING) {
-            NRLog.d("Video Is Buffering");
+            NRLog.d("\tVideo Is Buffering");
+
+            sendBufferStart();
         }
 
         if (playWhenReady && playbackState == Player.STATE_READY) {
-            NRLog.d("Video Playing");
-            this.videoIsPlaying = true;
+            NRLog.d("\tVideo Playing");
+
+            if (state() == CoreTrackerState.CoreTrackerStateStopped) {
+                sendRequest();
+                sendStart();
+            }
+            else if (state() == CoreTrackerState.CoreTrackerStatePaused) {
+                sendResume();
+            }
         }
         else if (playWhenReady) {
-            NRLog.d("Video Not Playing");
-            this.videoIsPlaying = false;
+            NRLog.d("\tVideo Not Playing");
         }
         else {
-            NRLog.d("Video Paused");
-            this.videoIsPlaying = false;
+            NRLog.d("\tVideo Paused");
+
+            if (state() == CoreTrackerState.CoreTrackerStatePlaying) {
+                sendPause();
+            }
         }
+
+        NRLog.d("}");
     }
 
     @Override
