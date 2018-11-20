@@ -19,6 +19,6 @@ public class NRLog {
     }
 
     private static String out(String str) {
-        return "(" + Long.toString(System.currentTimeMillis()) + "): " + str;
+        return "NRLog(" + Long.toString(System.currentTimeMillis()) + "): " + str;
     }
 }
