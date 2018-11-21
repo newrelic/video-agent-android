@@ -140,6 +140,7 @@ public class CAL {
     public static void abortTimer() {
         if (getInstance().scheduler != null) {
             getInstance().scheduler.shutdown();
+            getInstance().scheduler = null;
         }
     }
 }

@@ -31,7 +31,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         super.reset();
     }
 
-    // Getters
+    // TODO: Getters
 
     public Object getIsAd() {
         return new Long(0);
