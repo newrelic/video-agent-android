@@ -1,17 +1,22 @@
 package com.newrelic.videoagent.tracker;
 
+import android.view.Surface;
+
 import com.google.android.exoplayer2.ExoPlaybackException;
+import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.Timeline;
+import com.google.android.exoplayer2.decoder.DecoderCounters;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
+import com.google.android.exoplayer2.video.VideoRendererEventListener;
 import com.newrelic.videoagent.BuildConfig;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.jni.swig.CoreTrackerState;
 
-public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventListener {
+public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventListener, VideoRendererEventListener {
 
     protected SimpleExoPlayer player;
 
@@ -24,6 +29,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     public void setup() {
         super.setup();
         player.addListener(this);
+        player.addVideoDebugListener(this);
     }
 
     @Override
@@ -88,13 +94,11 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
             if (state() == CoreTrackerState.CoreTrackerStateBuffering) {
                 sendBufferEnd();
             }
-        }
-        else if (playbackState == Player.STATE_ENDED) {
+        } else if (playbackState == Player.STATE_ENDED) {
             NRLog.d("\tVideo Ended Playing");
 
             sendEnd();
-        }
-        else if (playbackState == Player.STATE_BUFFERING) {
+        } else if (playbackState == Player.STATE_BUFFERING) {
             NRLog.d("\tVideo Is Buffering");
 
             sendBufferStart();
@@ -107,15 +111,12 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
                 sendRequest();
                 // TODO: after request, check for actual first frame event (how? track playback time change?)
                 sendStart();
-            }
-            else if (state() == CoreTrackerState.CoreTrackerStatePaused) {
+            } else if (state() == CoreTrackerState.CoreTrackerStatePaused) {
                 sendResume();
             }
-        }
-        else if (playWhenReady) {
+        } else if (playWhenReady) {
             NRLog.d("\tVideo Not Playing");
-        }
-        else {
+        } else {
             NRLog.d("\tVideo Paused");
 
             if (state() == CoreTrackerState.CoreTrackerStatePlaying) {
@@ -156,5 +157,42 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     @Override
     public void onSeekProcessed() {
         NRLog.d("onSeekProcessed");
+    }
+
+    // ExoPlayer VideoRendererEventListener
+
+    @Override
+    public void onVideoEnabled(DecoderCounters counters) {
+        NRLog.d("onVideoEnabled");
+    }
+
+    @Override
+    public void onVideoDecoderInitialized(String decoderName, long initializedTimestampMs, long initializationDurationMs) {
+        NRLog.d("onVideoDecoderInitialized");
+    }
+
+    @Override
+    public void onDroppedFrames(int count, long elapsedMs) {
+        NRLog.d("onDroppedFrames");
+    }
+
+    @Override
+    public void onVideoSizeChanged(int width, int height, int unappliedRotationDegrees, float pixelWidthHeightRatio) {
+        NRLog.d("onVideoSizeChanged");
+    }
+
+    @Override
+    public void onRenderedFirstFrame(Surface surface) {
+        NRLog.d("onRenderedFirstFrame");
+    }
+
+    @Override
+    public void onVideoDisabled(DecoderCounters counters) {
+        NRLog.d("onVideoDisabled");
+    }
+
+    @Override
+    public void onVideoInputFormatChanged(Format format) {
+        NRLog.d("onVideoInputFormatChanged");
     }
 }
