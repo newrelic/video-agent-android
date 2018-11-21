@@ -1,5 +1,7 @@
 package com.newrelic.videoagent.tracker;
 
+import android.net.NetworkInfo;
+import android.support.annotation.Nullable;
 import android.view.Surface;
 
 import com.google.android.exoplayer2.ExoPlaybackException;
@@ -8,15 +10,19 @@ import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.Timeline;
+import com.google.android.exoplayer2.analytics.AnalyticsListener;
 import com.google.android.exoplayer2.decoder.DecoderCounters;
+import com.google.android.exoplayer2.metadata.Metadata;
+import com.google.android.exoplayer2.source.MediaSourceEventListener;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
-import com.google.android.exoplayer2.video.VideoRendererEventListener;
 import com.newrelic.videoagent.BuildConfig;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.jni.swig.CoreTrackerState;
 
-public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventListener, VideoRendererEventListener {
+import java.io.IOException;
+
+public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventListener, AnalyticsListener {
 
     protected SimpleExoPlayer player;
 
@@ -29,7 +35,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     public void setup() {
         super.setup();
         player.addListener(this);
-        player.addVideoDebugListener(this);
+        player.addAnalyticsListener(this);
     }
 
     @Override
@@ -159,40 +165,191 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         NRLog.d("onSeekProcessed");
     }
 
-    // ExoPlayer VideoRendererEventListener
+    // ExoPlayer AnalyticsListener
 
     @Override
-    public void onVideoEnabled(DecoderCounters counters) {
-        NRLog.d("onVideoEnabled");
+    public void onPlayerStateChanged(EventTime eventTime, boolean playWhenReady, int playbackState) {
+        NRLog.d("onPlayerStateChanged analytics");
     }
 
     @Override
-    public void onVideoDecoderInitialized(String decoderName, long initializedTimestampMs, long initializationDurationMs) {
-        NRLog.d("onVideoDecoderInitialized");
+    public void onTimelineChanged(EventTime eventTime, int reason) {
+        NRLog.d("onTimelineChanged analytics");
     }
 
     @Override
-    public void onDroppedFrames(int count, long elapsedMs) {
-        NRLog.d("onDroppedFrames");
+    public void onPositionDiscontinuity(EventTime eventTime, int reason) {
+        NRLog.d("onPositionDiscontinuity analytics");
     }
 
     @Override
-    public void onVideoSizeChanged(int width, int height, int unappliedRotationDegrees, float pixelWidthHeightRatio) {
-        NRLog.d("onVideoSizeChanged");
+    public void onSeekStarted(EventTime eventTime) {
+        NRLog.d("onSeekStarted analytics");
     }
 
     @Override
-    public void onRenderedFirstFrame(Surface surface) {
-        NRLog.d("onRenderedFirstFrame");
+    public void onSeekProcessed(EventTime eventTime) {
+        NRLog.d("onSeekProcessed analytics");
     }
 
     @Override
-    public void onVideoDisabled(DecoderCounters counters) {
-        NRLog.d("onVideoDisabled");
+    public void onPlaybackParametersChanged(EventTime eventTime, PlaybackParameters playbackParameters) {
+        NRLog.d("onPlaybackParametersChanged analytics");
     }
 
     @Override
-    public void onVideoInputFormatChanged(Format format) {
-        NRLog.d("onVideoInputFormatChanged");
+    public void onRepeatModeChanged(EventTime eventTime, int repeatMode) {
+        NRLog.d("onRepeatModeChanged analytics");
     }
+
+    @Override
+    public void onShuffleModeChanged(EventTime eventTime, boolean shuffleModeEnabled) {
+        NRLog.d("onShuffleModeChanged analytics");
+    }
+
+    @Override
+    public void onLoadingChanged(EventTime eventTime, boolean isLoading) {
+        NRLog.d("onLoadingChanged analytics");
+    }
+
+    @Override
+    public void onPlayerError(EventTime eventTime, ExoPlaybackException error) {
+        NRLog.d("onPlayerError analytics");
+    }
+
+    @Override
+    public void onTracksChanged(EventTime eventTime, TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
+        NRLog.d("onTracksChanged analytics");
+    }
+
+    @Override
+    public void onLoadStarted(EventTime eventTime, MediaSourceEventListener.LoadEventInfo loadEventInfo, MediaSourceEventListener.MediaLoadData mediaLoadData) {
+        NRLog.d("onLoadStarted analytics");
+    }
+
+    @Override
+    public void onLoadCompleted(EventTime eventTime, MediaSourceEventListener.LoadEventInfo loadEventInfo, MediaSourceEventListener.MediaLoadData mediaLoadData) {
+        NRLog.d("onLoadCompleted analytics");
+    }
+
+    @Override
+    public void onLoadCanceled(EventTime eventTime, MediaSourceEventListener.LoadEventInfo loadEventInfo, MediaSourceEventListener.MediaLoadData mediaLoadData) {
+        NRLog.d("onLoadCanceled analytics");
+    }
+
+    @Override
+    public void onLoadError(EventTime eventTime, MediaSourceEventListener.LoadEventInfo loadEventInfo, MediaSourceEventListener.MediaLoadData mediaLoadData, IOException error, boolean wasCanceled) {
+        NRLog.d("onLoadError analytics");
+    }
+
+    @Override
+    public void onDownstreamFormatChanged(EventTime eventTime, MediaSourceEventListener.MediaLoadData mediaLoadData) {
+
+    }
+
+    @Override
+    public void onMediaPeriodReleased(EventTime eventTime) {
+
+    }
+
+    @Override
+    public void onReadingStarted(EventTime eventTime) {
+        NRLog.d("onReadingStarted analytics");
+    }
+
+    @Override
+    public void onBandwidthEstimate(EventTime eventTime, int totalLoadTimeMs, long totalBytesLoaded, long bitrateEstimate) {
+        NRLog.d("onBandwidthEstimate analytics");
+    }
+
+    @Override
+    public void onViewportSizeChange(EventTime eventTime, int width, int height) {
+
+    }
+
+    @Override
+    public void onNetworkTypeChanged(EventTime eventTime, @Nullable NetworkInfo networkInfo) {
+
+    }
+
+    @Override
+    public void onMetadata(EventTime eventTime, Metadata metadata) {
+
+    }
+
+    @Override
+    public void onDecoderEnabled(EventTime eventTime, int trackType, DecoderCounters decoderCounters) {
+
+    }
+
+    @Override
+    public void onDecoderInitialized(EventTime eventTime, int trackType, String decoderName, long initializationDurationMs) {
+
+    }
+
+    @Override
+    public void onDecoderInputFormatChanged(EventTime eventTime, int trackType, Format format) {
+
+    }
+
+    @Override
+    public void onUpstreamDiscarded(EventTime eventTime, MediaSourceEventListener.MediaLoadData mediaLoadData) {
+
+    }
+
+    @Override
+    public void onMediaPeriodCreated(EventTime eventTime) {
+
+    }
+
+    @Override
+    public void onDecoderDisabled(EventTime eventTime, int trackType, DecoderCounters decoderCounters) {
+
+    }
+
+    @Override
+    public void onAudioSessionId(EventTime eventTime, int audioSessionId) {
+
+    }
+
+    @Override
+    public void onAudioUnderrun(EventTime eventTime, int bufferSize, long bufferSizeMs, long elapsedSinceLastFeedMs) {
+
+    }
+
+    @Override
+    public void onDroppedVideoFrames(EventTime eventTime, int droppedFrames, long elapsedMs) {
+        NRLog.d("onDroppedVideoFrames analytics");
+    }
+
+    @Override
+    public void onVideoSizeChanged(EventTime eventTime, int width, int height, int unappliedRotationDegrees, float pixelWidthHeightRatio) {
+        NRLog.d("onVideoSizeChanged analytics");
+    }
+
+    @Override
+    public void onRenderedFirstFrame(EventTime eventTime, Surface surface) {
+        NRLog.d("onRenderedFirstFrame analytics");
+    }
+
+    @Override
+    public void onDrmKeysLoaded(EventTime eventTime) {
+
+    }
+
+    @Override
+    public void onDrmSessionManagerError(EventTime eventTime, Exception error) {
+
+    }
+
+    @Override
+    public void onDrmKeysRestored(EventTime eventTime) {
+
+    }
+
+    @Override
+    public void onDrmKeysRemoved(EventTime eventTime) {
+
+    }
+
 }
