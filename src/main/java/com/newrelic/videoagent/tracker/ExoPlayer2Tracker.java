@@ -68,7 +68,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     // ExoPlayer EventListener
 
     // TODO: track events:
-    // seeking
     // rendition change
     // actual video start (first frame)
 
@@ -99,6 +98,10 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
 
             if (state() == CoreTrackerState.CoreTrackerStateBuffering) {
                 sendBufferEnd();
+
+                if (state() == CoreTrackerState.CoreTrackerStateSeeking) {
+                    sendSeekEnd();
+                }
             }
         } else if (playbackState == Player.STATE_ENDED) {
             NRLog.d("\tVideo Ended Playing");
@@ -185,6 +188,8 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     @Override
     public void onSeekStarted(EventTime eventTime) {
         NRLog.d("onSeekStarted analytics");
+
+        sendSeekStart();
     }
 
     @Override
