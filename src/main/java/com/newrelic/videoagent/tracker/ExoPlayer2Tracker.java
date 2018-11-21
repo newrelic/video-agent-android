@@ -17,6 +17,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
 
     public ExoPlayer2Tracker(SimpleExoPlayer player) {
         this.player = player;
+        sendPlayerReady();
     }
 
     @Override
@@ -53,6 +54,13 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     }
 
     // ExoPlayer EventListener
+
+    // TODO: track events:
+    // seeking
+    // rendition change
+    // actual video start (first frame)
+
+    // TODO: test with playlists
 
     @Override
     public void onTimelineChanged(Timeline timeline, Object manifest, int reason) {
@@ -97,6 +105,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
 
             if (state() == CoreTrackerState.CoreTrackerStateStopped) {
                 sendRequest();
+                // TODO: after request, check for actual first frame event (how? track playback time change?)
                 sendStart();
             }
             else if (state() == CoreTrackerState.CoreTrackerStatePaused) {
@@ -130,6 +139,8 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     @Override
     public void onPlayerError(ExoPlaybackException error) {
         NRLog.d("onPlayerError");
+
+        sendError(error.getMessage());
     }
 
     @Override
