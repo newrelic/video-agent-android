@@ -68,8 +68,9 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     // ExoPlayer EventListener
 
     // TODO: track events:
-    // rendition change
+    // actual seek start (from dragging start)
     // actual video start (first frame)
+    // rendition change
 
     // TODO: test with playlists
 
@@ -103,11 +104,13 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
                     sendSeekEnd();
                 }
             }
-        } else if (playbackState == Player.STATE_ENDED) {
+        }
+        else if (playbackState == Player.STATE_ENDED) {
             NRLog.d("\tVideo Ended Playing");
 
             sendEnd();
-        } else if (playbackState == Player.STATE_BUFFERING) {
+        }
+        else if (playbackState == Player.STATE_BUFFERING) {
             NRLog.d("\tVideo Is Buffering");
 
             sendBufferStart();
@@ -120,12 +123,15 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
                 sendRequest();
                 // TODO: after request, check for actual first frame event (how? track playback time change?)
                 sendStart();
-            } else if (state() == CoreTrackerState.CoreTrackerStatePaused) {
+            }
+            else if (state() == CoreTrackerState.CoreTrackerStatePaused) {
                 sendResume();
             }
-        } else if (playWhenReady) {
+        }
+        else if (playWhenReady) {
             NRLog.d("\tVideo Not Playing");
-        } else {
+        }
+        else {
             NRLog.d("\tVideo Paused");
 
             if (state() == CoreTrackerState.CoreTrackerStatePlaying) {

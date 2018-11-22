@@ -61,7 +61,7 @@ public class ContentsTracker extends ContentsTrackerCore {
             CAL.registerGetter(name, this, this.getClass().getMethod(methodName), new Long(ptr));
         }
         catch (Exception e) {
-            NRLog.e("Error registering a getter in ContentsTracker = " + e);
+            NRLog.e("Error registering a getter in " + this.getClass().getSimpleName() + " = " + e);
         }
     }
 }
