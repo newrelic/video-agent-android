@@ -22,13 +22,7 @@ public class NewRelicVideoAgent {
         initJNIEnv();
 
         tracker = new ExoPlayer2Tracker(player);
-        tracker.setup();
         tracker.reset();
-
-        // TEST
-//        tracker.sendRequest();
-//        tracker.sendStart();
-//        tracker.sendHeartbeat();
-//        tracker.sendEnd();
+        tracker.setup();
     }
 }

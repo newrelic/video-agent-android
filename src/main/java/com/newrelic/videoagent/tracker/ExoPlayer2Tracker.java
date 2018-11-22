@@ -28,7 +28,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
 
     public ExoPlayer2Tracker(SimpleExoPlayer player) {
         this.player = player;
-        sendPlayerReady();
     }
 
     @Override
@@ -36,6 +35,8 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         super.setup();
         player.addListener(this);
         player.addAnalyticsListener(this);
+
+        sendPlayerReady();
     }
 
     @Override
