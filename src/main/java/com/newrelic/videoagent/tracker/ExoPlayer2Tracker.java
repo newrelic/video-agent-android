@@ -211,12 +211,20 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     public void onPlayerError(ExoPlaybackException error) {
         NRLog.d("onPlayerError");
 
+        String msg;
         if (error != null) {
-            sendError(error.toString());
+            if (error.getMessage() != null) {
+                msg = error.getMessage();
+            }
+            else {
+                msg = error.toString();
+            }
         }
         else {
-            sendError("<Unknown error>");
+            msg = "<Unknown error>";
         }
+
+        sendError(msg);
     }
 
     @Override
