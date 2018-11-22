@@ -101,10 +101,13 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     }
 
     public Object getFps() {
-        // TODO
-        NRLog.d("Video format frameRate = " + player.getVideoFormat().frameRate);
-        //player.getVideoDecoderCounters().
-        return new Long(0);
+        if (player.getVideoFormat() != null) {
+            if (player.getVideoFormat().frameRate > 0) {
+                return new Double(player.getVideoFormat().frameRate);
+            }
+        }
+
+        return new Double(0);
     }
 
     public Object getIsMuted() {
