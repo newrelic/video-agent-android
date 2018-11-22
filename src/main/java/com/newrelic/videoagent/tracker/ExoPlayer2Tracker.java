@@ -1,7 +1,5 @@
 package com.newrelic.videoagent.tracker;
 
-import android.net.NetworkInfo;
-import android.support.annotation.Nullable;
 import android.view.Surface;
 
 import com.google.android.exoplayer2.ExoPlaybackException;
@@ -25,6 +23,7 @@ import java.io.IOException;
 public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventListener, AnalyticsListener {
 
     protected SimpleExoPlayer player;
+    private long bitrateEstimate;
 
     public ExoPlayer2Tracker(SimpleExoPlayer player) {
         this.player = player;
@@ -42,6 +41,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     @Override
     public void reset() {
         super.reset();
+        bitrateEstimate = 0;
     }
 
     public Object getIsAd() {
@@ -65,12 +65,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     }
 
     public Object getBitrate() {
-        NRLog.d("Video format bitrate = " + player.getVideoFormat().bitrate);
-        // TODO: we need a bandwidth meter:
-        // https://android.jlelse.eu/android-exoplayer-starters-guide-6350433f256c
-        // https://google.github.io/ExoPlayer/doc/reference/com/google/android/exoplayer2/upstream/BandwidthMeter.html
-        // https://github.com/google/ExoPlayer/issues/1570
-        return new Long(0);
+        return new Long(bitrateEstimate);
     }
 
     public Object getRenditionWidth() {
@@ -336,16 +331,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     @Override
     public void onBandwidthEstimate(EventTime eventTime, int totalLoadTimeMs, long totalBytesLoaded, long bitrateEstimate) {
         NRLog.d("onBandwidthEstimate analytics");
-    }
-
-    @Override
-    public void onViewportSizeChange(EventTime eventTime, int width, int height) {
-
-    }
-
-    @Override
-    public void onNetworkTypeChanged(EventTime eventTime, @Nullable NetworkInfo networkInfo) {
-
+        this.bitrateEstimate = bitrateEstimate;
     }
 
     @Override
