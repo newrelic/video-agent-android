@@ -7,6 +7,7 @@ import android.util.Pair;
 import com.newrelic.agent.android.NewRelic;
 import com.newrelic.videoagent.EventDefs;
 import com.newrelic.videoagent.NRLog;
+import com.newrelic.videoagent.jni.swig.ValueHolder;
 
 import java.lang.reflect.Method;
 import java.util.HashMap;
@@ -141,6 +142,21 @@ public class CAL {
         if (getInstance().scheduler != null) {
             getInstance().scheduler.shutdown();
             getInstance().scheduler = null;
+        }
+    }
+
+    public static ValueHolder convertObjectToHolder(Object object) {
+        if (object instanceof String) {
+            return new ValueHolder((String)object);
+        }
+        else if (object instanceof Long) {
+            return new ValueHolder((Long)object);
+        }
+        else if (object instanceof Double) {
+            return new ValueHolder((Double)object);
+        }
+        else {
+            return new ValueHolder();
         }
     }
 }

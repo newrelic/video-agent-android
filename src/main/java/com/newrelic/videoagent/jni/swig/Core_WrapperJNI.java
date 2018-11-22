@@ -14,8 +14,8 @@ public class Core_WrapperJNI {
   public final static native long new_TrackerCore();
   public final static native void delete_TrackerCore(long jarg1);
   public final static native int TrackerCore_state(long jarg1, TrackerCore jarg1_);
-  public final static native void TrackerCore_updateAttribute__SWIG_0(long jarg1, TrackerCore jarg1_, String jarg2, long jarg3, String jarg4);
-  public final static native void TrackerCore_updateAttribute__SWIG_1(long jarg1, TrackerCore jarg1_, String jarg2, long jarg3);
+  public final static native void TrackerCore_updateAttribute__SWIG_0(long jarg1, TrackerCore jarg1_, String jarg2, long jarg3, ValueHolder jarg3_, String jarg4);
+  public final static native void TrackerCore_updateAttribute__SWIG_1(long jarg1, TrackerCore jarg1_, String jarg2, long jarg3, ValueHolder jarg3_);
   public final static native void TrackerCore_reset(long jarg1, TrackerCore jarg1_);
   public final static native void TrackerCore_setup(long jarg1, TrackerCore jarg1_);
   public final static native String TrackerCore_getViewId(long jarg1, TrackerCore jarg1_);
@@ -94,6 +94,15 @@ public class Core_WrapperJNI {
   public final static native void AdsTrackerCore_sendAdQuartile(long jarg1, AdsTrackerCore jarg1_);
   public final static native void AdsTrackerCore_sendAdClick(long jarg1, AdsTrackerCore jarg1_);
   public final static native int AdsTrackerCore_getNumberOfAds(long jarg1, AdsTrackerCore jarg1_);
+  public final static native long new_ValueHolder__SWIG_0();
+  public final static native long new_ValueHolder__SWIG_1(String jarg1);
+  public final static native long new_ValueHolder__SWIG_2(int jarg1);
+  public final static native long new_ValueHolder__SWIG_4(double jarg1);
+  public final static native int ValueHolder_getValueType(long jarg1, ValueHolder jarg1_);
+  public final static native String ValueHolder_getValueString(long jarg1, ValueHolder jarg1_);
+  public final static native int ValueHolder_getValueInt(long jarg1, ValueHolder jarg1_);
+  public final static native double ValueHolder_getValueFloat(long jarg1, ValueHolder jarg1_);
+  public final static native void delete_ValueHolder(long jarg1);
   public final static native int CoreTrackerStateStopped_get();
   public final static native long ContentsTrackerCore_SWIGUpcast(long jarg1);
   public final static native long AdsTrackerCore_SWIGUpcast(long jarg1);

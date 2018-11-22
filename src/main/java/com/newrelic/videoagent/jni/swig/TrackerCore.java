@@ -43,12 +43,12 @@ public class TrackerCore {
     return CoreTrackerState.swigToEnum(Core_WrapperJNI.TrackerCore_state(swigCPtr, this));
   }
 
-  public void updateAttribute(String name, SWIGTYPE_p_ValueHolder value, String filter) {
-    Core_WrapperJNI.TrackerCore_updateAttribute__SWIG_0(swigCPtr, this, name, SWIGTYPE_p_ValueHolder.getCPtr(value), filter);
+  public void updateAttribute(String name, ValueHolder value, String filter) {
+    Core_WrapperJNI.TrackerCore_updateAttribute__SWIG_0(swigCPtr, this, name, ValueHolder.getCPtr(value), value, filter);
   }
 
-  public void updateAttribute(String name, SWIGTYPE_p_ValueHolder value) {
-    Core_WrapperJNI.TrackerCore_updateAttribute__SWIG_1(swigCPtr, this, name, SWIGTYPE_p_ValueHolder.getCPtr(value));
+  public void updateAttribute(String name, ValueHolder value) {
+    Core_WrapperJNI.TrackerCore_updateAttribute__SWIG_1(swigCPtr, this, name, ValueHolder.getCPtr(value), value);
   }
 
   public void reset() {

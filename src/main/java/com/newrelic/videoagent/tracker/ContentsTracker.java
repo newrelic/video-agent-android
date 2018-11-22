@@ -3,6 +3,7 @@ package com.newrelic.videoagent.tracker;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.jni.CAL;
 import com.newrelic.videoagent.jni.swig.ContentsTrackerCore;
+import com.newrelic.videoagent.jni.swig.ValueHolder;
 
 public class ContentsTracker extends ContentsTrackerCore {
 
@@ -53,6 +54,14 @@ public class ContentsTracker extends ContentsTrackerCore {
 
     public Object getTrackerVersion() {
         throw new RuntimeException("getTrackerVersion must be overwritten by subclass");
+    }
+
+    public void setOptionKey(String name, Object value) {
+        updateAttribute(name, CAL.convertObjectToHolder(value));
+    }
+
+    public void setOptionKey(String name, Object value, String action) {
+        updateAttribute(name, CAL.convertObjectToHolder(value), action);
     }
 
     protected void registerGetter(String name, String methodName) {

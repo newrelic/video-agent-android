@@ -314,7 +314,7 @@ SWIGEXPORT jint JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_T
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1updateAttribute_1_1SWIG_10(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3, jstring jarg4) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1updateAttribute_1_1SWIG_10(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3, jobject jarg3_, jstring jarg4) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   std::string arg2 ;
   ValueHolder arg3 ;
@@ -324,6 +324,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_T
   (void)jenv;
   (void)jcls;
   (void)jarg1_;
+  (void)jarg3_;
   arg1 = *(TrackerCore **)&jarg1; 
   if(!jarg2) {
     SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null string");
@@ -351,7 +352,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_T
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1updateAttribute_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1updateAttribute_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3, jobject jarg3_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   std::string arg2 ;
   ValueHolder arg3 ;
@@ -360,6 +361,7 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_T
   (void)jenv;
   (void)jcls;
   (void)jarg1_;
+  (void)jarg3_;
   arg1 = *(TrackerCore **)&jarg1; 
   if(!jarg2) {
     SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null string");
@@ -1439,6 +1441,137 @@ SWIGEXPORT jint JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_A
   result = (int)(arg1)->getNumberOfAds();
   jresult = (jint)result; 
   return jresult;
+}
+
+
+SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_new_1ValueHolder_1_1SWIG_10(JNIEnv *jenv, jclass jcls) {
+  jlong jresult = 0 ;
+  ValueHolder *result = 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  result = (ValueHolder *)new ValueHolder();
+  *(ValueHolder **)&jresult = result; 
+  return jresult;
+}
+
+
+SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_new_1ValueHolder_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jstring jarg1) {
+  jlong jresult = 0 ;
+  std::string arg1 ;
+  ValueHolder *result = 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  if(!jarg1) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null string");
+    return 0;
+  } 
+  const char *arg1_pstr = (const char *)jenv->GetStringUTFChars(jarg1, 0); 
+  if (!arg1_pstr) return 0;
+  (&arg1)->assign(arg1_pstr);
+  jenv->ReleaseStringUTFChars(jarg1, arg1_pstr); 
+  result = (ValueHolder *)new ValueHolder(arg1);
+  *(ValueHolder **)&jresult = result; 
+  return jresult;
+}
+
+
+SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_new_1ValueHolder_1_1SWIG_12(JNIEnv *jenv, jclass jcls, jint jarg1) {
+  jlong jresult = 0 ;
+  long arg1 ;
+  ValueHolder *result = 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  arg1 = (long)jarg1; 
+  result = (ValueHolder *)new ValueHolder(arg1);
+  *(ValueHolder **)&jresult = result; 
+  return jresult;
+}
+
+
+SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_new_1ValueHolder_1_1SWIG_14(JNIEnv *jenv, jclass jcls, jdouble jarg1) {
+  jlong jresult = 0 ;
+  double arg1 ;
+  ValueHolder *result = 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  arg1 = (double)jarg1; 
+  result = (ValueHolder *)new ValueHolder(arg1);
+  *(ValueHolder **)&jresult = result; 
+  return jresult;
+}
+
+
+SWIGEXPORT jint JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ValueHolder_1getValueType(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  jint jresult = 0 ;
+  ValueHolder *arg1 = (ValueHolder *) 0 ;
+  ValueHolder::ValueHolderType result;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(ValueHolder **)&jarg1; 
+  result = (ValueHolder::ValueHolderType)(arg1)->getValueType();
+  jresult = (jint)result; 
+  return jresult;
+}
+
+
+SWIGEXPORT jstring JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ValueHolder_1getValueString(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  jstring jresult = 0 ;
+  ValueHolder *arg1 = (ValueHolder *) 0 ;
+  std::string result;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(ValueHolder **)&jarg1; 
+  result = (arg1)->getValueString();
+  jresult = jenv->NewStringUTF((&result)->c_str()); 
+  return jresult;
+}
+
+
+SWIGEXPORT jint JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ValueHolder_1getValueInt(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  jint jresult = 0 ;
+  ValueHolder *arg1 = (ValueHolder *) 0 ;
+  long result;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(ValueHolder **)&jarg1; 
+  result = (long)(arg1)->getValueInt();
+  jresult = (jint)result; 
+  return jresult;
+}
+
+
+SWIGEXPORT jdouble JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ValueHolder_1getValueFloat(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  jdouble jresult = 0 ;
+  ValueHolder *arg1 = (ValueHolder *) 0 ;
+  double result;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(ValueHolder **)&jarg1; 
+  result = (double)(arg1)->getValueFloat();
+  jresult = (jdouble)result; 
+  return jresult;
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_delete_1ValueHolder(JNIEnv *jenv, jclass jcls, jlong jarg1) {
+  ValueHolder *arg1 = (ValueHolder *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  arg1 = *(ValueHolder **)&jarg1; 
+  delete arg1;
 }
 
 

@@ -19,5 +19,5 @@ add_library(
         src/main/cpp/Core/Utils/ValueHolder/ValueHolder.cpp
 )
 
-# To generate Swig code from the terminal, go to Core/Trackers dir and run:
-# swig -c++ -java -package com.newrelic.videoagent.jni.swig -outdir /Users/asantaren/AndroidStudioProjects/VideoTest/NewRelicVideo/src/main/java/com/newrelic/videoagent/jni/swig -o ../../Core_Wrapper.cxx ../../Core_Wrapper.i
+# To generate Swig code from the terminal, go to src/main/cpp and run:
+# swig -c++ -java -package com.newrelic.videoagent.jni.swig -outdir ../java/com/newrelic/videoagent/jni/swig -o Core_Wrapper.cxx Core_Wrapper.i

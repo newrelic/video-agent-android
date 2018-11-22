@@ -15,6 +15,7 @@ import com.google.android.exoplayer2.source.MediaSourceEventListener;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 import com.newrelic.videoagent.BuildConfig;
+import com.newrelic.videoagent.EventDefs;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.jni.swig.CoreTrackerState;
 
@@ -66,6 +67,10 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
 
     public Object getBitrate() {
         return new Long(bitrateEstimate);
+    }
+
+    public Object getRenditionBitrate() {
+        return getBitrate();
     }
 
     public Object getRenditionWidth() {
@@ -331,6 +336,18 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     @Override
     public void onBandwidthEstimate(EventTime eventTime, int totalLoadTimeMs, long totalBytesLoaded, long bitrateEstimate) {
         NRLog.d("onBandwidthEstimate analytics");
+
+        if (this.bitrateEstimate != 0) {
+            if (bitrateEstimate > this.bitrateEstimate) {
+                setOptionKey("shift", "up", EventDefs.CONTENT_RENDITION_CHANGE);
+                sendRenditionChange();
+            }
+            else if (bitrateEstimate < this.bitrateEstimate) {
+                setOptionKey("shift", "down", EventDefs.CONTENT_RENDITION_CHANGE);
+                sendRenditionChange();
+            }
+        }
+
         this.bitrateEstimate = bitrateEstimate;
     }
 

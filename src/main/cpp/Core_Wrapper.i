@@ -13,7 +13,8 @@
 // The prototypes to convert
 %include "std_string.i"
 %include "std_map.i"
-%include "TrackerCore.hpp"
-%include "ContentsTrackerCore.hpp"
-%include "AdsTrackerCore.hpp"
-%include "../CoreDefs.hpp"
+%include "Core/Trackers/TrackerCore.hpp"
+%include "Core/Trackers/ContentsTrackerCore.hpp"
+%include "Core/Trackers/AdsTrackerCore.hpp"
+%include "Core/Utils/ValueHolder/ValueHolder.hpp"
+%include "Core/CoreDefs.hpp"
