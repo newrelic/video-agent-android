@@ -43,8 +43,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         super.reset();
     }
 
-    // TODO: Getters
-
     public Object getIsAd() {
         return new Long(0);
     }
@@ -65,7 +63,63 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         return BuildConfig.VERSION_NAME;
     }
 
-    // ExoPlayer EventListener
+    public Object getBitrate() {
+        NRLog.d("Video format bitrate = " + player.getVideoFormat().bitrate);
+        // TODO: we need a bandwidth meter:
+        // https://android.jlelse.eu/android-exoplayer-starters-guide-6350433f256c
+        // https://google.github.io/ExoPlayer/doc/reference/com/google/android/exoplayer2/upstream/BandwidthMeter.html
+        // https://github.com/google/ExoPlayer/issues/1570
+        return new Long(0);
+    }
+
+    public Object getRenditionWidth() {
+        return new Long((long)player.getVideoFormat().width);
+    }
+
+    public Object getRenditionHeight() {
+        return new Long((long)player.getVideoFormat().height);
+    }
+
+    public Object getDuration() {
+        return new Long(player.getDuration());
+    }
+
+    public Object getPlayhead() {
+        return new Long(player.getContentPosition());
+    }
+
+    public Object getSrc() {
+        // TODO: can't find a way to ontain it from player. Found post saying we have to store it ourselves:
+        // https://github.com/google/ExoPlayer/issues/2328
+        // https://google.github.io/ExoPlayer/doc/reference/com/google/android/exoplayer2/upstream/ContentDataSource.html
+        return "";
+    }
+
+    public Object getPlayrate() {
+        return new Double(player.getPlaybackParameters().speed);
+    }
+
+    public Object getFps() {
+        // TODO
+        NRLog.d("Video format frameRate = " + player.getVideoFormat().frameRate);
+        //player.getVideoDecoderCounters().
+        return new Long(0);
+    }
+
+    public Object getIsAutoplayed() {
+        return new Long(player.getPlayWhenReady() ? 1L : 0L);
+    }
+
+    public Object getIsMuted() {
+        if (player.getVolume() == 0) {
+            return new Long(1);
+        }
+        else {
+            return new Long(0);
+        }
+    }
+
+    // ExoPlayer Player.EventListener
 
     // TODO: track events:
     // actual seek start (from dragging start)
@@ -126,6 +180,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
             }
             else if (state() == CoreTrackerState.CoreTrackerStatePaused) {
                 sendResume();
+                sendResume();
             }
         }
         else if (playWhenReady) {
@@ -156,7 +211,12 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     public void onPlayerError(ExoPlaybackException error) {
         NRLog.d("onPlayerError");
 
-        sendError(error.getMessage());
+        if (error != null) {
+            sendError(error.toString());
+        }
+        else {
+            sendError("<Unknown error>");
+        }
     }
 
     @Override
@@ -362,5 +422,4 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     public void onDrmKeysRemoved(EventTime eventTime) {
 
     }
-
 }
