@@ -107,10 +107,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         return new Long(0);
     }
 
-    public Object getIsAutoplayed() {
-        return new Long(player.getPlayWhenReady() ? 1L : 0L);
-    }
-
     public Object getIsMuted() {
         if (player.getVolume() == 0) {
             return new Long(1);
