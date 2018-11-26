@@ -194,11 +194,9 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
 
             if (state() == CoreTrackerState.CoreTrackerStateStopped) {
                 sendRequest();
-                // TODO: after request, check for actual first frame event (how? track playback time change?)
                 sendStart();
             }
             else if (state() == CoreTrackerState.CoreTrackerStatePaused) {
-                sendResume();
                 sendResume();
             }
         }
