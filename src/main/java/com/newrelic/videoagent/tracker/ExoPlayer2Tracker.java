@@ -2,7 +2,6 @@ package com.newrelic.videoagent.tracker;
 
 import android.net.Uri;
 import android.view.Surface;
-
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.PlaybackParameters;
@@ -19,14 +18,14 @@ import com.newrelic.videoagent.BuildConfig;
 import com.newrelic.videoagent.EventDefs;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.jni.swig.CoreTrackerState;
-
 import java.io.IOException;
+import java.util.List;
 
 public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventListener, AnalyticsListener {
 
     protected SimpleExoPlayer player;
     private long bitrateEstimate;
-    private Uri srcUri;
+    private List<Uri> playlist;
 
     public ExoPlayer2Tracker(SimpleExoPlayer player) {
         this.player = player;
@@ -99,11 +98,23 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     // https://google.github.io/ExoPlayer/doc/reference/com/google/android/exoplayer2/upstream/ContentDataSource.html
 
     public Object getSrc() {
-        return srcUri.toString();
+        if (playlist != null) {
+            NRLog.d("Current window index = " + player.getCurrentWindowIndex());
+            try {
+                Uri src = playlist.get(player.getCurrentWindowIndex());
+                return src.toString();
+            }
+            catch (Exception e) {
+                return "";
+            }
+        }
+        else {
+            return "";
+        }
     }
 
-    public void setSrc(Uri uri) {
-        srcUri = uri;
+    public void setSrc(List<Uri> uris) {
+        playlist = uris;
     }
 
     public Object getPlayrate() {
