@@ -26,6 +26,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     protected SimpleExoPlayer player;
     private long bitrateEstimate;
     private List<Uri> playlist;
+    private int lastWindow;
 
     public ExoPlayer2Tracker(SimpleExoPlayer player) {
         this.player = player;
@@ -43,6 +44,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     public void reset() {
         super.reset();
         bitrateEstimate = 0;
+        lastWindow = 0;
     }
 
     public Object getIsAd() {
@@ -146,8 +148,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     // actual seek start (from dragging start), check player.getSeekParameters()
     // actual video start (first frame)
 
-    // TODO: test with playlists
-
     @Override
     public void onTimelineChanged(Timeline timeline, Object manifest, int reason) {
         NRLog.d("onTimelineChanged");
@@ -155,7 +155,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
 
     @Override
     public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
-        NRLog.d("onTracksChanged");
     }
 
     @Override
@@ -319,6 +318,18 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     @Override
     public void onTracksChanged(EventTime eventTime, TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
         NRLog.d("onTracksChanged analytics");
+
+        // Next track in the playlist
+        if (player.getCurrentWindowIndex() != lastWindow) {
+            NRLog.d("Next video in the playlist starts");
+            lastWindow = player.getCurrentWindowIndex();
+
+            // BUG: the END belongs to the previous video, not current
+            sendEnd();
+
+            sendRequest();
+            sendStart();
+        }
     }
 
     @Override
