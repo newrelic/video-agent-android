@@ -1,5 +1,6 @@
 package com.newrelic.videoagent.tracker;
 
+import android.net.Uri;
 import android.view.Surface;
 
 import com.google.android.exoplayer2.ExoPlaybackException;
@@ -25,6 +26,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
 
     protected SimpleExoPlayer player;
     private long bitrateEstimate;
+    private Uri srcUri;
 
     public ExoPlayer2Tracker(SimpleExoPlayer player) {
         this.player = player;
@@ -35,7 +37,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         super.setup();
         player.addListener(this);
         player.addAnalyticsListener(this);
-        //registerGetter("contentId", "getContentId");
         sendPlayerReady();
     }
 
@@ -89,29 +90,21 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         return new Long(player.getContentPosition());
     }
 
-    // TODO: to implement getSrc we need to access the mediasource somehow:
+    // to implement getSrc we need to access the mediasource somehow:
     // https://github.com/google/ExoPlayer/issues/2799
     // https://github.com/google/ExoPlayer/issues/3943
     // https://github.com/google/ExoPlayer/issues/2639
     // https://stackoverflow.com/questions/40284772/exoplayer-2-playlist-listener
-    // How? Two ways: we can leave it to a subclass or we can accept it from args qhen initializing the Video Agent.
+    // https://github.com/google/ExoPlayer/issues/2328
+    // https://google.github.io/ExoPlayer/doc/reference/com/google/android/exoplayer2/upstream/ContentDataSource.html
 
-    /*
     public Object getSrc() {
-        // TODO: can't find a way to ontain it from player. Found post saying we have to store it ourselves:
-        // https://github.com/google/ExoPlayer/issues/2328
-        // https://google.github.io/ExoPlayer/doc/reference/com/google/android/exoplayer2/upstream/ContentDataSource.html
-        return "";
+        return srcUri.toString();
     }
-    */
 
-    // TODO: If we implement getSrc we don't need getContentId.
-    /*
-    public Object getContentId() {
-        //player.getCurrentManifest()
-        //player.getCurrentWindowIndex()
+    public void setSrc(Uri uri) {
+        srcUri = uri;
     }
-    */
 
     public Object getPlayrate() {
         return new Double(player.getPlaybackParameters().speed);
@@ -124,7 +117,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
             }
         }
 
-        return new Double(0);
+        return null;
     }
 
     public Object getIsMuted() {
@@ -141,7 +134,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     // TODO: track events:
     // actual seek start (from dragging start), check player.getSeekParameters()
     // actual video start (first frame)
-    // rendition change
 
     // TODO: test with playlists
 
