@@ -1,6 +1,7 @@
 package com.newrelic.videoagent.tracker;
 
 import android.net.Uri;
+import android.os.Handler;
 import android.view.Surface;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.Format;
@@ -32,6 +33,18 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     private long bitrateEstimate;
     private List<Uri> playlist;
     private int lastWindow;
+    private Handler handler = new Handler();
+    private Runnable runnable = new Runnable() {
+        @Override
+        public void run() {
+            double currentTimeSecs = (double) player.getContentPosition() / 1000.0;
+            double durationSecs = (double)player.getDuration() / 1000.0;
+            NRLog.d("Current position time = " + currentTimeSecs);
+            NRLog.d("Current position percentage = " + 100.0 * currentTimeSecs / durationSecs);
+
+            handler.postDelayed(this, 500);
+        }
+    };
 
     public ExoPlayer2Tracker(SimpleExoPlayer player) {
         this.player = player;
@@ -194,6 +207,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
             NRLog.d("\tVideo Playing");
 
             if (state() == CoreTrackerState.CoreTrackerStateStopped) {
+                handler.postDelayed(this.runnable, 500);
                 sendRequest();
                 sendStart();
             }
