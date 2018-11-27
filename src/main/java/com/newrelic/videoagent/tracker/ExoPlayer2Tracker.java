@@ -25,11 +25,11 @@ import java.util.List;
 // BUGS:
 // Seek start is sent when seeks ends, not when dragging starts. check player.getSeekParameters(),.
 // The start is not send on first frame, but on request. First frame event happens when video is loaded not played.
-// onTracksChanged the END is sent for the next video, not the finished video. Only with playlists.
 
 public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventListener, AnalyticsListener {
 
     protected SimpleExoPlayer player;
+    private static final long timerTrackTimeMs = 500;
     private long bitrateEstimate;
     private List<Uri> playlist;
     private int lastWindow;
@@ -37,12 +37,21 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     private Runnable runnable = new Runnable() {
         @Override
         public void run() {
-            double currentTimeSecs = (double) player.getContentPosition() / 1000.0;
+            double currentTimeSecs = (double)player.getContentPosition() / 1000.0;
             double durationSecs = (double)player.getDuration() / 1000.0;
+
             NRLog.d("Current position time = " + currentTimeSecs);
+            NRLog.d("Duration time = " + durationSecs);
             NRLog.d("Current position percentage = " + 100.0 * currentTimeSecs / durationSecs);
 
-            handler.postDelayed(this, 500);
+            if (currentTimeSecs + ((double)timerTrackTimeMs / 1000.0f) >= durationSecs) {
+                NRLog.d("!! End Of Video !!");
+                sendEnd();
+            }
+
+            if (state() != CoreTrackerState.CoreTrackerStateStopped) {
+                handler.postDelayed(this, timerTrackTimeMs );
+            }
         }
     };
 
@@ -63,6 +72,13 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         super.reset();
         bitrateEstimate = 0;
         lastWindow = 0;
+    }
+
+    @Override
+    public void sendRequest() {
+        NRLog.d("OVERWRITTEN sendRequest");
+        super.sendRequest();
+        handler.postDelayed(this.runnable, timerTrackTimeMs);
     }
 
     public Object getIsAd() {
@@ -108,14 +124,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     public Object getPlayhead() {
         return new Long(player.getContentPosition());
     }
-
-    // to implement getSrc we need to access the mediasource somehow:
-    // https://github.com/google/ExoPlayer/issues/2799
-    // https://github.com/google/ExoPlayer/issues/3943
-    // https://github.com/google/ExoPlayer/issues/2639
-    // https://stackoverflow.com/questions/40284772/exoplayer-2-playlist-listener
-    // https://github.com/google/ExoPlayer/issues/2328
-    // https://google.github.io/ExoPlayer/doc/reference/com/google/android/exoplayer2/upstream/ContentDataSource.html
 
     public Object getSrc() {
         if (playlist != null) {
@@ -194,8 +202,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         }
         else if (playbackState == Player.STATE_ENDED) {
             NRLog.d("\tVideo Ended Playing");
-
-            sendEnd();
         }
         else if (playbackState == Player.STATE_BUFFERING) {
             NRLog.d("\tVideo Is Buffering");
@@ -207,7 +213,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
             NRLog.d("\tVideo Playing");
 
             if (state() == CoreTrackerState.CoreTrackerStateStopped) {
-                handler.postDelayed(this.runnable, 500);
                 sendRequest();
                 sendStart();
             }
@@ -336,9 +341,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         if (player.getCurrentWindowIndex() != lastWindow) {
             NRLog.d("Next video in the playlist starts");
             lastWindow = player.getCurrentWindowIndex();
-
-            sendEnd();
-
             sendRequest();
             sendStart();
         }
