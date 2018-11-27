@@ -21,6 +21,11 @@ import com.newrelic.videoagent.jni.swig.CoreTrackerState;
 import java.io.IOException;
 import java.util.List;
 
+// BUGS:
+// Seek start is sent when seeks ends, not when dragging starts. check player.getSeekParameters(),.
+// The start is not send on first frame, but on request. First frame event happens when video is loaded not played.
+// onTracksChanged the END is sent for the next video, not the finished video. Only with playlists.
+
 public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventListener, AnalyticsListener {
 
     protected SimpleExoPlayer player;
@@ -143,10 +148,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     }
 
     // ExoPlayer Player.EventListener
-
-    // TODO: track events:
-    // actual seek start (from dragging start), check player.getSeekParameters()
-    // actual video start (first frame)
 
     @Override
     public void onTimelineChanged(Timeline timeline, Object manifest, int reason) {
@@ -322,7 +323,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
             NRLog.d("Next video in the playlist starts");
             lastWindow = player.getCurrentWindowIndex();
 
-            // BUG: the END belongs to the previous video, not current
             sendEnd();
 
             sendRequest();
@@ -431,7 +431,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     @Override
     public void onDroppedVideoFrames(EventTime eventTime, int droppedFrames, long elapsedMs) {
         NRLog.d("onDroppedVideoFrames analytics");
-
         // TODO: interesting event to register
     }
 
