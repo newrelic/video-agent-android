@@ -24,15 +24,15 @@ import java.util.List;
 
 // BUGS:
 // Seek start is sent when seeks ends, not when dragging starts. check player.getSeekParameters(),.
-// The start is not send on first frame, but on request. First frame event happens when video is loaded not played.
 
 public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventListener, AnalyticsListener {
 
     protected SimpleExoPlayer player;
-    private static final long timerTrackTimeMs = 500;
+    private static final long timerTrackTimeMs = 250;
     private long bitrateEstimate;
     private List<Uri> playlist;
     private int lastWindow;
+    private boolean firstFrameHappened;
     private Handler handler = new Handler();
     private Runnable runnable = new Runnable() {
         @Override
@@ -44,9 +44,17 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
             NRLog.d("Duration time = " + durationSecs);
             NRLog.d("Current position percentage = " + 100.0 * currentTimeSecs / durationSecs);
 
-            if (currentTimeSecs + ((double)timerTrackTimeMs / 1000.0f) >= durationSecs) {
+            if (currentTimeSecs > 0 && firstFrameHappened == false) {
+                NRLog.d("!! First Frame !!");
+                firstFrameHappened = true;
+                sendStart();
+            }
+
+            // Give it margin to ensure the video won't fin ish before we get the last time event
+            if (currentTimeSecs + 0.4 >= durationSecs) {
                 NRLog.d("!! End Of Video !!");
                 sendEnd();
+                return;
             }
 
             if (state() != CoreTrackerState.CoreTrackerStateStopped) {
@@ -72,6 +80,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         super.reset();
         bitrateEstimate = 0;
         lastWindow = 0;
+        firstFrameHappened = false;
     }
 
     @Override
@@ -79,6 +88,12 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         NRLog.d("OVERWRITTEN sendRequest");
         super.sendRequest();
         handler.postDelayed(this.runnable, timerTrackTimeMs);
+    }
+
+    @Override
+    public void sendEnd() {
+        super.sendEnd();
+        firstFrameHappened = false;
     }
 
     public Object getIsAd() {
@@ -206,7 +221,9 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         else if (playbackState == Player.STATE_BUFFERING) {
             NRLog.d("\tVideo Is Buffering");
 
-            sendBufferStart();
+            if (state() != CoreTrackerState.CoreTrackerStateBuffering) {
+                sendBufferStart();
+            }
         }
 
         if (playWhenReady && playbackState == Player.STATE_READY) {
@@ -214,7 +231,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
 
             if (state() == CoreTrackerState.CoreTrackerStateStopped) {
                 sendRequest();
-                sendStart();
+                //sendStart();
             }
             else if (state() == CoreTrackerState.CoreTrackerStatePaused) {
                 sendResume();
@@ -342,7 +359,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
             NRLog.d("Next video in the playlist starts");
             lastWindow = player.getCurrentWindowIndex();
             sendRequest();
-            sendStart();
+            //sendStart();
         }
     }
 
