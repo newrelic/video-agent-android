@@ -237,7 +237,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
 
             if (state() == CoreTrackerState.CoreTrackerStateStopped) {
                 sendRequest();
-                //sendStart();
             }
             else if (state() == CoreTrackerState.CoreTrackerStatePaused) {
                 sendResume();
@@ -365,7 +364,6 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
             NRLog.d("Next video in the playlist starts");
             lastWindow = player.getCurrentWindowIndex();
             sendRequest();
-            //sendStart();
         }
     }
 
