@@ -13,6 +13,11 @@
 // The prototypes to convert
 %include "std_string.i"
 %include "std_map.i"
+
+namespace std {
+  %template(AttrList) map<string, ValueHolder>;
+}
+
 %include "Core/Trackers/TrackerCore.hpp"
 %include "Core/Trackers/ContentsTrackerCore.hpp"
 %include "Core/Trackers/AdsTrackerCore.hpp"

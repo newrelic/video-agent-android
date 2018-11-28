@@ -139,16 +139,16 @@ public class TrackerCore {
     Core_WrapperJNI.TrackerCore_sendCustomAction__SWIG_0(swigCPtr, this, name);
   }
 
-  public void sendCustomAction(String name, SWIGTYPE_p_std__mapT_std__string_ValueHolder_t attr) {
-    Core_WrapperJNI.TrackerCore_sendCustomAction__SWIG_1(swigCPtr, this, name, SWIGTYPE_p_std__mapT_std__string_ValueHolder_t.getCPtr(attr));
+  public void sendCustomAction(String name, AttrList attr) {
+    Core_WrapperJNI.TrackerCore_sendCustomAction__SWIG_1(swigCPtr, this, name, AttrList.getCPtr(attr), attr);
   }
 
-  public void setOptions(SWIGTYPE_p_std__mapT_std__string_ValueHolder_t opts) {
-    Core_WrapperJNI.TrackerCore_setOptions__SWIG_0(swigCPtr, this, SWIGTYPE_p_std__mapT_std__string_ValueHolder_t.getCPtr(opts));
+  public void setOptions(AttrList opts) {
+    Core_WrapperJNI.TrackerCore_setOptions__SWIG_0(swigCPtr, this, AttrList.getCPtr(opts), opts);
   }
 
-  public void setOptions(SWIGTYPE_p_std__mapT_std__string_ValueHolder_t opts, String action) {
-    Core_WrapperJNI.TrackerCore_setOptions__SWIG_1(swigCPtr, this, SWIGTYPE_p_std__mapT_std__string_ValueHolder_t.getCPtr(opts), action);
+  public void setOptions(AttrList opts, String action) {
+    Core_WrapperJNI.TrackerCore_setOptions__SWIG_1(swigCPtr, this, AttrList.getCPtr(opts), opts, action);
   }
 
   public void startTimerEvent() {

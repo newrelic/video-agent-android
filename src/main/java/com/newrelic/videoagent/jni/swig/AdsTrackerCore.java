@@ -111,8 +111,8 @@ public class AdsTrackerCore extends TrackerCore {
     Core_WrapperJNI.AdsTrackerCore_sendCustomAction__SWIG_0(swigCPtr, this, name);
   }
 
-  public void sendCustomAction(String name, SWIGTYPE_p_std__mapT_std__string_ValueHolder_t attr) {
-    Core_WrapperJNI.AdsTrackerCore_sendCustomAction__SWIG_1(swigCPtr, this, name, SWIGTYPE_p_std__mapT_std__string_ValueHolder_t.getCPtr(attr));
+  public void sendCustomAction(String name, AttrList attr) {
+    Core_WrapperJNI.AdsTrackerCore_sendCustomAction__SWIG_1(swigCPtr, this, name, AttrList.getCPtr(attr), attr);
   }
 
   public boolean setTimestamp(double timestamp, String attributeName) {

@@ -248,10 +248,226 @@ static void SWIGUNUSED SWIG_JavaThrowException(JNIEnv *jenv, SWIG_JavaExceptionC
 #include <algorithm>
 #include <stdexcept>
 
+SWIGINTERN ValueHolder const &std_map_Sl_std_string_Sc_ValueHolder_Sg__get(std::map< std::string,ValueHolder > *self,std::string const &key){
+                std::map<std::string,ValueHolder >::iterator i = self->find(key);
+                if (i != self->end())
+                    return i->second;
+                else
+                    throw std::out_of_range("key not found");
+            }
+SWIGINTERN void std_map_Sl_std_string_Sc_ValueHolder_Sg__set(std::map< std::string,ValueHolder > *self,std::string const &key,ValueHolder const &x){
+                (*self)[key] = x;
+            }
+SWIGINTERN void std_map_Sl_std_string_Sc_ValueHolder_Sg__del(std::map< std::string,ValueHolder > *self,std::string const &key){
+                std::map<std::string,ValueHolder >::iterator i = self->find(key);
+                if (i != self->end())
+                    self->erase(i);
+                else
+                    throw std::out_of_range("key not found");
+            }
+SWIGINTERN bool std_map_Sl_std_string_Sc_ValueHolder_Sg__has_key(std::map< std::string,ValueHolder > *self,std::string const &key){
+                std::map<std::string,ValueHolder >::iterator i = self->find(key);
+                return i != self->end();
+            }
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_new_1AttrList_1_1SWIG_10(JNIEnv *jenv, jclass jcls) {
+  jlong jresult = 0 ;
+  std::map< std::string,ValueHolder > *result = 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  result = (std::map< std::string,ValueHolder > *)new std::map< std::string,ValueHolder >();
+  *(std::map< std::string,ValueHolder > **)&jresult = result; 
+  return jresult;
+}
+
+
+SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_new_1AttrList_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  jlong jresult = 0 ;
+  std::map< std::string,ValueHolder > *arg1 = 0 ;
+  std::map< std::string,ValueHolder > *result = 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(std::map< std::string,ValueHolder > **)&jarg1;
+  if (!arg1) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "std::map< std::string,ValueHolder > const & reference is null");
+    return 0;
+  } 
+  result = (std::map< std::string,ValueHolder > *)new std::map< std::string,ValueHolder >((std::map< std::string,ValueHolder > const &)*arg1);
+  *(std::map< std::string,ValueHolder > **)&jresult = result; 
+  return jresult;
+}
+
+
+SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AttrList_1size(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  jlong jresult = 0 ;
+  std::map< std::string,ValueHolder > *arg1 = (std::map< std::string,ValueHolder > *) 0 ;
+  unsigned int result;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(std::map< std::string,ValueHolder > **)&jarg1; 
+  result = (unsigned int)((std::map< std::string,ValueHolder > const *)arg1)->size();
+  jresult = (jlong)result; 
+  return jresult;
+}
+
+
+SWIGEXPORT jboolean JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AttrList_1empty(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  jboolean jresult = 0 ;
+  std::map< std::string,ValueHolder > *arg1 = (std::map< std::string,ValueHolder > *) 0 ;
+  bool result;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(std::map< std::string,ValueHolder > **)&jarg1; 
+  result = (bool)((std::map< std::string,ValueHolder > const *)arg1)->empty();
+  jresult = (jboolean)result; 
+  return jresult;
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AttrList_1clear(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  std::map< std::string,ValueHolder > *arg1 = (std::map< std::string,ValueHolder > *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(std::map< std::string,ValueHolder > **)&jarg1; 
+  (arg1)->clear();
+}
+
+
+SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AttrList_1get(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2) {
+  jlong jresult = 0 ;
+  std::map< std::string,ValueHolder > *arg1 = (std::map< std::string,ValueHolder > *) 0 ;
+  std::string *arg2 = 0 ;
+  ValueHolder *result = 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(std::map< std::string,ValueHolder > **)&jarg1; 
+  if(!jarg2) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null string");
+    return 0;
+  }
+  const char *arg2_pstr = (const char *)jenv->GetStringUTFChars(jarg2, 0); 
+  if (!arg2_pstr) return 0;
+  std::string arg2_str(arg2_pstr);
+  arg2 = &arg2_str;
+  jenv->ReleaseStringUTFChars(jarg2, arg2_pstr); 
+  try {
+    result = (ValueHolder *) &std_map_Sl_std_string_Sc_ValueHolder_Sg__get(arg1,(std::string const &)*arg2);
+  }
+  catch(std::out_of_range &_e) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaIndexOutOfBoundsException, (&_e)->what());
+    return 0;
+  }
+  
+  *(ValueHolder **)&jresult = result; 
+  return jresult;
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AttrList_1set(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3, jobject jarg3_) {
+  std::map< std::string,ValueHolder > *arg1 = (std::map< std::string,ValueHolder > *) 0 ;
+  std::string *arg2 = 0 ;
+  ValueHolder *arg3 = 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  (void)jarg3_;
+  arg1 = *(std::map< std::string,ValueHolder > **)&jarg1; 
+  if(!jarg2) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null string");
+    return ;
+  }
+  const char *arg2_pstr = (const char *)jenv->GetStringUTFChars(jarg2, 0); 
+  if (!arg2_pstr) return ;
+  std::string arg2_str(arg2_pstr);
+  arg2 = &arg2_str;
+  jenv->ReleaseStringUTFChars(jarg2, arg2_pstr); 
+  arg3 = *(ValueHolder **)&jarg3;
+  if (!arg3) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "ValueHolder const & reference is null");
+    return ;
+  } 
+  std_map_Sl_std_string_Sc_ValueHolder_Sg__set(arg1,(std::string const &)*arg2,(ValueHolder const &)*arg3);
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AttrList_1del(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2) {
+  std::map< std::string,ValueHolder > *arg1 = (std::map< std::string,ValueHolder > *) 0 ;
+  std::string *arg2 = 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(std::map< std::string,ValueHolder > **)&jarg1; 
+  if(!jarg2) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null string");
+    return ;
+  }
+  const char *arg2_pstr = (const char *)jenv->GetStringUTFChars(jarg2, 0); 
+  if (!arg2_pstr) return ;
+  std::string arg2_str(arg2_pstr);
+  arg2 = &arg2_str;
+  jenv->ReleaseStringUTFChars(jarg2, arg2_pstr); 
+  try {
+    std_map_Sl_std_string_Sc_ValueHolder_Sg__del(arg1,(std::string const &)*arg2);
+  }
+  catch(std::out_of_range &_e) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaIndexOutOfBoundsException, (&_e)->what());
+    return ;
+  }
+  
+}
+
+
+SWIGEXPORT jboolean JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AttrList_1has_1key(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2) {
+  jboolean jresult = 0 ;
+  std::map< std::string,ValueHolder > *arg1 = (std::map< std::string,ValueHolder > *) 0 ;
+  std::string *arg2 = 0 ;
+  bool result;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(std::map< std::string,ValueHolder > **)&jarg1; 
+  if(!jarg2) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null string");
+    return 0;
+  }
+  const char *arg2_pstr = (const char *)jenv->GetStringUTFChars(jarg2, 0); 
+  if (!arg2_pstr) return 0;
+  std::string arg2_str(arg2_pstr);
+  arg2 = &arg2_str;
+  jenv->ReleaseStringUTFChars(jarg2, arg2_pstr); 
+  result = (bool)std_map_Sl_std_string_Sc_ValueHolder_Sg__has_key(arg1,(std::string const &)*arg2);
+  jresult = (jboolean)result; 
+  return jresult;
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_delete_1AttrList(JNIEnv *jenv, jclass jcls, jlong jarg1) {
+  std::map< std::string,ValueHolder > *arg1 = (std::map< std::string,ValueHolder > *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  arg1 = *(std::map< std::string,ValueHolder > **)&jarg1; 
+  delete arg1;
+}
+
 
 SWIGEXPORT jdouble JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_OBSERVATION_1TIME_1get(JNIEnv *jenv, jclass jcls) {
   jdouble jresult = 0 ;
@@ -661,15 +877,16 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_T
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendCustomAction_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendCustomAction_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3, jobject jarg3_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   std::string arg2 ;
-  SwigValueWrapper< std::map< std::string,ValueHolder > > arg3 ;
+  std::map< std::string,ValueHolder > arg3 ;
   std::map< std::string,ValueHolder > *argp3 ;
   
   (void)jenv;
   (void)jcls;
   (void)jarg1_;
+  (void)jarg3_;
   arg1 = *(TrackerCore **)&jarg1; 
   if(!jarg2) {
     SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null string");
@@ -689,14 +906,15 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_T
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1setOptions_1_1SWIG_10(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jlong jarg2) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1setOptions_1_1SWIG_10(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jlong jarg2, jobject jarg2_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
-  SwigValueWrapper< std::map< std::string,ValueHolder > > arg2 ;
+  std::map< std::string,ValueHolder > arg2 ;
   std::map< std::string,ValueHolder > *argp2 ;
   
   (void)jenv;
   (void)jcls;
   (void)jarg1_;
+  (void)jarg2_;
   arg1 = *(TrackerCore **)&jarg1; 
   argp2 = *(std::map< std::string,ValueHolder > **)&jarg2; 
   if (!argp2) {
@@ -708,15 +926,16 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_T
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1setOptions_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jlong jarg2, jstring jarg3) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1setOptions_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jlong jarg2, jobject jarg2_, jstring jarg3) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
-  SwigValueWrapper< std::map< std::string,ValueHolder > > arg2 ;
+  std::map< std::string,ValueHolder > arg2 ;
   std::string arg3 ;
   std::map< std::string,ValueHolder > *argp2 ;
   
   (void)jenv;
   (void)jcls;
   (void)jarg1_;
+  (void)jarg2_;
   arg1 = *(TrackerCore **)&jarg1; 
   argp2 = *(std::map< std::string,ValueHolder > **)&jarg2; 
   if (!argp2) {
@@ -1022,15 +1241,16 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_C
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendCustomAction_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendCustomAction_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3, jobject jarg3_) {
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
   std::string arg2 ;
-  SwigValueWrapper< std::map< std::string,ValueHolder > > arg3 ;
+  std::map< std::string,ValueHolder > arg3 ;
   std::map< std::string,ValueHolder > *argp3 ;
   
   (void)jenv;
   (void)jcls;
   (void)jarg1_;
+  (void)jarg3_;
   arg1 = *(ContentsTrackerCore **)&jarg1; 
   if(!jarg2) {
     SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null string");
@@ -1331,15 +1551,16 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_A
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendCustomAction_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3) {
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_AdsTrackerCore_1sendCustomAction_1_1SWIG_11(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jlong jarg3, jobject jarg3_) {
   AdsTrackerCore *arg1 = (AdsTrackerCore *) 0 ;
   std::string arg2 ;
-  SwigValueWrapper< std::map< std::string,ValueHolder > > arg3 ;
+  std::map< std::string,ValueHolder > arg3 ;
   std::map< std::string,ValueHolder > *argp3 ;
   
   (void)jenv;
   (void)jcls;
   (void)jarg1_;
+  (void)jarg3_;
   arg1 = *(AdsTrackerCore **)&jarg1; 
   if(!jarg2) {
     SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null string");

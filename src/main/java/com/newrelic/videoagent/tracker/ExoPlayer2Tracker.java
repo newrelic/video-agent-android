@@ -18,7 +18,10 @@ import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 import com.newrelic.videoagent.BuildConfig;
 import com.newrelic.videoagent.EventDefs;
 import com.newrelic.videoagent.NRLog;
+import com.newrelic.videoagent.jni.swig.AttrList;
 import com.newrelic.videoagent.jni.swig.CoreTrackerState;
+import com.newrelic.videoagent.jni.swig.ValueHolder;
+
 import java.io.IOException;
 import java.util.List;
 
@@ -464,7 +467,10 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     @Override
     public void onDroppedVideoFrames(EventTime eventTime, int droppedFrames, long elapsedMs) {
         NRLog.d("onDroppedVideoFrames analytics");
-        // TODO: interesting event to register
+        AttrList attributes = new AttrList();
+        attributes.set("droppedFrames", new ValueHolder(droppedFrames));
+        attributes.set("elapsedTime", new ValueHolder(elapsedMs));
+        sendCustomAction("CONTENT_DROPPED_FRAMES", attributes);
     }
 
     @Override
