@@ -381,6 +381,8 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     @Override
     public void onLoadCanceled(EventTime eventTime, MediaSourceEventListener.LoadEventInfo loadEventInfo, MediaSourceEventListener.MediaLoadData mediaLoadData) {
         NRLog.d("onLoadCanceled analytics");
+        sendEnd();
+        reset();
     }
 
     @Override
