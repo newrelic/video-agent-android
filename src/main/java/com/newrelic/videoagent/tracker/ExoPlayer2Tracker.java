@@ -54,9 +54,12 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
             }
 
             // Give it margin to ensure the video won't fin ish before we get the last time event
-            if (currentTimeSecs + 0.4 >= durationSecs) {
-                NRLog.d("!! End Of Video !!");
-                sendEnd();
+            double margin = 2.0 * (double)timerTrackTimeMs / 1000.0;
+            if (currentTimeSecs + margin >= durationSecs) {
+                if (state() != CoreTrackerState.CoreTrackerStateStopped) {
+                    NRLog.d("!! End Of Video !!");
+                    sendEnd();
+                }
                 return;
             }
 
