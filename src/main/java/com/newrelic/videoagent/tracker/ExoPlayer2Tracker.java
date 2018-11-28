@@ -43,9 +43,10 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
             double currentTimeSecs = (double)player.getContentPosition() / 1000.0;
             double durationSecs = (double)player.getDuration() / 1000.0;
 
-            NRLog.d("Current position time = " + currentTimeSecs);
+            NRLog.d("Current content position time = " + currentTimeSecs);
             NRLog.d("Duration time = " + durationSecs);
-            NRLog.d("Current position percentage = " + 100.0 * currentTimeSecs / durationSecs);
+            NRLog.d("Current content position percentage = " + 100.0 * currentTimeSecs / durationSecs);
+            NRLog.d("Get current seek bar postion = " + player.getCurrentPosition());
 
             if (currentTimeSecs > 0 && firstFrameHappened == false) {
                 NRLog.d("!! First Frame !!");
