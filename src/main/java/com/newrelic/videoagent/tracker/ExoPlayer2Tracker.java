@@ -469,8 +469,8 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     public void onDroppedVideoFrames(EventTime eventTime, int droppedFrames, long elapsedMs) {
         NRLog.d("onDroppedVideoFrames analytics");
         AttrList attributes = new AttrList();
-        attributes.set("droppedFrames", new ValueHolder(droppedFrames));
-        attributes.set("elapsedTime", new ValueHolder(elapsedMs));
+        attributes.set("lostFrames", new ValueHolder(droppedFrames));
+        attributes.set("lostFramesDuration", new ValueHolder(elapsedMs));
         sendCustomAction("CONTENT_DROPPED_FRAMES", attributes);
     }
 
