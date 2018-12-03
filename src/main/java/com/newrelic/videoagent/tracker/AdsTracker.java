@@ -6,8 +6,17 @@ import com.newrelic.videoagent.jni.swig.AdsTrackerCore;
 
 public class AdsTracker extends AdsTrackerCore {
 
+    public AdsTracker(ContentsTracker contentsTracker) {
+        super(contentsTracker);
+        setupGetters();
+    }
+
     public AdsTracker() {
         super();
+        setupGetters();
+    }
+
+    private void setupGetters() {
 
         registerGetter("numberOfAds", "getNumberOfAdsAttr");
         registerGetter("trackerName", "getTrackerName");
