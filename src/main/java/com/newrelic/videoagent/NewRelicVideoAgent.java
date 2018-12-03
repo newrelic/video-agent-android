@@ -3,6 +3,7 @@ package com.newrelic.videoagent;
 import android.net.Uri;
 
 import com.google.android.exoplayer2.*;
+import com.newrelic.videoagent.tracker.AdsTracker;
 import com.newrelic.videoagent.tracker.ContentsTracker;
 import com.newrelic.videoagent.tracker.ExoPlayer2.ExoPlayer2ContentsTracker;
 
@@ -18,42 +19,71 @@ public class NewRelicVideoAgent {
     public static native void initJNIEnv();
 
     private static ContentsTracker tracker;
-
-    // TODO: ads tracker
+    private static AdsTracker adsTracker;
 
     public static void startWithPlayer(SimpleExoPlayer player, Uri videoUri) {
-        NRLog.d("Starting Video Agent with player");
+        NRLog.d("Starting Video Agent with player and one video");
 
         initJNIEnv();
 
         tracker = new ExoPlayer2ContentsTracker(player);
 
-        if (videoUri != null) {
-            List<Uri> playlist = new ArrayList<>();
-            playlist.add(videoUri);
-            ((ExoPlayer2ContentsTracker) tracker).setSrc(playlist);
-        }
+        List<Uri> playlist = new ArrayList<>();
+        playlist.add(videoUri);
 
-        tracker.reset();
-        tracker.setup();
+        initializeTracker(playlist);
     }
 
     public static void startWithPlayer(SimpleExoPlayer player, List<Uri> playlist) {
-        NRLog.d("Starting Video Agent with player");
+        NRLog.d("Starting Video Agent with player and a playlist");
 
         initJNIEnv();
 
         tracker = new ExoPlayer2ContentsTracker(player);
 
+        initializeTracker(playlist);
+    }
+
+    public static void startWithTracker(ContentsTracker contentsTracker, List<Uri> playlist) {
+        NRLog.d("Starting Video Agent with ContentsTracker");
+
+        initJNIEnv();
+
+        tracker = contentsTracker;
+
+        initializeTracker(playlist);
+
+    }
+
+    public static void startWithTracker(ContentsTracker tracker1, AdsTracker tracker2, List<Uri> playlist) {
+        NRLog.d("Starting Video Agent with ContentsTracker and AdsTracker");
+
+        initJNIEnv();
+
+        tracker = tracker1;
+        adsTracker = tracker2;
+
+        initializeTracker(playlist);
+    }
+
+    private static void initializeTracker(List<Uri> playlist) {
         if (playlist != null && playlist.size() > 0) {
             ((ExoPlayer2ContentsTracker) tracker).setSrc(playlist);
         }
 
         tracker.reset();
         tracker.setup();
+
+        if (adsTracker != null) {
+            adsTracker.reset();
+            adsTracker.setup();
+        }
     }
 
     public static ContentsTracker getTracker() {
         return tracker;
+    }
+    public static AdsTracker getAdsTracker() {
+        return adsTracker;
     }
 }

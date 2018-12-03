@@ -202,6 +202,23 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
         firstFrameHappened = false;
     }
 
+    private void sendError(Exception error) {
+        String msg;
+        if (error != null) {
+            if (error.getMessage() != null) {
+                msg = error.getMessage();
+            }
+            else {
+                msg = error.toString();
+            }
+        }
+        else {
+            msg = "<Unknown error>";
+        }
+
+        trackerCore.sendError(msg);
+    }
+
     // ExoPlayer Player.EventListener
 
     @Override
@@ -282,21 +299,7 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
     @Override
     public void onPlayerError(ExoPlaybackException error) {
         NRLog.d("onPlayerError");
-
-        String msg;
-        if (error != null) {
-            if (error.getMessage() != null) {
-                msg = error.getMessage();
-            }
-            else {
-                msg = error.toString();
-            }
-        }
-        else {
-            msg = "<Unknown error>";
-        }
-
-        trackerCore.sendError(msg);
+        sendError(error);
     }
 
     @Override
@@ -400,6 +403,7 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
     @Override
     public void onLoadError(EventTime eventTime, MediaSourceEventListener.LoadEventInfo loadEventInfo, MediaSourceEventListener.MediaLoadData mediaLoadData, IOException error, boolean wasCanceled) {
         NRLog.d("onLoadError analytics");
+        sendError(error);
     }
 
     @Override
