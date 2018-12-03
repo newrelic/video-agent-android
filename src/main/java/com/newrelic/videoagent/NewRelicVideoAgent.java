@@ -4,7 +4,7 @@ import android.net.Uri;
 
 import com.google.android.exoplayer2.*;
 import com.newrelic.videoagent.tracker.ContentsTracker;
-import com.newrelic.videoagent.tracker.ExoPlayer2Tracker;
+import com.newrelic.videoagent.tracker.ExoPlayer2.ExoPlayer2ContentsTracker;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,12 +26,12 @@ public class NewRelicVideoAgent {
 
         initJNIEnv();
 
-        tracker = new ExoPlayer2Tracker(player);
+        tracker = new ExoPlayer2ContentsTracker(player);
 
         if (videoUri != null) {
             List<Uri> playlist = new ArrayList<>();
             playlist.add(videoUri);
-            ((ExoPlayer2Tracker) tracker).setSrc(playlist);
+            ((ExoPlayer2ContentsTracker) tracker).setSrc(playlist);
         }
 
         tracker.reset();
@@ -43,10 +43,10 @@ public class NewRelicVideoAgent {
 
         initJNIEnv();
 
-        tracker = new ExoPlayer2Tracker(player);
+        tracker = new ExoPlayer2ContentsTracker(player);
 
         if (playlist != null && playlist.size() > 0) {
-            ((ExoPlayer2Tracker) tracker).setSrc(playlist);
+            ((ExoPlayer2ContentsTracker) tracker).setSrc(playlist);
         }
 
         tracker.reset();

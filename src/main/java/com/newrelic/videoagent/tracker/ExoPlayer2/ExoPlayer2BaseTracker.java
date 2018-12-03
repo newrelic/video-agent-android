@@ -1,8 +1,9 @@
-package com.newrelic.videoagent.tracker;
+package com.newrelic.videoagent.tracker.ExoPlayer2;
 
 import android.net.Uri;
 import android.os.Handler;
 import android.view.Surface;
+
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.PlaybackParameters;
@@ -18,9 +19,13 @@ import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 import com.newrelic.videoagent.BuildConfig;
 import com.newrelic.videoagent.EventDefs;
 import com.newrelic.videoagent.NRLog;
+import com.newrelic.videoagent.jni.CAL;
 import com.newrelic.videoagent.jni.swig.AttrList;
 import com.newrelic.videoagent.jni.swig.CoreTrackerState;
+import com.newrelic.videoagent.jni.swig.TrackerCore;
 import com.newrelic.videoagent.jni.swig.ValueHolder;
+import com.newrelic.videoagent.tracker.AdsTracker;
+import com.newrelic.videoagent.tracker.ContentsTracker;
 
 import java.io.IOException;
 import java.util.List;
@@ -28,9 +33,11 @@ import java.util.List;
 // BUGS:
 // Seek start is sent when seeks ends, not when dragging starts. check player.getSeekParameters(),.
 
-public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventListener, AnalyticsListener {
+public class ExoPlayer2BaseTracker extends Object implements Player.EventListener, AnalyticsListener {
 
     protected SimpleExoPlayer player;
+    protected TrackerCore trackerCore;
+
     private static final long timerTrackTimeMs = 250;
     private long bitrateEstimate;
     private List<Uri> playlist;
@@ -51,60 +58,52 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
             if (currentTimeSecs > 0 && firstFrameHappened == false) {
                 NRLog.d("!! First Frame !!");
                 firstFrameHappened = true;
-                sendStart();
+                trackerCore.sendStart();
             }
 
             // Give it margin to ensure the video won't fin ish before we get the last time event
             double margin = 2.0 * (double)timerTrackTimeMs / 1000.0;
             if (currentTimeSecs + margin >= durationSecs) {
-                if (state() != CoreTrackerState.CoreTrackerStateStopped) {
+                if (trackerCore.state() != CoreTrackerState.CoreTrackerStateStopped) {
                     NRLog.d("!! End Of Video !!");
                     sendEnd();
                 }
                 return;
             }
 
-            if (state() != CoreTrackerState.CoreTrackerStateStopped) {
+            if (trackerCore.state() != CoreTrackerState.CoreTrackerStateStopped) {
                 handler.postDelayed(this, timerTrackTimeMs );
             }
         }
     };
 
-    public ExoPlayer2Tracker(SimpleExoPlayer player) {
+    public ExoPlayer2BaseTracker(SimpleExoPlayer player, TrackerCore trackerCore) {
+        this.trackerCore = trackerCore;
         this.player = player;
     }
 
-    @Override
     public void setup() {
-        super.setup();
         player.addListener(this);
         player.addAnalyticsListener(this);
-        sendPlayerReady();
+        trackerCore.sendPlayerReady();
     }
 
-    @Override
     public void reset() {
-        super.reset();
         bitrateEstimate = 0;
         lastWindow = 0;
         firstFrameHappened = false;
     }
 
-    @Override
-    public void sendRequest() {
-        NRLog.d("OVERWRITTEN sendRequest");
-        super.sendRequest();
-        handler.postDelayed(this.runnable, timerTrackTimeMs);
-    }
-
-    @Override
-    public void sendEnd() {
-        super.sendEnd();
-        firstFrameHappened = false;
-    }
-
     public Object getIsAd() {
-        return new Long(0);
+        if (this.trackerCore instanceof ContentsTracker) {
+            return new Long(0);
+        }
+        else if (this.trackerCore instanceof AdsTracker) {
+            return new Long(1);
+        }
+        else {
+            return new Long(0);
+        }
     }
 
     public Object getPlayerName() {
@@ -190,6 +189,19 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         }
     }
 
+    // "Overwritten" senders
+
+    private void sendRequest() {
+        NRLog.d("OVERWRITTEN sendRequest");
+        trackerCore.sendRequest();
+        handler.postDelayed(this.runnable, timerTrackTimeMs);
+    }
+
+    private void sendEnd() {
+        trackerCore.sendEnd();
+        firstFrameHappened = false;
+    }
+
     // ExoPlayer Player.EventListener
 
     @Override
@@ -214,11 +226,11 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         if (playbackState == Player.STATE_READY) {
             NRLog.d("\tVideo Is Ready");
 
-            if (state() == CoreTrackerState.CoreTrackerStateBuffering) {
-                sendBufferEnd();
+            if (trackerCore.state() == CoreTrackerState.CoreTrackerStateBuffering) {
+                trackerCore.sendBufferEnd();
 
-                if (state() == CoreTrackerState.CoreTrackerStateSeeking) {
-                    sendSeekEnd();
+                if (trackerCore.state() == CoreTrackerState.CoreTrackerStateSeeking) {
+                    trackerCore.sendSeekEnd();
                 }
             }
         }
@@ -228,19 +240,19 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         else if (playbackState == Player.STATE_BUFFERING) {
             NRLog.d("\tVideo Is Buffering");
 
-            if (state() != CoreTrackerState.CoreTrackerStateBuffering) {
-                sendBufferStart();
+            if (trackerCore.state() != CoreTrackerState.CoreTrackerStateBuffering) {
+                trackerCore.sendBufferStart();
             }
         }
 
         if (playWhenReady && playbackState == Player.STATE_READY) {
             NRLog.d("\tVideo Playing");
 
-            if (state() == CoreTrackerState.CoreTrackerStateStopped) {
+            if (trackerCore.state() == CoreTrackerState.CoreTrackerStateStopped) {
                 sendRequest();
             }
-            else if (state() == CoreTrackerState.CoreTrackerStatePaused) {
-                sendResume();
+            else if (trackerCore.state() == CoreTrackerState.CoreTrackerStatePaused) {
+                trackerCore.sendResume();
             }
         }
         else if (playWhenReady) {
@@ -249,8 +261,8 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         else {
             NRLog.d("\tVideo Paused");
 
-            if (state() == CoreTrackerState.CoreTrackerStatePlaying) {
-                sendPause();
+            if (trackerCore.state() == CoreTrackerState.CoreTrackerStatePlaying) {
+                trackerCore.sendPause();
             }
         }
 
@@ -284,7 +296,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
             msg = "<Unknown error>";
         }
 
-        sendError(msg);
+        trackerCore.sendError(msg);
     }
 
     @Override
@@ -323,7 +335,7 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     public void onSeekStarted(EventTime eventTime) {
         NRLog.d("onSeekStarted analytics");
 
-        sendSeekStart();
+        trackerCore.sendSeekStart();
     }
 
     @Override
@@ -409,14 +421,16 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
     public void onBandwidthEstimate(EventTime eventTime, int totalLoadTimeMs, long totalBytesLoaded, long bitrateEstimate) {
         NRLog.d("onBandwidthEstimate analytics");
 
+        String actionName = ((Long)getIsAd()).longValue() == 0 ? EventDefs.CONTENT_RENDITION_CHANGE : EventDefs.AD_RENDITION_CHANGE ;
+
         if (this.bitrateEstimate != 0) {
             if (bitrateEstimate > this.bitrateEstimate) {
-                setOptionKey("shift", "up", EventDefs.CONTENT_RENDITION_CHANGE);
-                sendRenditionChange();
+                trackerCore.updateAttribute("shift", CAL.convertObjectToHolder("up"), actionName);
+                trackerCore.sendRenditionChange();
             }
             else if (bitrateEstimate < this.bitrateEstimate) {
-                setOptionKey("shift", "down", EventDefs.CONTENT_RENDITION_CHANGE);
-                sendRenditionChange();
+                trackerCore.updateAttribute("shift", CAL.convertObjectToHolder("down"), actionName);
+                trackerCore.sendRenditionChange();
             }
         }
 
@@ -474,7 +488,10 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
         AttrList attributes = new AttrList();
         attributes.set("lostFrames", new ValueHolder(droppedFrames));
         attributes.set("lostFramesDuration", new ValueHolder(elapsedMs));
-        sendCustomAction("CONTENT_DROPPED_FRAMES", attributes);
+
+        String actionName = ((Long)getIsAd()).longValue() == 0 ? "CONTENT_DROPPED_FRAMES" : "AD_DROPPED_FRAMES" ;
+
+        trackerCore.sendCustomAction(actionName, attributes);
     }
 
     @Override
@@ -507,3 +524,4 @@ public class ExoPlayer2Tracker extends ContentsTracker implements Player.EventLi
 
     }
 }
+
