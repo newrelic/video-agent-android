@@ -7,11 +7,11 @@ public class NRLog {
     private static final String TAG = NewRelicVideoAgent.class.getPackage().getName();
     private static Boolean flag = true;
 
-    public static void enableLogging() {
+    public static void enable() {
         flag = true;
     }
 
-    public static void disableLogging() {
+    public static void disable() {
         flag = false;
     }
 
