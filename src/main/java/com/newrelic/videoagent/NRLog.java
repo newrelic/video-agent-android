@@ -2,20 +2,29 @@ package com.newrelic.videoagent;
 
 import android.util.Log;
 
-import com.newrelic.videoagent.NewRelicVideoAgent;
-
 public class NRLog {
 
-    private static String TAG = NewRelicVideoAgent.class.getPackage().getName();
+    private static final String TAG = NewRelicVideoAgent.class.getPackage().getName();
+    private static Boolean flag = true;
 
-    // TODO: for "d" check for a config flag (where??), just like plist in iOS.
+    public static void enableLogging() {
+        flag = true;
+    }
+
+    public static void disableLogging() {
+        flag = false;
+    }
 
     public static void d(String str) {
-        Log.d(TAG, out(str));
+        if (flag) {
+            Log.d(TAG, out(str));
+        }
     }
 
     public static void e(String str) {
-        Log.e(TAG, out(str));
+        if (flag) {
+            Log.e(TAG, out(str));
+        }
     }
 
     private static String out(String str) {
