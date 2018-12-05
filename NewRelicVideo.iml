@@ -139,11 +139,11 @@
     <orderEntry type="library" name="Gradle: com.android.support:interpolator-28.0.0-rc02" level="project" />
     <orderEntry type="library" name="Gradle: com.android.support:versionedparcelable-28.0.0-rc02" level="project" />
     <orderEntry type="library" name="Gradle: com.android.support:loader-28.0.0-rc02" level="project" />
+    <orderEntry type="library" name="Gradle: com.newrelic.agent.android:android-agent:5.21.2@jar" level="project" />
     <orderEntry type="library" name="Gradle: com.android.support:animated-vector-drawable-28.0.0-rc02" level="project" />
     <orderEntry type="library" scope="TEST" name="Gradle: com.squareup:javawriter:2.1.1@jar" level="project" />
     <orderEntry type="library" name="Gradle: com.android.support:support-media-compat-27.1.1" level="project" />
     <orderEntry type="library" name="Gradle: com.android.support:appcompat-v7-28.0.0-rc02" level="project" />
-    <orderEntry type="library" name="Gradle: com.newrelic.agent.android:android-agent:5.21.1@jar" level="project" />
     <orderEntry type="library" scope="TEST" name="Gradle: javax.inject:javax.inject:1@jar" level="project" />
     <orderEntry type="library" name="Gradle: android.arch.core:runtime-1.1.1" level="project" />
     <orderEntry type="library" scope="TEST" name="Gradle: com.android.support.test:monitor-1.0.2" level="project" />
