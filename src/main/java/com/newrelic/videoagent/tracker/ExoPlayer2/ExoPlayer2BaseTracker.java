@@ -48,10 +48,12 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
             double currentTimeSecs = (double)player.getContentPosition() / 1000.0;
             double durationSecs = (double)player.getDuration() / 1000.0;
 
+            /*
             NRLog.d("Current content position time = " + currentTimeSecs);
             NRLog.d("Duration time = " + durationSecs);
             NRLog.d("Current content position percentage = " + 100.0 * currentTimeSecs / durationSecs);
             NRLog.d("Get current seek bar postion = " + player.getCurrentPosition());
+            */
 
             if (currentTimeSecs > 0 && firstFrameHappened == false) {
                 NRLog.d("!! First Frame !!");
@@ -344,7 +346,7 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
     public void onBandwidthEstimate(EventTime eventTime, int totalLoadTimeMs, long totalBytesLoaded, long bitrateEstimate) {
         NRLog.d("onBandwidthEstimate analytics");
 
-        String actionName = isAd() ? EventDefs.CONTENT_RENDITION_CHANGE : EventDefs.AD_RENDITION_CHANGE ;
+        String actionName = isAd() ? EventDefs.AD_RENDITION_CHANGE : EventDefs.CONTENT_RENDITION_CHANGE;
 
         if (this.bitrateEstimate != 0) {
             if (bitrateEstimate > this.bitrateEstimate) {
@@ -412,7 +414,7 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
         attributes.set("lostFrames", new ValueHolder(droppedFrames));
         attributes.set("lostFramesDuration", new ValueHolder(elapsedMs));
 
-        String actionName = isAd() ? "CONTENT_DROPPED_FRAMES" : "AD_DROPPED_FRAMES" ;
+        String actionName = isAd() ? "AD_DROPPED_FRAMES" : "CONTENT_DROPPED_FRAMES";
 
         trackerCore.sendCustomAction(actionName, attributes);
     }

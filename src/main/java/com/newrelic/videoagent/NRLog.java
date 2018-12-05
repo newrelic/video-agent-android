@@ -5,7 +5,7 @@ import android.util.Log;
 public class NRLog {
 
     private static final String TAG = NewRelicVideoAgent.class.getPackage().getName();
-    private static Boolean flag = true;
+    private static Boolean flag = false;
 
     public static void enable() {
         flag = true;
