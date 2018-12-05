@@ -3,6 +3,8 @@ package com.newrelic.videoagent.tracker.ExoPlayer2;
 import android.net.Uri;
 
 import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.newrelic.videoagent.BuildConfig;
+import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.tracker.ContentsTracker;
 
 import java.util.List;
@@ -27,7 +29,90 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker {
         baseTracker.reset();
     }
 
+    public Object getIsAd() {
+        return new Long(0);
+    }
+
+    public Object getPlayerName() {
+        return "ExoPlayer2";
+    }
+
+    public Object getPlayerVersion() {
+        return "2.x";
+    }
+
+    public Object getTrackerName() {
+        return "ExoPlayer2Tracker";
+    }
+
+    public Object getTrackerVersion() {
+        return BuildConfig.VERSION_NAME;
+    }
+
+    public Object getBitrate() {
+        return new Long(baseTracker.getBitrateEstimate());
+    }
+
+    public Object getRenditionBitrate() {
+        return getBitrate();
+    }
+
+    public Object getRenditionWidth() {
+        return new Long((long)baseTracker.player.getVideoFormat().width);
+    }
+
+    public Object getRenditionHeight() {
+        return new Long((long)baseTracker.player.getVideoFormat().height);
+    }
+
+    public Object getDuration() {
+        return new Long(baseTracker.player.getDuration());
+    }
+
+    public Object getPlayhead() {
+        return new Long(baseTracker.player.getContentPosition());
+    }
+
+    public Object getSrc() {
+        if (baseTracker.getPlaylist() != null) {
+            NRLog.d("Current window index = " + baseTracker.player.getCurrentWindowIndex());
+            try {
+                Uri src = baseTracker.getPlaylist().get(baseTracker.player.getCurrentWindowIndex());
+                return src.toString();
+            }
+            catch (Exception e) {
+                return "";
+            }
+        }
+        else {
+            return "";
+        }
+    }
+
     public void setSrc(List<Uri> uris) {
-        baseTracker.setSrc(uris);
+        baseTracker.setPlaylist(uris);
+    }
+
+    public Object getPlayrate() {
+        return new Double(baseTracker.player.getPlaybackParameters().speed);
+    }
+
+    public Object getFps() {
+        if (baseTracker.player.getVideoFormat() != null) {
+            if (baseTracker.player.getVideoFormat().frameRate > 0) {
+                return new Double(baseTracker.player.getVideoFormat().frameRate);
+            }
+        }
+
+        return null;
+    }
+
+    public Object getIsMuted() {
+        if (baseTracker.player.getVolume() == 0) {
+            return new Long(1);
+        }
+        else {
+            return new Long(0);
+        }
     }
 }

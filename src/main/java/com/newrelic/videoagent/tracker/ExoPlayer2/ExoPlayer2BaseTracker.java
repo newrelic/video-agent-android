@@ -16,7 +16,6 @@ import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.source.MediaSourceEventListener;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
-import com.newrelic.videoagent.BuildConfig;
 import com.newrelic.videoagent.EventDefs;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.jni.CAL;
@@ -25,7 +24,6 @@ import com.newrelic.videoagent.jni.swig.CoreTrackerState;
 import com.newrelic.videoagent.jni.swig.TrackerCore;
 import com.newrelic.videoagent.jni.swig.ValueHolder;
 import com.newrelic.videoagent.tracker.AdsTracker;
-import com.newrelic.videoagent.tracker.ContentsTracker;
 
 import java.io.IOException;
 import java.util.List;
@@ -94,99 +92,20 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
         firstFrameHappened = false;
     }
 
-    public Object getIsAd() {
-        if (this.trackerCore instanceof ContentsTracker) {
-            return new Long(0);
-        }
-        else if (this.trackerCore instanceof AdsTracker) {
-            return new Long(1);
-        }
-        else {
-            return new Long(0);
-        }
+    public Boolean isAd() {
+        return this.trackerCore instanceof AdsTracker;
     }
 
-    public Object getPlayerName() {
-        return "ExoPlayer2";
+    public long getBitrateEstimate() {
+        return bitrateEstimate;
     }
 
-    public Object getPlayerVersion() {
-        return "2.x";
+    public List<Uri> getPlaylist() {
+        return playlist;
     }
 
-    public Object getTrackerName() {
-        return "ExoPlayer2Tracker";
-    }
-
-    public Object getTrackerVersion() {
-        return BuildConfig.VERSION_NAME;
-    }
-
-    public Object getBitrate() {
-        return new Long(bitrateEstimate);
-    }
-
-    public Object getRenditionBitrate() {
-        return getBitrate();
-    }
-
-    public Object getRenditionWidth() {
-        return new Long((long)player.getVideoFormat().width);
-    }
-
-    public Object getRenditionHeight() {
-        return new Long((long)player.getVideoFormat().height);
-    }
-
-    public Object getDuration() {
-        return new Long(player.getDuration());
-    }
-
-    public Object getPlayhead() {
-        return new Long(player.getContentPosition());
-    }
-
-    public Object getSrc() {
-        if (playlist != null) {
-            NRLog.d("Current window index = " + player.getCurrentWindowIndex());
-            try {
-                Uri src = playlist.get(player.getCurrentWindowIndex());
-                return src.toString();
-            }
-            catch (Exception e) {
-                return "";
-            }
-        }
-        else {
-            return "";
-        }
-    }
-
-    public void setSrc(List<Uri> uris) {
-        playlist = uris;
-    }
-
-    public Object getPlayrate() {
-        return new Double(player.getPlaybackParameters().speed);
-    }
-
-    public Object getFps() {
-        if (player.getVideoFormat() != null) {
-            if (player.getVideoFormat().frameRate > 0) {
-                return new Double(player.getVideoFormat().frameRate);
-            }
-        }
-
-        return null;
-    }
-
-    public Object getIsMuted() {
-        if (player.getVolume() == 0) {
-            return new Long(1);
-        }
-        else {
-            return new Long(0);
-        }
+    public void setPlaylist(List<Uri> playlist) {
+        this.playlist = playlist;
     }
 
     // "Overwritten" senders
@@ -425,7 +344,7 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
     public void onBandwidthEstimate(EventTime eventTime, int totalLoadTimeMs, long totalBytesLoaded, long bitrateEstimate) {
         NRLog.d("onBandwidthEstimate analytics");
 
-        String actionName = ((Long)getIsAd()).longValue() == 0 ? EventDefs.CONTENT_RENDITION_CHANGE : EventDefs.AD_RENDITION_CHANGE ;
+        String actionName = isAd() ? EventDefs.CONTENT_RENDITION_CHANGE : EventDefs.AD_RENDITION_CHANGE ;
 
         if (this.bitrateEstimate != 0) {
             if (bitrateEstimate > this.bitrateEstimate) {
@@ -493,7 +412,7 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
         attributes.set("lostFrames", new ValueHolder(droppedFrames));
         attributes.set("lostFramesDuration", new ValueHolder(elapsedMs));
 
-        String actionName = ((Long)getIsAd()).longValue() == 0 ? "CONTENT_DROPPED_FRAMES" : "AD_DROPPED_FRAMES" ;
+        String actionName = isAd() ? "CONTENT_DROPPED_FRAMES" : "AD_DROPPED_FRAMES" ;
 
         trackerCore.sendCustomAction(actionName, attributes);
     }
