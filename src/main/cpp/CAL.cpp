@@ -13,9 +13,17 @@
 
 JNIEnv *env;
 
+// Version of initJNIEnv() for normal operation
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_newrelic_videoagent_NewRelicVideoAgent_initJNIEnv(JNIEnv *e, jclass type) {
+    env = e;
+}
+
+// Version of initJNIEnv() for Android Tests
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_newrelic_videoagent_ExampleInstrumentedTest_initJNIEnv(JNIEnv *e, jclass type) {
     env = e;
 }
 
