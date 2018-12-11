@@ -146,5 +146,43 @@ public class ExampleInstrumentedTest {
             assertTrue("Error setting timeSinceLastAd", tracker.setTimestamp(1000.0, "timeSinceLastAd"));
             assertTrue("Error setting timeSinceLastHeartbeat", tracker.setTimestamp(1000.0, "timeSinceLastHeartbeat"));
         }
+
+        assertTrue("State not Stopped", tracker.state() == CoreTrackerState.CoreTrackerStateStopped);
+
+        tracker.sendRequest();
+        assertTrue("State not Starting", tracker.state() == CoreTrackerState.CoreTrackerStateStarting);
+
+        tracker.sendStart();
+        assertTrue("State not Playing", tracker.state() == CoreTrackerState.CoreTrackerStatePlaying);
+
+        tracker.sendPause();
+        assertTrue("State not Paused", tracker.state() == CoreTrackerState.CoreTrackerStatePaused);
+
+        tracker.sendResume();
+        assertTrue("State not Paying", tracker.state() == CoreTrackerState.CoreTrackerStatePlaying);
+
+        tracker.sendBufferStart();
+        assertTrue("State not Buffering",tracker.state() == CoreTrackerState.CoreTrackerStateBuffering);
+
+        tracker.sendPause();
+        assertTrue("State not Buffering", tracker.state() == CoreTrackerState.CoreTrackerStateBuffering);
+
+        tracker.sendBufferEnd();
+        assertTrue("State not Playing", tracker.state() == CoreTrackerState.CoreTrackerStatePlaying);
+
+        tracker.sendSeekStart();
+        assertTrue("State not Seeking",tracker.state() == CoreTrackerState.CoreTrackerStateSeeking);
+
+        tracker.sendSeekEnd();
+        assertTrue("State not Playing",tracker.state() == CoreTrackerState.CoreTrackerStatePlaying);
+
+        tracker.sendHeartbeat();
+        assertTrue("State not Playing", tracker.state() == CoreTrackerState.CoreTrackerStatePlaying);
+
+        tracker.sendError("Test error message");
+        assertTrue("State not Playing", tracker.state() == CoreTrackerState.CoreTrackerStatePlaying);
+
+        tracker.sendRenditionChange();
+        assertTrue("State not Playing", tracker.state() == CoreTrackerState.CoreTrackerStatePlaying);
     }
 }
