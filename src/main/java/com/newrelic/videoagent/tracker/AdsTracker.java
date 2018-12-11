@@ -49,7 +49,7 @@ public class AdsTracker extends AdsTrackerCore {
     }
 
     public Object getIsAd() {
-        throw new RuntimeException("getIsAd must be overwritten by subclass");
+        return new Long(1);
     }
 
     public Object getPlayerName() {

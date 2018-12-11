@@ -29,10 +29,6 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker {
         baseTracker.reset();
     }
 
-    public Object getIsAd() {
-        return new Long(0);
-    }
-
     public Object getPlayerName() {
         return "ExoPlayer2";
     }

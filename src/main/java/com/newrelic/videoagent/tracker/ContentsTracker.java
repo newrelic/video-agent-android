@@ -37,7 +37,7 @@ public class ContentsTracker extends ContentsTrackerCore {
     }
 
     public Object getIsAd() {
-        throw new RuntimeException("getIsAd must be overwritten by subclass");
+        return new Long(0);
     }
 
     public Object getPlayerName() {
