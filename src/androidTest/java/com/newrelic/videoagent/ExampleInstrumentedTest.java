@@ -2,6 +2,7 @@ package com.newrelic.videoagent;
 
 import android.support.test.runner.AndroidJUnit4;
 
+import com.newrelic.videoagent.jni.swig.AttrList;
 import com.newrelic.videoagent.jni.swig.CoreTrackerState;
 import com.newrelic.videoagent.jni.swig.TrackerCore;
 import com.newrelic.videoagent.jni.swig.ValueHolder;
@@ -16,16 +17,6 @@ import org.junit.runner.RunWith;
 import static org.junit.Assert.*;
 
 class TestContentsTracker extends ContentsTracker {
-
-    @Override
-    public void setup() {
-        super.setup();
-    }
-
-    @Override
-    public void reset() {
-        super.reset();
-    }
 
     @Override
     public Object getPlayerName() {
@@ -49,16 +40,6 @@ class TestContentsTracker extends ContentsTracker {
 }
 
 class TestAdsTracker extends AdsTracker {
-
-    @Override
-    public void setup() {
-        super.setup();
-    }
-
-    @Override
-    public void reset() {
-        super.reset();
-    }
 
     @Override
     public Object getPlayerName() {
@@ -184,5 +165,29 @@ public class ExampleInstrumentedTest {
 
         tracker.sendRenditionChange();
         assertTrue("State not Playing", tracker.state() == CoreTrackerState.CoreTrackerStatePlaying);
+
+        tracker.sendPlayerReady();
+        tracker.sendDownload();
+        tracker.sendHeartbeat();
+        tracker.sendCustomAction("TEST_ACTION");
+        AttrList attr = new AttrList();
+        attr.set("testAttr", new ValueHolder("testValue"));
+        tracker.sendCustomAction("TEST_ACTION", attr);
+
+        assertTrue("State not Playing", tracker.state() == CoreTrackerState.CoreTrackerStatePlaying);
+
+        if (tracker instanceof AdsTracker) {
+            ((AdsTracker)tracker).sendAdBreakStart();
+            assertTrue("State not Playing", tracker.state() == CoreTrackerState.CoreTrackerStatePlaying);
+            ((AdsTracker)tracker).sendAdClick();
+            assertTrue("State not Playing", tracker.state() == CoreTrackerState.CoreTrackerStatePlaying);
+            ((AdsTracker)tracker).sendAdQuartile();
+            assertTrue("State not Playing", tracker.state() == CoreTrackerState.CoreTrackerStatePlaying);
+            ((AdsTracker)tracker).sendAdBreakEnd();
+            assertTrue("State not Playing", tracker.state() == CoreTrackerState.CoreTrackerStatePlaying);
+        }
+
+        tracker.sendEnd();
+        assertTrue("State not Stopped", tracker.state() == CoreTrackerState.CoreTrackerStateStopped);
     }
 }
