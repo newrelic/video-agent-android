@@ -98,7 +98,7 @@ public class CAL {
                     ret = method.invoke(target);
                 }
                 catch (Exception e) {
-                    NRLog.e("Error calling a getter with name " + name + " = " + e);
+                    NRLog.e("Getter not found, with name " + name + " = " + e);
                     return null;
                 }
             }

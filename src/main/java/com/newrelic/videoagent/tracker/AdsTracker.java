@@ -74,7 +74,7 @@ public class AdsTracker extends AdsTrackerCore {
             CAL.registerGetter(name, this, this.getClass().getMethod(methodName), new Long(ptr));
         }
         catch (Exception e) {
-            NRLog.e("Error registering a getter in " + this.getClass().getSimpleName() + " = " + e);
+            NRLog.e("Getter not registered in " + this.getClass().getSimpleName() + " = " + e);
         }
     }
 }
