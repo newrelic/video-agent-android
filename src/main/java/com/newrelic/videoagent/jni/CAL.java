@@ -51,12 +51,14 @@ public class CAL {
     }
 
     public static void recordCustomEvent(String name, Map attr) {
-        if (NewRelic.currentSessionId() != null) {
+        if (NewRelic.currentSessionId() != null || NewRelic.currentSessionId().isEmpty()) {
             if (attr == null) {
                 attr = new HashMap();
             }
             attr.put("actionName", name);
-            NewRelic.recordCustomEvent(EventDefs.VIDEO_EVENT, attr);
+            if (NewRelic.recordCustomEvent(EventDefs.VIDEO_EVENT, attr) == false) {
+                NRLog.e("⚠️ The NewRelicAgent is not initialized, you need to do it before using the NewRelicVideo. ⚠️");
+            }
         }
         else {
             NRLog.e("⚠️ The NewRelicAgent is not initialized, you need to do it before using the NewRelicVideo. ⚠️");
