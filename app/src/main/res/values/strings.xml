@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">VideoTest</string>
+    <string name="videoURL_bunny">https://www.quirksmode.org/html5/videos/big_buck_bunny.mp4</string>
+    <string name="videoURL_jelly">http://mirrors.standaloneinstaller.com/video-sample/jellyfish-25-mbps-hd-hevc.m4v</string>
+    <string name="videoURL_panasonic">http://mirrors.standaloneinstaller.com/video-sample/Panasonic_HDC_TM_700_P_50i.m4v</string>
+    <string name="videoURL_dolby">http://mirrors.standaloneinstaller.com/video-sample/dolbycanyon.m4v</string>
+
+    <string name="videoURL_bunny_local">http://10.0.2.2/videos/big_buck_bunny.mp4</string>
+    <string name="videoURL_jelly_local">http://10.0.2.2/videos/jellyfish-25-mbps-hd-hevc.m4v</string>
+    <string name="videoURL_panasonic_local">http://10.0.2.2/videos/Panasonic_HDC_TM_700_P_50i.m4v</string>
+    <string name="videoURL_dolby_local">http://10.0.2.2/videos/dolbycanyon.m4v</string>
+
+    <string name="videoURL_cgi_panasonic">http://10.0.2.2/catfile.py?name=Panasonic_HDC_TM_700_P_50i.m4v</string>
+    <string name="videoURL_cgi_bunny">http://10.0.2.2/catfile.py?name=big_buck_bunny.mp4</string>
+    <string name="videoURL_cgi_dolby">http://10.0.2.2/catfile.py?name=dolbycanyon.m4v</string>
+    <string name="videoURL_cgi_jelly">http://10.0.2.2/catfile.py?name=jellyfish-25-mbps-hd-hevc.m4v</string>
+    <string name="videoURL_cgi_page18">http://10.0.2.2/catfile.py?name=page18-movie-4.mov</string>
+    <string name="videoURL_cgi_star">http://10.0.2.2/catfile.py?name=star_trails.mov</string>
+
+    <string name="videoURL_cgi_star_hls">http://10.0.2.2/hlsstream.py?name=jelly</string>
+    <string name="videoURL_cgi_jelly_hls">http://10.0.2.2/hlsstream.py?name=star_trails</string>
+</resources>

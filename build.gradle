@@ -1,64 +1,33 @@
-apply plugin: 'com.android.library'
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
 
-android {
-    compileSdkVersion 28
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+buildscript {
+    
+    repositories {
+        google()
+        jcenter()
+        mavenCentral()
     }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:3.2.1'
+        
 
-    defaultConfig {
-        minSdkVersion 15
-        targetSdkVersion 28
-        versionCode 5
-        versionName "0.5.0"
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
 
-        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
-
-        externalNativeBuild {
-            cmake {
-                cppFlags "-DPRODUCT_VERSION_STR=\"\\\"" + versionName + "\\\"\""
-                cppFlags += "-std=c++11"
-                cppFlags += "-I" + file("src/main/cpp/Core/").absolutePath
-                cppFlags += "-I" + file("src/main/cpp/Core/Automat/").absolutePath
-                cppFlags += "-I" + file("src/main/cpp/Core/Backend/").absolutePath
-                cppFlags += "-I" + file("src/main/cpp/Core/Time/").absolutePath
-                cppFlags += "-I" + file("src/main/cpp/Core/Trackers/").absolutePath
-                cppFlags += "-I" + file("src/main/cpp/Core/Utils/DictionaryMerge/").absolutePath
-                cppFlags += "-I" + file("src/main/cpp/Core/Utils/ValueHolder/").absolutePath
-            }
-        }
-
-        // This determines the .so filename
-        ndk {
-            moduleName "Core"
-        }
+        classpath "com.newrelic.agent.android:agent-gradle-plugin:5.+"
     }
-
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-        }
-    }
-
-    externalNativeBuild {
-        cmake {
-            path file('CMakeLists.txt')
-        }
-    }
-
 }
 
-dependencies {
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
+allprojects {
+    repositories {
+        google()
+        jcenter()
+        maven {
+            url 'https://google.bintray.com/exoplayer/'
+        }
+    }
+}
 
-    implementation 'com.android.support:appcompat-v7:28.0.0-rc02'
-    testImplementation 'junit:junit:4.12'
-    androidTestImplementation 'com.android.support.test:runner:1.0.2'
-    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
-
-    implementation 'com.google.android.exoplayer:exoplayer:2.9.+'
-    implementation "com.newrelic.agent.android:android-agent:5.+"
+task clean(type: Delete) {
+    delete rootProject.buildDir
 }

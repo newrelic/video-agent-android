@@ -1,0 +1,69 @@
+apply plugin: 'com.android.library'
+
+android {
+    compileSdkVersion 28
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    defaultConfig {
+        minSdkVersion 15
+        targetSdkVersion 28
+        versionCode 5
+        versionName "0.5.0"
+
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+
+        externalNativeBuild {
+            cmake {
+                cppFlags "-DPRODUCT_VERSION_STR=\"\\\"" + versionName + "\\\"\""
+                cppFlags += "-std=c++11"
+                cppFlags += "-I" + file("src/main/cpp/Core/").absolutePath
+                cppFlags += "-I" + file("src/main/cpp/Core/Automat/").absolutePath
+                cppFlags += "-I" + file("src/main/cpp/Core/Backend/").absolutePath
+                cppFlags += "-I" + file("src/main/cpp/Core/Time/").absolutePath
+                cppFlags += "-I" + file("src/main/cpp/Core/Trackers/").absolutePath
+                cppFlags += "-I" + file("src/main/cpp/Core/Utils/DictionaryMerge/").absolutePath
+                cppFlags += "-I" + file("src/main/cpp/Core/Utils/ValueHolder/").absolutePath
+            }
+        }
+
+        // This determines the .so filename
+        ndk {
+            moduleName "Core"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path file('CMakeLists.txt')
+        }
+    }
+
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+
+    //implementation 'com.android.support:appcompat-v7:28.0.0-rc02'
+    implementation 'com.android.support:appcompat-v7:28.0.0'
+    testImplementation 'junit:junit:4.12'
+    androidTestImplementation 'com.android.support.test:runner:1.0.2'
+    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
+
+    // TODO: move trackers to separate module and only compile the tracker we need
+    implementation 'com.google.android.exoplayer:exoplayer:2.9.+'
+    //implementation 'com.google.android.exoplayer:exoplayer:r1.5.+'
+    implementation "com.newrelic.agent.android:android-agent:5.+"
+
+    //implementation project(':exo2tracker')
+}
