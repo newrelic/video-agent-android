@@ -22,7 +22,6 @@ import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.NewRelicVideoAgent;
-import com.newrelic.videoagent.trackers.HelloClass;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,8 +41,6 @@ public class Exo2Activity extends AppCompatActivity {
         //setupPlayer();
         //setupPlayerWithPlaylist();
         setupPlayerWithHLSMediaSource();
-
-        HelloClass.saluda("Andreu");
     }
 
     @Override

@@ -5,7 +5,7 @@ import android.net.Uri;
 import com.google.android.exoplayer2.*;
 import com.newrelic.videoagent.basetrackers.AdsTracker;
 import com.newrelic.videoagent.basetrackers.ContentsTracker;
-import com.newrelic.videoagent.basetrackers.ExoPlayer2.ExoPlayer2ContentsTracker;
+import com.newrelic.videoagent.trackers.ExoPlayer2ContentsTracker;
 
 import java.util.ArrayList;
 import java.util.List;

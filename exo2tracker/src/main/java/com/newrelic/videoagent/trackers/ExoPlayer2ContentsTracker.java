@@ -1,4 +1,4 @@
-package com.newrelic.videoagent.basetrackers.ExoPlayer2;
+package com.newrelic.videoagent.trackers;
 
 import android.net.Uri;
 
