@@ -33,6 +33,4 @@ dependencies {
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
 
     implementation 'com.google.android.exoplayer:exoplayer:2.9.+'
-
-    implementation project(':NewRelicVideo')
 }

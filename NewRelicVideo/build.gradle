@@ -49,12 +49,19 @@ android {
         }
     }
 
+    sourceSets {
+        main {
+            java.srcDirs = [
+                    'src/main/java',
+                    '../exo2tracker/src/main/java'
+            ]
+        }
+    }
 }
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
-    //implementation 'com.android.support:appcompat-v7:28.0.0-rc02'
     implementation 'com.android.support:appcompat-v7:28.0.0'
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'com.android.support.test:runner:1.0.2'
@@ -64,6 +71,4 @@ dependencies {
     implementation 'com.google.android.exoplayer:exoplayer:2.9.+'
     //implementation 'com.google.android.exoplayer:exoplayer:r1.5.+'
     implementation "com.newrelic.agent.android:android-agent:5.+"
-
-    //implementation project(':exo2tracker')
 }

@@ -1,2 +1,11 @@
 /build
 .externalNativeBuild
+.idea/
+.gradle
+NewRelicVideo/build
+exo2tracker/build
+app/build
+*.so
+*.jar
+*.class
+*.aar
