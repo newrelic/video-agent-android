@@ -1,1 +1,0 @@
-[{"outputType":{"type":"MERGED_MANIFESTS"},"apkInfo":{"type":"MAIN","splits":[],"versionCode":5,"versionName":"0.5.0","enabled":true,"outputFile":"NewRelicVideo-debug.aar","fullName":"debug","baseName":"debug"},"path":"AndroidManifest.xml","properties":{"packageId":"com.newrelic.videoagent","split":""}}]
