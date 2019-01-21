@@ -1,12 +1,8 @@
 package com.newrelic.videoagent;
 
 import android.net.Uri;
-
-import com.google.android.exoplayer2.*;
 import com.newrelic.videoagent.basetrackers.AdsTracker;
 import com.newrelic.videoagent.basetrackers.ContentsTracker;
-import com.newrelic.videoagent.trackers.ExoPlayer2ContentsTracker;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,27 +17,38 @@ public class NewRelicVideoAgent {
     private static ContentsTracker tracker;
     private static AdsTracker adsTracker;
 
-    public static void startWithPlayer(SimpleExoPlayer player, Uri videoUri) {
-        NRLog.d("Starting Video Agent with player and one video");
+    public static void start(Object player, Uri videoUri, Class c) {
 
         initJNIEnv();
 
-        tracker = new ExoPlayer2ContentsTracker(player);
+        try {
+            TrackerBuilder trackerBuilder = (TrackerBuilder) c.newInstance();
+            trackerBuilder.startWithPlayer(player, videoUri);
+            tracker = trackerBuilder.contents();
 
-        List<Uri> playlist = new ArrayList<>();
-        playlist.add(videoUri);
-
-        initializeTracker(playlist);
+            List<Uri> playlist = new ArrayList<>();
+            playlist.add(videoUri);
+            initializeTracker(playlist);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
-    public static void startWithPlayer(SimpleExoPlayer player, List<Uri> playlist) {
-        NRLog.d("Starting Video Agent with player and a playlist");
+    public static void start(Object player, List<Uri> playlist, Class c) {
 
         initJNIEnv();
 
-        tracker = new ExoPlayer2ContentsTracker(player);
+        try {
+            TrackerBuilder trackerBuilder = (TrackerBuilder) c.newInstance();
+            trackerBuilder.startWithPlayer(player, playlist);
+            tracker = trackerBuilder.contents();
 
-        initializeTracker(playlist);
+            initializeTracker(playlist);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public static void startWithTracker(ContentsTracker contentsTracker, List<Uri> playlist) {
@@ -52,7 +59,6 @@ public class NewRelicVideoAgent {
         tracker = contentsTracker;
 
         initializeTracker(playlist);
-
     }
 
     public static void startWithTracker(ContentsTracker tracker1, AdsTracker tracker2, List<Uri> playlist) {
@@ -66,9 +72,9 @@ public class NewRelicVideoAgent {
         initializeTracker(playlist);
     }
 
-    private static void initializeTracker(List<Uri> playlist) {
+    public static void initializeTracker(List<Uri> playlist) {
         if (playlist != null && playlist.size() > 0) {
-            ((ExoPlayer2ContentsTracker) tracker).setSrc(playlist);
+            tracker.setSrc(playlist);
         }
 
         tracker.reset();

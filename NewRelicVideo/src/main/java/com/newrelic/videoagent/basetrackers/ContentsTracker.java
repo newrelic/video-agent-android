@@ -1,8 +1,10 @@
 package com.newrelic.videoagent.basetrackers;
 
+import android.net.Uri;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.jni.CAL;
 import com.newrelic.videoagent.jni.swig.ContentsTrackerCore;
+import java.util.List;
 
 public class ContentsTracker extends ContentsTrackerCore {
 
@@ -72,4 +74,7 @@ public class ContentsTracker extends ContentsTrackerCore {
             NRLog.e("Getter not registered in " + this.getClass().getSimpleName() + " = " + e);
         }
     }
+
+    // To be overwritten
+    public void setSrc(List<Uri> uris) { }
 }

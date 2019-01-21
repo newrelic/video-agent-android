@@ -22,6 +22,7 @@ import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.NewRelicVideoAgent;
+import com.newrelic.videoagent.trackers.Exo2TrackerBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -69,7 +70,7 @@ public class Exo2Activity extends AppCompatActivity {
 
         MediaSource videoSource = new ExtractorMediaSource.Factory(dataSourceFactory).createMediaSource(videoUri);
 
-        NewRelicVideoAgent.startWithPlayer(player, videoUri);
+        NewRelicVideoAgent.start(player, videoUri, Exo2TrackerBuilder.class);
 
         player.setPlayWhenReady(true);
         player.prepare(videoSource);
@@ -120,7 +121,7 @@ public class Exo2Activity extends AppCompatActivity {
 
         ConcatenatingMediaSource concatenatedSource = new ConcatenatingMediaSource(mediaSourceArray);
 
-        NewRelicVideoAgent.startWithPlayer(player, playlistUri);
+        NewRelicVideoAgent.start(player, playlistUri, Exo2TrackerBuilder.class);
 
         player.prepare(concatenatedSource);
         player.setPlayWhenReady(true);
@@ -155,7 +156,7 @@ public class Exo2Activity extends AppCompatActivity {
 
         ConcatenatingMediaSource concatenatedSource = new ConcatenatingMediaSource(mediaSourceArray);
 
-        NewRelicVideoAgent.startWithPlayer(player, playlistUri);
+        NewRelicVideoAgent.start(player, playlistUri, Exo2TrackerBuilder.class);
 
         player.prepare(concatenatedSource);
         player.setPlayWhenReady(true);

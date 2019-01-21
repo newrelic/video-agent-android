@@ -85,10 +85,6 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker {
         }
     }
 
-    public void setSrc(List<Uri> uris) {
-        baseTracker.setPlaylist(uris);
-    }
-
     public Object getPlayrate() {
         return new Double(baseTracker.player.getPlaybackParameters().speed);
     }
@@ -110,5 +106,10 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker {
         else {
             return new Long(0);
         }
+    }
+
+    @Override
+    public void setSrc(List<Uri> uris) {
+        baseTracker.setPlaylist(uris);
     }
 }
