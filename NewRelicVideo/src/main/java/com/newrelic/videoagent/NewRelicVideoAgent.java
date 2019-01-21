@@ -72,7 +72,7 @@ public class NewRelicVideoAgent {
         initializeTracker(playlist);
     }
 
-    public static void initializeTracker(List<Uri> playlist) {
+    private static void initializeTracker(List<Uri> playlist) {
         if (playlist != null && playlist.size() > 0) {
             tracker.setSrc(playlist);
         }
