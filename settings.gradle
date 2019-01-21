@@ -1,1 +1,1 @@
-include ':app', ':NewRelicVideo', ':exo2tracker'
+include ':app', ':NewRelicVideo', ':exo2tracker', ':exo1tracker'

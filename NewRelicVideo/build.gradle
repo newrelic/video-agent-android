@@ -59,6 +59,16 @@ android {
             }
         }
     }
+    else if (trackerToBuild == 'exo1') {
+        sourceSets {
+            main {
+                java.srcDirs = [
+                        'src/main/java',
+                        '../exo1tracker/src/main/java'
+                ]
+            }
+        }
+    }
 }
 
 dependencies {
@@ -72,7 +82,9 @@ dependencies {
     if (trackerToBuild == 'exo2') {
         implementation 'com.google.android.exoplayer:exoplayer:2.9.+'
     }
+    else if (trackerToBuild == 'exo1') {
+        implementation 'com.google.android.exoplayer:exoplayer:r1.5.+'
+    }
 
-    //implementation 'com.google.android.exoplayer:exoplayer:r1.5.+'
     implementation "com.newrelic.agent.android:android-agent:5.+"
 }
