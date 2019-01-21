@@ -49,12 +49,14 @@ android {
         }
     }
 
-    sourceSets {
-        main {
-            java.srcDirs = [
-                    'src/main/java',
-                    '../exo2tracker/src/main/java'
-            ]
+    if (trackerToBuild == 'exo2') {
+        sourceSets {
+            main {
+                java.srcDirs = [
+                        'src/main/java',
+                        '../exo2tracker/src/main/java'
+                ]
+            }
         }
     }
 }
@@ -67,8 +69,10 @@ dependencies {
     androidTestImplementation 'com.android.support.test:runner:1.0.2'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
 
-    // TODO: move trackers to separate module and only compile the tracker we need
-    implementation 'com.google.android.exoplayer:exoplayer:2.9.+'
+    if (trackerToBuild == 'exo2') {
+        implementation 'com.google.android.exoplayer:exoplayer:2.9.+'
+    }
+
     //implementation 'com.google.android.exoplayer:exoplayer:r1.5.+'
     implementation "com.newrelic.agent.android:android-agent:5.+"
 }
