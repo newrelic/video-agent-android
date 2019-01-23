@@ -26,7 +26,7 @@ public class ExoPlayer1BaseTracker extends Object implements ExoPlayer.Listener,
     protected TrackerCore trackerCore;
     private List<Uri> playlist;
 
-    Handler mainHandler;
+    Handler mainHandler = new Handler();
 
     Runnable runnable = new Runnable() {
         /*

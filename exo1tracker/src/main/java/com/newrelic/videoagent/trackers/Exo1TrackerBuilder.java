@@ -16,7 +16,7 @@ public class Exo1TrackerBuilder extends TrackerBuilder {
 
     @Override
     public ContentsTracker contents() {
-        return null;
+        return contentsTracker;
     }
 
     @Override
