@@ -45,6 +45,7 @@ public class Core_WrapperJNI {
   public final static native void TrackerCore_sendHeartbeat(long jarg1, TrackerCore jarg1_);
   public final static native void TrackerCore_sendRenditionChange(long jarg1, TrackerCore jarg1_);
   public final static native void TrackerCore_sendError(long jarg1, TrackerCore jarg1_, String jarg2);
+  public final static native void TrackerCore_sendDroppedFrame(long jarg1, TrackerCore jarg1_, int jarg2, int jarg3);
   public final static native void TrackerCore_sendPlayerReady(long jarg1, TrackerCore jarg1_);
   public final static native void TrackerCore_sendDownload(long jarg1, TrackerCore jarg1_);
   public final static native void TrackerCore_sendCustomAction__SWIG_0(long jarg1, TrackerCore jarg1_, String jarg2);

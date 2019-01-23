@@ -127,6 +127,10 @@ public class TrackerCore {
     Core_WrapperJNI.TrackerCore_sendError(swigCPtr, this, message);
   }
 
+  public void sendDroppedFrame(int count, int elapsed) {
+    Core_WrapperJNI.TrackerCore_sendDroppedFrame(swigCPtr, this, count, elapsed);
+  }
+
   public void sendPlayerReady() {
     Core_WrapperJNI.TrackerCore_sendPlayerReady(swigCPtr, this);
   }

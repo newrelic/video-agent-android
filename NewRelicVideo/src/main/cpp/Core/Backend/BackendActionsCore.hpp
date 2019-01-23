@@ -35,6 +35,7 @@ public:
     void sendHeartbeat();
     void sendRenditionChange();
     void sendError(std::string message);
+    void sendDroppedFrame(int count, long elapsed);
     
     void sendAdRequest();
     void sendAdStart();
@@ -48,6 +49,7 @@ public:
     void sendAdHeartbeat();
     void sendAdRenditionChange();
     void sendAdError(std::string message);
+    void sendAdDroppedFrame(int count, long elapsed);
     void sendAdBreakStart();
     void sendAdBreakEnd();
     void sendAdQuartile();

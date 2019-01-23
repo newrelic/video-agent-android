@@ -23,6 +23,7 @@
 #define CONTENT_HEARTBEAT           "CONTENT_HEARTBEAT"
 #define CONTENT_RENDITION_CHANGE    "CONTENT_RENDITION_CHANGE"
 #define CONTENT_ERROR               "CONTENT_ERROR"
+#define CONTENT_DROPPED_FRAMES      "CONTENT_DROPPED_FRAMES"
 
 #define AD_REQUEST                  "AD_REQUEST"
 #define AD_START                    "AD_START"
@@ -36,6 +37,7 @@
 #define AD_HEARTBEAT                "AD_HEARTBEAT"
 #define AD_RENDITION_CHANGE         "AD_RENDITION_CHANGE"
 #define AD_ERROR                    "AD_ERROR"
+#define AD_DROPPED_FRAMES           "AD_DROPPED_FRAMES"
 #define AD_BREAK_START              "AD_BREAK_START"
 #define AD_BREAK_END                "AD_BREAK_END"
 #define AD_QUARTILE                 "AD_QUARTILE"

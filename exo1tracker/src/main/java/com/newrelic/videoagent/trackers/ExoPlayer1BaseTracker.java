@@ -29,32 +29,10 @@ public class ExoPlayer1BaseTracker extends Object implements ExoPlayer.Listener,
     Handler mainHandler = new Handler();
 
     Runnable runnable = new Runnable() {
-        /*
-        @Override
-        public void run() {
-
-            if (player.getPlaybackState() == ExoPlayer.STATE_READY) {
-                mainHandler.postDelayed(runnable, PROGRESS_TRACK_DELAY_MS);
-            }
-            else {
-                return;
-            }
-
-            Log.v("Exo1Log", "Time Tracked = " + exoPlayer.getCurrentPosition());
-        }
-        */
-
         @Override
         public void run() {
             double currentTimeSecs = (double)player.getCurrentPosition() / 1000.0;
             double durationSecs = (double)player.getDuration() / 1000.0;
-
-            /*
-            NRLog.d("Current content position time = " + currentTimeSecs);
-            NRLog.d("Duration time = " + durationSecs);
-            NRLog.d("Current content position percentage = " + 100.0 * currentTimeSecs / durationSecs);
-            NRLog.d("Get current seek bar postion = " + player.getCurrentPosition());
-            */
 
             if (currentTimeSecs > 0 && firstFrameHappened == false) {
                 NRLog.d("!! First Frame !!");
@@ -134,31 +112,6 @@ public class ExoPlayer1BaseTracker extends Object implements ExoPlayer.Listener,
 
     @Override
     public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
-        /*
-        String stateStr = "Unknown";
-        switch (playbackState) {
-            case ExoPlayer.STATE_IDLE:
-                stateStr = "STATE_IDLE";
-                break;
-            case ExoPlayer.STATE_PREPARING:
-                stateStr = "STATE_PREPARING";
-                break;
-            case ExoPlayer.STATE_BUFFERING:
-                stateStr = "STATE_BUFFERING";
-                break;
-            case ExoPlayer.STATE_READY:
-                stateStr = "STATE_READY";
-                mainHandler.removeCallbacks(runnable);
-                mainHandler.postDelayed(runnable, 0);
-                break;
-            case ExoPlayer.STATE_ENDED:
-                stateStr = "STATE_ENDED";
-                break;
-        }
-
-        Log.v("Exo1Log", "onPlayerStateChanged = " + stateStr);
-        */
-
         NRLog.d("onPlayerStateChanged, payback state = " + playbackState + " {");
 
         if (playbackState == ExoPlayer.STATE_READY) {

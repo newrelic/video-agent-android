@@ -66,6 +66,10 @@ void BackendActionsCore::sendError(std::string message) {
     sendAction(CONTENT_ERROR, {{"errorMessage", ValueHolder(message)}});
 }
 
+void BackendActionsCore::sendDroppedFrame(int count, long elapsed) {
+    sendAction(CONTENT_DROPPED_FRAMES, {{"lostFrames", ValueHolder(count)}, {"lostFramesDuration", ValueHolder(elapsed)}});
+}
+
 void BackendActionsCore::sendAdRequest() {
     sendAction(AD_REQUEST);
 }
@@ -112,6 +116,10 @@ void BackendActionsCore::sendAdRenditionChange() {
 
 void BackendActionsCore::sendAdError(std::string message) {
     sendAction(AD_ERROR, {{"errorMessage", ValueHolder(message)}});
+}
+
+void BackendActionsCore::sendAdDroppedFrame(int count, long elapsed) {
+    sendAction(AD_DROPPED_FRAMES, {{"lostFrames", ValueHolder(count)}, {"lostFramesDuration", ValueHolder(elapsed)}});
 }
 
 void BackendActionsCore::sendAdBreakStart() {

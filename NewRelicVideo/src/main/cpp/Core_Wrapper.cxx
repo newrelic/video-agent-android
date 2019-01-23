@@ -835,6 +835,21 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_T
 }
 
 
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendDroppedFrame(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jint jarg2, jint jarg3) {
+  TrackerCore *arg1 = (TrackerCore *) 0 ;
+  int arg2 ;
+  long arg3 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(TrackerCore **)&jarg1; 
+  arg2 = (int)jarg2; 
+  arg3 = (long)jarg3; 
+  (arg1)->sendDroppedFrame(arg2,arg3);
+}
+
+
 SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendPlayerReady(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   

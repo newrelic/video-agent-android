@@ -66,6 +66,7 @@ public:
     void sendHeartbeat();
     void sendRenditionChange();
     void sendError(std::string message);
+    void sendDroppedFrame(int count, long elapsed);
 };
 
 #endif /* PlaybackAutomat_hpp */

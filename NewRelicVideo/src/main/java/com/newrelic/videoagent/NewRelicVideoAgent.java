@@ -98,4 +98,8 @@ public class NewRelicVideoAgent {
     public static void setAdsTracker(AdsTracker obj) {
         adsTracker = obj;
     }
+    public static void release() {
+        setAdsTracker(null);
+        setTracker(null);
+    }
 }

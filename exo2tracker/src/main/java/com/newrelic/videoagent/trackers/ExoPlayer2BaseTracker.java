@@ -410,13 +410,7 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
     @Override
     public void onDroppedVideoFrames(EventTime eventTime, int droppedFrames, long elapsedMs) {
         NRLog.d("onDroppedVideoFrames analytics");
-        AttrList attributes = new AttrList();
-        attributes.set("lostFrames", new ValueHolder(droppedFrames));
-        attributes.set("lostFramesDuration", new ValueHolder(elapsedMs));
-
-        String actionName = isAd() ? "AD_DROPPED_FRAMES" : "CONTENT_DROPPED_FRAMES";
-
-        trackerCore.sendCustomAction(actionName, attributes);
+        trackerCore.sendDroppedFrame(droppedFrames, (int)elapsedMs);
     }
 
     @Override

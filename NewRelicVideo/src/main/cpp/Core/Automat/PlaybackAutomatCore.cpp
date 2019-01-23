@@ -195,6 +195,15 @@ void PlaybackAutomatCore::sendError(std::string message) {
     }
 }
 
+void PlaybackAutomatCore::sendDroppedFrame(int count, long elapsed) {
+    if (!isAd) {
+        actions->sendDroppedFrame(count, elapsed);
+    }
+    else {
+        actions->sendAdDroppedFrame(count, elapsed);
+    }
+}
+
 bool PlaybackAutomatCore::transition(CoreTrackerTransition tt) {
     
     AV_LOG(">>>> transition, tt = %s , state = %s", printTransition(tt), printState(state));

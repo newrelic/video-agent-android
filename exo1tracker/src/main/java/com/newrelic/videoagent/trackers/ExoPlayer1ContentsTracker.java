@@ -117,7 +117,6 @@ public class ExoPlayer1ContentsTracker extends ContentsTracker {
         baseTracker.setPlaylist(uris);
     }
 
-
     private MediaFormat getTrackFormat(ExoPlayer exoPlayer) {
         return exoPlayer.getTrackFormat(getRendererIndex(), getTrackIndex());
     }

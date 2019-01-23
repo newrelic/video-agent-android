@@ -62,6 +62,7 @@ public:
     void sendHeartbeat();
     void sendRenditionChange();
     void sendError(std::string message);
+    void sendDroppedFrame(int count, long elapsed);
     void sendPlayerReady();
     void sendDownload();
     void sendCustomAction(std::string name);

@@ -162,6 +162,11 @@ void TrackerCore::sendError(std::string message) {
     numErrors ++;
 }
 
+void TrackerCore::sendDroppedFrame(int count, long elapsed) {
+    preSend();
+    automat->sendDroppedFrame(count, elapsed);
+}
+
 void TrackerCore::sendPlayerReady() {
     preSend();
     automat->getActions()->sendPlayerReady();
