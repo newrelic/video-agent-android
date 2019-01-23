@@ -2,6 +2,7 @@ package com.newrelic.videoagent.trackers;
 
 import android.net.Uri;
 
+import com.google.android.exoplayer.ExoPlayer;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.TrackerBuilder;
 import com.newrelic.videoagent.basetrackers.AdsTracker;
@@ -10,6 +11,8 @@ import com.newrelic.videoagent.basetrackers.ContentsTracker;
 import java.util.List;
 
 public class Exo1TrackerBuilder extends TrackerBuilder {
+
+    ExoPlayer1ContentsTracker contentsTracker;
 
     @Override
     public ContentsTracker contents() {
@@ -36,6 +39,10 @@ public class Exo1TrackerBuilder extends TrackerBuilder {
     }
 
     private void initPlayer(Object player) {
-        // TODO: check and init
+        if (!(player instanceof ExoPlayer)) {
+            throw new Error("Player is not a instance of ExoPlayer");
+        }
+        ExoPlayer1ContentsTracker tracker = new ExoPlayer1ContentsTracker((ExoPlayer) player);
+        contentsTracker = tracker;
     }
 }
