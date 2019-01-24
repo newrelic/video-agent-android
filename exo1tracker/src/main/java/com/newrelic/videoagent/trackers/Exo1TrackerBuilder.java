@@ -40,7 +40,7 @@ public class Exo1TrackerBuilder extends TrackerBuilder {
 
     private void initPlayer(Object player) {
         if (!(player instanceof ExoPlayer)) {
-            throw new Error("Player is not a instance of ExoPlayer");
+            throw new Error("Player is not an instance of ExoPlayer");
         }
         ExoPlayer1ContentsTracker tracker = new ExoPlayer1ContentsTracker((ExoPlayer) player);
         contentsTracker = tracker;

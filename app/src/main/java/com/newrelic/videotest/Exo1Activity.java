@@ -5,15 +5,11 @@ import android.net.Uri;
 import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.Surface;
-import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.SeekBar;
-
 import com.google.android.exoplayer.AspectRatioFrameLayout;
 import com.google.android.exoplayer.ExoPlayer;
 import com.google.android.exoplayer.MediaCodecAudioTrackRenderer;
@@ -81,11 +77,6 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
         MediaCodecVideoTrackRenderer videoRenderer = new MediaCodecVideoTrackRenderer(
                 this, sampleSource, MediaCodecSelector.DEFAULT, MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT, 100, mainHandler,  this, 1);
 
-        /*
-        MediaCodecVideoTrackRenderer videoRenderer = new MediaCodecVideoTrackRenderer(
-                this, sampleSource, MediaCodecSelector.DEFAULT, MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT);
-                */
-
         MediaCodecAudioTrackRenderer audioRenderer = new MediaCodecAudioTrackRenderer(
                 sampleSource, MediaCodecSelector.DEFAULT);
         TrackRenderer[] rendererArray = {videoRenderer, audioRenderer};
@@ -104,9 +95,11 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
         mainHandler.removeCallbacks(runnable);
         mainHandler.postDelayed(runnable, 0);
 
+        // Enable logs and start Video Agent with ExoPlayer-1 Tracker
         NRLog.enable();
         NewRelicVideoAgent.start(exoPlayer, url, Exo1TrackerBuilder.class);
 
+        // Autoplay
         exoPlayer.setPlayWhenReady(true);
     }
 
@@ -114,37 +107,29 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
 
     @Override
     public void onDroppedFrames(int count, long elapsed) {
-        Log.v("Exo1Log", "onDroppedFrames");
-
         NewRelicVideoAgent.getTracker().sendDroppedFrame(count, (int)elapsed);
     }
 
     @Override
     public void onVideoSizeChanged(int width, int height, int unappliedRotationDegrees, float pixelWidthHeightRatio) {
-        Log.v("Exo1Log", "onVideoSizeChanged");
-
         AspectRatioFrameLayout aspectRatioFrameLayout = findViewById(R.id.video_frame);
         aspectRatioFrameLayout.setAspectRatio(height == 0 ? 1 : (width * pixelWidthHeightRatio) / height);
     }
 
     @Override
     public void onDrawnToSurface(Surface surface) {
-        Log.v("Exo1Log", "onDrawnToSurface");
     }
 
     @Override
     public void onDecoderInitializationError(MediaCodecTrackRenderer.DecoderInitializationException e) {
-        Log.v("Exo1Log", "onDecoderInitializationError");
     }
 
     @Override
     public void onCryptoError(MediaCodec.CryptoException e) {
-        Log.v("Exo1Log", "onCryptoError");
     }
 
     @Override
     public void onDecoderInitialized(String decoderName, long elapsedRealtimeMs, long initializationDurationMs) {
-        Log.v("Exo1Log", "onDecoderInitialized");
     }
 
     // OnClickListener
@@ -152,11 +137,9 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
     @Override
     public void onClick(View v) {
         if (exoPlayer.getPlayWhenReady()) {
-            Log.v("Exo1Log", "PAUSE");
             exoPlayer.setPlayWhenReady(false);
         }
         else {
-            Log.v("Exo1Log", "PLAY");
             exoPlayer.setPlayWhenReady(true);
         }
     }
@@ -165,20 +148,15 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
 
     @Override
     public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-        Log.v("Exo1Log", "onProgressChanged");
     }
 
     @Override
     public void onStartTrackingTouch(SeekBar seekBar) {
-        Log.v("Exo1Log", "onStartTrackingTouch");
     }
 
     @Override
     public void onStopTrackingTouch(SeekBar seekBar) {
-        Log.v("Exo1Log", "onStopTrackingTouch");
-
         NewRelicVideoAgent.getTracker().sendSeekStart();
-
         long newPos = (long)(((float)seekBar.getProgress() / 100.0f) * exoPlayer.getDuration());
         exoPlayer.seekTo(newPos);
     }
