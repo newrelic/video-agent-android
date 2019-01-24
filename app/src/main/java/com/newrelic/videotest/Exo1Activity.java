@@ -49,11 +49,6 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_exo1);
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
         setupPlayer();
     }
 
