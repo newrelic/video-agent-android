@@ -94,9 +94,6 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
         exoPlayer.prepare(rendererArray);
         exoPlayer.sendMessage(videoRenderer, MediaCodecVideoTrackRenderer.MSG_SET_SURFACE, surfaceView.getHolder().getSurface());
 
-        //exoPlayer.setPlayWhenReady(true);
-        //exoPlayer.addListener(this);
-
         Button playButton = findViewById(R.id.play_button);
         playButton.setOnClickListener(this);
 
@@ -109,6 +106,8 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
 
         NRLog.enable();
         NewRelicVideoAgent.start(exoPlayer, url, Exo1TrackerBuilder.class);
+
+        exoPlayer.setPlayWhenReady(true);
     }
 
     // MediaCodecVideoTrackRenderer.EventListener

@@ -114,6 +114,10 @@ public class ExoPlayer1ContentsTracker extends ContentsTracker {
     }
     */
 
+    public ExoPlayer1BaseTracker getEventListener() {
+        return baseTracker;
+    }
+
     @Override
     public void setSrc(List<Uri> uris) {
         baseTracker.setPlaylist(uris);
