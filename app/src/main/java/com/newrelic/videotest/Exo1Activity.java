@@ -44,15 +44,8 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
     Runnable runnable = new Runnable() {
         @Override
         public void run() {
-
-            if (exoPlayer.getPlaybackState() == ExoPlayer.STATE_READY) {
-                mainHandler.postDelayed(runnable, PROGRESS_TRACK_DELAY_MS);
-            }
-            else {
-                return;
-            }
-
-            progressBar.setProgress((int) ((exoPlayer.getCurrentPosition()*100)/exoPlayer.getDuration()));
+            mainHandler.postDelayed(runnable, PROGRESS_TRACK_DELAY_MS);
+            progressBar.setProgress((int) ((exoPlayer.getCurrentPosition() * 100) / exoPlayer.getDuration()));
         }
     };
 
@@ -123,6 +116,8 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
     @Override
     public void onDroppedFrames(int count, long elapsed) {
         Log.v("Exo1Log", "onDroppedFrames");
+
+        NewRelicVideoAgent.getTracker().sendDroppedFrame(count, (int)elapsed);
     }
 
     @Override
@@ -169,11 +164,9 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
 
     // OnSeekBarChangeListener
 
-    // TODO: seeking
-
     @Override
     public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-
+        Log.v("Exo1Log", "onProgressChanged");
     }
 
     @Override
@@ -184,5 +177,10 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
     @Override
     public void onStopTrackingTouch(SeekBar seekBar) {
         Log.v("Exo1Log", "onStopTrackingTouch");
+
+        NewRelicVideoAgent.getTracker().sendSeekStart();
+
+        long newPos = (long)(((float)seekBar.getProgress() / 100.0f) * exoPlayer.getDuration());
+        exoPlayer.seekTo(newPos);
     }
 }
