@@ -5,6 +5,7 @@ import android.net.Uri;
 import com.google.android.exoplayer.ExoPlayer;
 import com.google.android.exoplayer.MediaFormat;
 import com.newrelic.videoagent.BuildConfig;
+import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.basetrackers.ContentsTracker;
 
 import java.util.List;
@@ -47,6 +48,7 @@ public class ExoPlayer1ContentsTracker extends ContentsTracker {
     public Object getBitrate() {
         return new Long(getTrackFormat(baseTracker.player).bitrate);
     }
+
     public Object getRenditionBitrate() {
         return getBitrate();
     }
@@ -67,13 +69,12 @@ public class ExoPlayer1ContentsTracker extends ContentsTracker {
         return new Long(baseTracker.player.getCurrentPosition());
     }
 
-    /*
-    // TODO: implement
     public Object getSrc() {
         if (baseTracker.getPlaylist() != null) {
-            NRLog.d("Current window index = " + baseTracker.player.getCurrentWindowIndex());
+            NRLog.d("Current track index = " + getCurrentTrackIndex());
+
             try {
-                Uri src = baseTracker.getPlaylist().get(baseTracker.player.getCurrentWindowIndex());
+                Uri src = baseTracker.getPlaylist().get(getCurrentTrackIndex());
                 return src.toString();
             }
             catch (Exception e) {
@@ -85,6 +86,7 @@ public class ExoPlayer1ContentsTracker extends ContentsTracker {
         }
     }
 
+    /*
     // Not possible with Exo1
     public Object getPlayrate() {
         return new Double(baseTracker.player.getPlaybackParameters().speed);
@@ -118,16 +120,15 @@ public class ExoPlayer1ContentsTracker extends ContentsTracker {
     }
 
     private MediaFormat getTrackFormat(ExoPlayer exoPlayer) {
-        return exoPlayer.getTrackFormat(getRendererIndex(), getTrackIndex());
+        return exoPlayer.getTrackFormat(getRendererIndex(), getCurrentTrackIndex());
     }
 
-    // TODO: Fix it -> renderer index and track index HARDCODED!!
+    // TODO: Fix it -> renderer index index HARDCODED!!
     private int getRendererIndex() {
         return 0;
     }
 
-    // TODO: Fix it -> renderer index and track index HARDCODED!!
-    private int getTrackIndex() {
-        return 0;
+    private int getCurrentTrackIndex() {
+        return baseTracker.player.getSelectedTrack(getRendererIndex());
     }
 }

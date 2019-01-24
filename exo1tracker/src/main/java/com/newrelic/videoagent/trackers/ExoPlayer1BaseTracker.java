@@ -74,6 +74,9 @@ public class ExoPlayer1BaseTracker extends Object implements ExoPlayer.Listener,
         return this.trackerCore instanceof AdsTracker;
     }
 
+    public List<Uri> getPlaylist() {
+        return playlist;
+    }
 
     public void setPlaylist(List<Uri> playlist) {
         this.playlist = playlist;
