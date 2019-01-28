@@ -27,6 +27,7 @@ import com.google.android.exoplayer.upstream.DefaultUriDataSource;
 import com.google.android.exoplayer.MediaCodecSelector;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.NewRelicVideoAgent;
+import com.newrelic.videoagent.jni.swig.CoreTrackerState;
 import com.newrelic.videoagent.trackers.Exo1TrackerBuilder;
 import com.newrelic.videoagent.trackers.ExoPlayer1ContentsTracker;
 
@@ -38,10 +39,6 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
     class VideoProvider {
         private ArrayList<Uri> listOfVideos;
         private int videoIndex = 0;
-
-        public VideoProvider() {
-            listOfVideos = new ArrayList<>();
-        }
 
         public VideoProvider(Uri... uris) {
             setList(uris);
@@ -61,6 +58,11 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
             }
         }
 
+        public Uri getAt(int pos) {
+            videoIndex = pos;
+            return getNext();
+        }
+
         public void rewind() {
             videoIndex = 0;
         }
@@ -75,6 +77,7 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
     ExoPlayer exoPlayer;
     Handler mainHandler;
     SeekBar progressBar;
+    Button playButton;
 
     Runnable runnable = new Runnable() {
         @Override
@@ -91,7 +94,7 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
         videoProvider = new VideoProvider(
                 Uri.parse(getString(R.string.videoURL_bunny)),
                 Uri.parse(getString(R.string.videoURL_dolby)),
-                Uri.parse(getString(R.string.videoURL_panasonic)));
+                Uri.parse(getString(R.string.videoURL_jelly)));
         setupPlayer();
     }
 
@@ -107,6 +110,7 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
         SurfaceView surfaceView = (SurfaceView) findViewById(R.id.surface_view);
 
         Uri url = videoProvider.getNext();
+        //Uri url = videoProvider.getAt(2);
         if (url == null) return;
 
         TrackRenderer[] rendererArray = buildRendererArray(url);
@@ -123,7 +127,7 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
 
         exoPlayer.sendMessage(videoRenderer, MediaCodecVideoTrackRenderer.MSG_SET_SURFACE, surfaceView.getHolder().getSurface());
 
-        Button playButton = findViewById(R.id.play_button);
+        playButton = findViewById(R.id.play_button);
         playButton.setOnClickListener(this);
 
         progressBar = findViewById(R.id.progress_bar);
@@ -230,12 +234,22 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
 
     @Override
     public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+
+        if (NewRelicVideoAgent.getTracker().state() == CoreTrackerState.CoreTrackerStatePaused) {
+            playButton.setText("Play");
+        }
+        else {
+            playButton.setText("Pause");
+        }
+
+        /*
         if (playbackState == ExoPlayer.STATE_ENDED) {
             Log.v("Exo1Activity", "FINISHED PLAYING, NEXT TRACK");
             Uri url = videoProvider.getNext();
             if (url == null) return;
             changeVideo(url);
         }
+        */
     }
 
     @Override
