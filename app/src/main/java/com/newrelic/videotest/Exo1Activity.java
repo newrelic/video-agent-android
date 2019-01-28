@@ -118,14 +118,7 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
         exoPlayer = ExoPlayer.Factory.newInstance(rendererArray.length);
         exoPlayer.prepare(rendererArray);
 
-        TrackRenderer videoRenderer = null;
-        for (TrackRenderer renderer : rendererArray) {
-            if (renderer instanceof MediaCodecVideoTrackRenderer) {
-                videoRenderer = renderer;
-            }
-        }
-
-        exoPlayer.sendMessage(videoRenderer, MediaCodecVideoTrackRenderer.MSG_SET_SURFACE, surfaceView.getHolder().getSurface());
+        exoPlayer.sendMessage(getVideoRenderer(rendererArray), MediaCodecVideoTrackRenderer.MSG_SET_SURFACE, surfaceView.getHolder().getSurface());
 
         playButton = findViewById(R.id.play_button);
         playButton.setOnClickListener(this);
@@ -164,11 +157,24 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
         return rendererArray;
     }
 
+    public TrackRenderer getVideoRenderer(TrackRenderer[] rendererArray) {
+        TrackRenderer videoRenderer = null;
+        for (TrackRenderer renderer : rendererArray) {
+            if (renderer instanceof MediaCodecVideoTrackRenderer) {
+                videoRenderer = renderer;
+            }
+        }
+        return videoRenderer;
+    }
+
     private void changeVideo(Uri url){
         exoPlayer.stop();
         exoPlayer.seekTo(0L);
         TrackRenderer[] rendererArray = buildRendererArray(url);
         exoPlayer.prepare(rendererArray);
+
+        SurfaceView surfaceView = (SurfaceView) findViewById(R.id.surface_view);
+        exoPlayer.sendMessage(getVideoRenderer(rendererArray), MediaCodecVideoTrackRenderer.MSG_SET_SURFACE, surfaceView.getHolder().getSurface());
 
         ExoPlayer1ContentsTracker tracker = (ExoPlayer1ContentsTracker)NewRelicVideoAgent.getTracker();
         tracker.setSrc(url);
@@ -242,14 +248,12 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
             playButton.setText("Pause");
         }
 
-        /*
         if (playbackState == ExoPlayer.STATE_ENDED) {
             Log.v("Exo1Activity", "FINISHED PLAYING, NEXT TRACK");
             Uri url = videoProvider.getNext();
             if (url == null) return;
             changeVideo(url);
         }
-        */
     }
 
     @Override
