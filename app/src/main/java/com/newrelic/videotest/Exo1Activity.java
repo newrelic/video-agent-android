@@ -238,6 +238,8 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
         exoPlayer.seekTo(newPos);
     }
 
+    // ExoPlayer.Listener
+
     @Override
     public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
 
