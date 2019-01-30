@@ -40,8 +40,8 @@ public class Exo2Activity extends AppCompatActivity {
         NRLog.enable();
 
         //setupPlayer();
-        //setupPlayerWithPlaylist();
-        setupPlayerWithHLSMediaSource();
+        setupPlayerWithPlaylist();
+        //setupPlayerWithHLSMediaSource();
     }
 
     @Override
@@ -94,11 +94,9 @@ public class Exo2Activity extends AppCompatActivity {
 
         List<Uri> playlistUri = new ArrayList<>();
 
-        /*
-        playlistUri.add(Uri.parse(getString(R.string.videoURL_dolby)));
         playlistUri.add(Uri.parse(getString(R.string.videoURL_bunny)));
+        playlistUri.add(Uri.parse(getString(R.string.videoURL_dolby)));
         playlistUri.add(Uri.parse(getString(R.string.videoURL_jelly)));
-        */
 
         /*
         playlistUri.add(Uri.parse(getString(R.string.videoURL_dolby_local)));
@@ -106,11 +104,11 @@ public class Exo2Activity extends AppCompatActivity {
         playlistUri.add(Uri.parse(getString(R.string.videoURL_jelly_local)));
         */
 
+        /*
         playlistUri.add(Uri.parse(getString(R.string.videoURL_cgi_dolby)));
         playlistUri.add(Uri.parse(getString(R.string.videoURL_cgi_bunny)));
         playlistUri.add(Uri.parse(getString(R.string.videoURL_cgi_jelly)));
-        //playlistUri.add(Uri.parse(getString(R.string.videoURL_cgi_page18)));
-        //playlistUri.add(Uri.parse(getString(R.string.videoURL_cgi_panasonic)));
+        */
 
         MediaSource mediaSourceArray[] = new MediaSource[playlistUri.size()];
 
