@@ -20,6 +20,10 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 
+# NewRelic Mobile Agent
 -keep class com.newrelic.** { *; }
 -dontwarn com.newrelic.**
 -keepattributes Exceptions, Signature, InnerClasses, LineNumberTable
+
+# Chromecast
+-keep class android.support.v7.app.MediaRouteActionProvider { *; }

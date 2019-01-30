@@ -2,18 +2,17 @@ package com.newrelic.videoagent.trackers;
 
 import android.net.Uri;
 
-import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.google.android.exoplayer2.ext.cast.CastPlayer;
 import com.newrelic.videoagent.BuildConfig;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.basetrackers.ContentsTracker;
 
 import java.util.List;
 
-public class ExoPlayer2ContentsTracker extends ContentsTracker {
-
+public class CastPlayerContentsTracker extends ContentsTracker {
     private ExoPlayer2BaseTracker baseTracker;
 
-    public ExoPlayer2ContentsTracker(SimpleExoPlayer player) {
+    public CastPlayerContentsTracker(CastPlayer player) {
         baseTracker = new ExoPlayer2BaseTracker(player, this);
     }
 
@@ -30,7 +29,7 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker {
     }
 
     public Object getPlayerName() {
-        return "ExoPlayer2";
+        return "CastPlayer";
     }
 
     public Object getPlayerVersion() {
@@ -38,7 +37,7 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker {
     }
 
     public Object getTrackerName() {
-        return "ExoPlayer2Tracker";
+        return "CastPlayerTracker";
     }
 
     public Object getTrackerVersion() {
@@ -53,6 +52,7 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker {
         return getBitrate();
     }
 
+    /*
     public Object getRenditionWidth() {
         return new Long((long)getPlayer().getVideoFormat().width);
     }
@@ -60,6 +60,7 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker {
     public Object getRenditionHeight() {
         return new Long((long)getPlayer().getVideoFormat().height);
     }
+    */
 
     public Object getDuration() {
         return new Long(baseTracker.player.getDuration());
@@ -89,6 +90,7 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker {
         return new Double(baseTracker.player.getPlaybackParameters().speed);
     }
 
+    /*
     public Object getFps() {
         if (getPlayer().getVideoFormat() != null) {
             if (getPlayer().getVideoFormat().frameRate > 0) {
@@ -107,9 +109,10 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker {
             return new Long(0);
         }
     }
+    */
 
-    private SimpleExoPlayer getPlayer() {
-        return (SimpleExoPlayer)baseTracker.player;
+    private CastPlayer getPlayer() {
+        return (CastPlayer) baseTracker.player;
     }
 
     @Override

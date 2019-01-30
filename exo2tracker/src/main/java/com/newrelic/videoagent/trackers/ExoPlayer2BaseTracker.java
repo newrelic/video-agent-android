@@ -4,6 +4,7 @@ import android.net.Uri;
 import android.os.Handler;
 import android.view.Surface;
 
+import com.google.android.exoplayer2.BasePlayer;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.PlaybackParameters;
@@ -33,7 +34,7 @@ import java.util.List;
 
 public class ExoPlayer2BaseTracker extends Object implements Player.EventListener, AnalyticsListener {
 
-    protected SimpleExoPlayer player;
+    protected BasePlayer player;
     protected TrackerCore trackerCore;
 
     private static final long timerTrackTimeMs = 250;
@@ -77,14 +78,18 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
         }
     };
 
-    public ExoPlayer2BaseTracker(SimpleExoPlayer player, TrackerCore trackerCore) {
+    public ExoPlayer2BaseTracker(BasePlayer player, TrackerCore trackerCore) {
         this.trackerCore = trackerCore;
         this.player = player;
     }
 
     public void setup() {
         player.addListener(this);
-        player.addAnalyticsListener(this);
+
+        if (player instanceof SimpleExoPlayer) {
+            ((SimpleExoPlayer)player).addAnalyticsListener(this);
+        }
+
         trackerCore.sendPlayerReady();
     }
 
