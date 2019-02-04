@@ -694,6 +694,34 @@ SWIGEXPORT jint JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_T
 }
 
 
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1setLocked(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jboolean jarg2) {
+  TrackerCore *arg1 = (TrackerCore *) 0 ;
+  bool arg2 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(TrackerCore **)&jarg1; 
+  arg2 = jarg2 ? true : false; 
+  (arg1)->setLocked(arg2);
+}
+
+
+SWIGEXPORT jboolean JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1getLocked(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  jboolean jresult = 0 ;
+  TrackerCore *arg1 = (TrackerCore *) 0 ;
+  bool result;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(TrackerCore **)&jarg1; 
+  result = (bool)(arg1)->getLocked();
+  jresult = (jboolean)result; 
+  return jresult;
+}
+
+
 SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1sendRequest(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
   TrackerCore *arg1 = (TrackerCore *) 0 ;
   

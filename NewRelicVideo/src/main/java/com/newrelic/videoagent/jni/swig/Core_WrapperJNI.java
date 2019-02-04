@@ -33,6 +33,8 @@ public class Core_WrapperJNI {
   public final static native String TrackerCore_getCoreVersion(long jarg1, TrackerCore jarg1_);
   public final static native String TrackerCore_getViewSession(long jarg1, TrackerCore jarg1_);
   public final static native int TrackerCore_getNumberOfErrors(long jarg1, TrackerCore jarg1_);
+  public final static native void TrackerCore_setLocked(long jarg1, TrackerCore jarg1_, boolean jarg2);
+  public final static native boolean TrackerCore_getLocked(long jarg1, TrackerCore jarg1_);
   public final static native void TrackerCore_sendRequest(long jarg1, TrackerCore jarg1_);
   public final static native void TrackerCore_sendStart(long jarg1, TrackerCore jarg1_);
   public final static native void TrackerCore_sendEnd(long jarg1, TrackerCore jarg1_);

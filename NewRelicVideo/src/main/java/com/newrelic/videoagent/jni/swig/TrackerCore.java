@@ -79,6 +79,14 @@ public class TrackerCore {
     return Core_WrapperJNI.TrackerCore_getNumberOfErrors(swigCPtr, this);
   }
 
+  public void setLocked(boolean state) {
+    Core_WrapperJNI.TrackerCore_setLocked(swigCPtr, this, state);
+  }
+
+  public boolean getLocked() {
+    return Core_WrapperJNI.TrackerCore_getLocked(swigCPtr, this);
+  }
+
   public void sendRequest() {
     Core_WrapperJNI.TrackerCore_sendRequest(swigCPtr, this);
   }

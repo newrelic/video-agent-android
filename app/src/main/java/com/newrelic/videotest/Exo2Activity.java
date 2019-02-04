@@ -54,11 +54,11 @@ public class Exo2Activity extends AppCompatActivity {
 
         NRLog.enable();
 
-        //setupPlayer();
-        //setupPlayerWithPlayxlist();
+        setupPlayer();
+        //setupPlayerWithPlaylist();
         //setupPlayerWithHLSMediaSource();
 
-        setupCastMediaQueue();
+        //setupCastMediaQueue();
     }
 
     private void setupCastMediaQueue() {
