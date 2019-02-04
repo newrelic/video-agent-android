@@ -322,8 +322,6 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
     @Override
     public void onLoadCanceled(EventTime eventTime, MediaSourceEventListener.LoadEventInfo loadEventInfo, MediaSourceEventListener.MediaLoadData mediaLoadData) {
         NRLog.d("onLoadCanceled analytics");
-        sendEnd();
-        reset();
     }
 
     @Override
