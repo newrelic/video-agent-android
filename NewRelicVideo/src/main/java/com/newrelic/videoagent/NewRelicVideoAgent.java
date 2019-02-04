@@ -51,6 +51,22 @@ public class NewRelicVideoAgent {
         }
     }
 
+    public static void start(Object player, Class c) {
+
+        initJNIEnv();
+
+        try {
+            TrackerBuilder trackerBuilder = (TrackerBuilder) c.newInstance();
+            trackerBuilder.startWithPlayer(player);
+            tracker = trackerBuilder.contents();
+
+            initializeTracker(null);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public static void startWithTracker(ContentsTracker contentsTracker, List<Uri> playlist) {
         NRLog.d("Starting Video Agent with ContentsTracker");
 

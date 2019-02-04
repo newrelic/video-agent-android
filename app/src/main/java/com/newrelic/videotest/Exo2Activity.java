@@ -118,6 +118,7 @@ public class Exo2Activity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        NewRelicVideoAgent.release();
         player.release();
     }
 
@@ -191,6 +192,7 @@ public class Exo2Activity extends AppCompatActivity {
         ConcatenatingMediaSource concatenatedSource = new ConcatenatingMediaSource(mediaSourceArray);
 
         NewRelicVideoAgent.start(player, playlistUri, Exo2TrackerBuilder.class);
+        //NewRelicVideoAgent.start(player, Exo2TrackerBuilder.class);
 
         player.prepare(concatenatedSource);
         player.setPlayWhenReady(true);

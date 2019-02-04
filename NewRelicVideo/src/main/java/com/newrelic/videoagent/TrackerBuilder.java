@@ -16,4 +16,6 @@ public abstract class TrackerBuilder {
     public abstract void startWithPlayer(Object player, Uri videoUri);
 
     public abstract void startWithPlayer(Object player, List<Uri> playlist);
+
+    public abstract void startWithPlayer(Object player);
 }

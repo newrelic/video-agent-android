@@ -38,6 +38,13 @@ public class Exo1TrackerBuilder extends TrackerBuilder {
         initPlayer(player);
     }
 
+    @Override
+    public void startWithPlayer(Object player) {
+        NRLog.d("Starting Video Agent with player");
+
+        initPlayer(player);
+    }
+
     private void initPlayer(Object player) {
         if (!(player instanceof ExoPlayer)) {
             throw new Error("Player is not an instance of ExoPlayer");
