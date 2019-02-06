@@ -77,4 +77,8 @@ public class AdsTracker extends AdsTrackerCore {
             NRLog.e("Getter not registered in " + this.getClass().getSimpleName() + " = " + e);
         }
     }
+
+    public long getCppPointer() {
+        return getCPtr(this);
+    }
 }

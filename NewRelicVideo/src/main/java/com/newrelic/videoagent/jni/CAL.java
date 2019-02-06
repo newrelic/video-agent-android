@@ -7,8 +7,8 @@ import android.util.Pair;
 import com.newrelic.agent.android.NewRelic;
 import com.newrelic.videoagent.EventDefs;
 import com.newrelic.videoagent.NRLog;
+import com.newrelic.videoagent.NewRelicVideoAgent;
 import com.newrelic.videoagent.jni.swig.ValueHolder;
-
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
@@ -21,7 +21,6 @@ public class CAL {
 
     private Map<Long, Map<String, Pair<Object, Method>>> callbacksTree;
     private ScheduledExecutorService scheduler;
-    private long trackerPointer;
 
     private Runnable runnable = new Runnable() {
         @Override
@@ -31,7 +30,21 @@ public class CAL {
             new Handler(Looper.getMainLooper()).post(new Runnable () {
                 @Override
                 public void run () {
-                    callTrackerTimeEvent(trackerPointer);
+
+                    HashMap<Integer, NewRelicVideoAgent.TrackerContainer> trackersTable = NewRelicVideoAgent.getTrackersTable();
+
+                    for (Integer trackerID : trackersTable.keySet()) {
+                        NewRelicVideoAgent.TrackerContainer trackerContainer = trackersTable.get(trackerID);
+                        if (trackerContainer.timerIsActive) {
+                            if (trackerContainer.contentsTracker != null) {
+                                callTrackerTimeEvent(trackerContainer.contentsTracker.getCppPointer());
+                            }
+
+                            if (trackerContainer.adsTracker!= null) {
+                                callTrackerTimeEvent(trackerContainer.adsTracker.getCppPointer());
+                            }
+                        }
+                    }
                 }
             });
         }
@@ -130,21 +143,29 @@ public class CAL {
         callbacks.put(name, new Pair<>(target, method));
     }
 
+    // TODO: once started the timer is never stopped nor restarted.
     public static void startTimer(long trackerPointer, double timeInterval) {
-        getInstance().trackerPointer = trackerPointer;
+        // TODO: instead of start/stoping a general timer, set/unset the timerIsActive flag inside the TrackerContainer object
+        //getInstance().trackerPointer = trackerPointer;
 
         if (getInstance().scheduler == null) {
             getInstance().scheduler = Executors.newScheduledThreadPool(1);
+            getInstance().scheduler.scheduleAtFixedRate(getInstance().runnable, (long)timeInterval, (long)timeInterval, TimeUnit.SECONDS);
         }
 
-        getInstance().scheduler.scheduleAtFixedRate(getInstance().runnable, (long)timeInterval, (long)timeInterval, TimeUnit.SECONDS);
     }
 
+    // TODO: get trackerPointer as an argument
     public static void abortTimer() {
+        // TODO: instead of start/stoping a general timer, set/unset the timerIsActive flag inside the TrackerContainer object
+        /*
         if (getInstance().scheduler != null) {
             getInstance().scheduler.shutdown();
             getInstance().scheduler = null;
         }
+        */
+
+        // TODO: get the list of trackers, find the one with "long trackerPointer" and set the timerIsActive flag off
     }
 
     public static ValueHolder convertObjectToHolder(Object object) {

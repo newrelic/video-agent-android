@@ -13,7 +13,7 @@ public class NewRelicVideoAgent {
         System.loadLibrary("Core");
     }
 
-    private static class TrackerContainer {
+    public static class TrackerContainer {
         public ContentsTracker contentsTracker;
         public AdsTracker adsTracker;
         public boolean timerIsActive;
@@ -27,6 +27,7 @@ public class NewRelicVideoAgent {
 
     private static HashMap<Integer, TrackerContainer> trackersTable = new HashMap<>();
     private static Integer lastTrackerID = 0;
+    private static HashMap<Long, Integer> pointersTable = new HashMap<>();
 
     public static native void initJNIEnv();
 
@@ -143,6 +144,10 @@ public class NewRelicVideoAgent {
         }
     }
 
+    public static HashMap<Integer, TrackerContainer> getTrackersTable() {
+        return trackersTable;
+    }
+
     private static TrackerContainer getTrackerContainer(Integer trackerID) {
         if (trackersTable.containsKey(trackerID)) {
             return trackersTable.get(trackerID);
@@ -155,12 +160,35 @@ public class NewRelicVideoAgent {
     private static Integer createTracker(ContentsTracker contentsTracker, AdsTracker adsTracker) {
         lastTrackerID ++;
         trackersTable.put(lastTrackerID, new TrackerContainer(contentsTracker, adsTracker));
+
+        if (contentsTracker != null) {
+            pointersTable.put(contentsTracker.getCppPointer(), lastTrackerID);
+        }
+
+        if (adsTracker!= null) {
+            pointersTable.put(adsTracker.getCppPointer(), lastTrackerID);
+        }
+
         return lastTrackerID;
     }
 
     private static Boolean destroyTracker(Integer trackerID) {
         if (trackersTable.containsKey(trackerID)) {
             trackersTable.remove(trackerID);
+
+            List<Long> removeKeys = new ArrayList();
+
+            for (Long pointer : pointersTable.keySet()) {
+                Integer t = pointersTable.get(pointer);
+                if (t == trackerID) {
+                    removeKeys.add(pointer);
+                }
+            }
+
+            for (Long key : removeKeys) {
+                pointersTable.remove(key);
+            }
+
             return true;
         }
         else {
