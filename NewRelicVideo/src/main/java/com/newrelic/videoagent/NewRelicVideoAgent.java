@@ -4,6 +4,7 @@ import android.net.Uri;
 import com.newrelic.videoagent.basetrackers.AdsTracker;
 import com.newrelic.videoagent.basetrackers.ContentsTracker;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 public class NewRelicVideoAgent {
@@ -12,110 +13,174 @@ public class NewRelicVideoAgent {
         System.loadLibrary("Core");
     }
 
+    private static class TrackerContainer {
+        public ContentsTracker contentsTracker;
+        public AdsTracker adsTracker;
+        public boolean timerIsActive;
+
+        public TrackerContainer(ContentsTracker contentsTracker, AdsTracker adsTracker) {
+            this.contentsTracker = contentsTracker;
+            this.adsTracker = adsTracker;
+            this.timerIsActive = true;
+        }
+    }
+
+    private static HashMap<Integer, TrackerContainer> trackersTable = new HashMap<>();
+    private static Integer lastTrackerID = 0;
+
     public static native void initJNIEnv();
 
-    private static ContentsTracker tracker;
-    private static AdsTracker adsTracker;
-
-    public static void start(Object player, Uri videoUri, Class c) {
+    public static Integer start(Object player, Uri videoUri, Class c) {
 
         initJNIEnv();
 
         try {
             TrackerBuilder trackerBuilder = (TrackerBuilder) c.newInstance();
             trackerBuilder.startWithPlayer(player, videoUri);
-            tracker = trackerBuilder.contents();
+            ContentsTracker contentsTracker = trackerBuilder.contents();
+            Integer trackerID = createTracker(contentsTracker, null);
 
             List<Uri> playlist = new ArrayList<>();
             playlist.add(videoUri);
-            initializeTracker(playlist);
+            initializeTracker(contentsTracker, null, playlist);
+
+            return trackerID;
         }
         catch (Exception e) {
             e.printStackTrace();
+            return 0;
         }
     }
 
-    public static void start(Object player, List<Uri> playlist, Class c) {
+    public static Integer start(Object player, List<Uri> playlist, Class c) {
 
         initJNIEnv();
 
         try {
             TrackerBuilder trackerBuilder = (TrackerBuilder) c.newInstance();
             trackerBuilder.startWithPlayer(player, playlist);
-            tracker = trackerBuilder.contents();
+            ContentsTracker contentsTracker = trackerBuilder.contents();
+            Integer trackerID = createTracker(contentsTracker, null);
 
-            initializeTracker(playlist);
+            initializeTracker(contentsTracker, null, playlist);
+
+            return trackerID;
         }
         catch (Exception e) {
             e.printStackTrace();
+            return 0;
         }
     }
 
-    public static void start(Object player, Class c) {
+    public static Integer start(Object player, Class c) {
 
         initJNIEnv();
 
         try {
             TrackerBuilder trackerBuilder = (TrackerBuilder) c.newInstance();
             trackerBuilder.startWithPlayer(player);
-            tracker = trackerBuilder.contents();
+            ContentsTracker contentsTracker = trackerBuilder.contents();
+            Integer trackerID = createTracker(contentsTracker, null);
 
-            initializeTracker(null);
+            initializeTracker(contentsTracker, null, null);
+
+            return trackerID;
         }
         catch (Exception e) {
             e.printStackTrace();
+            return 0;
         }
     }
 
-    public static void startWithTracker(ContentsTracker contentsTracker, List<Uri> playlist) {
+    public static Integer startWithTracker(ContentsTracker contentsTracker, List<Uri> playlist) {
         NRLog.d("Starting Video Agent with ContentsTracker");
 
         initJNIEnv();
 
-        tracker = contentsTracker;
+        Integer trackerID = createTracker(contentsTracker, null);
 
-        initializeTracker(playlist);
+        initializeTracker(contentsTracker, null, playlist);
+
+        return trackerID;
     }
 
-    public static void startWithTracker(ContentsTracker tracker1, AdsTracker tracker2, List<Uri> playlist) {
+    public static Integer startWithTracker(ContentsTracker contentsTracker, AdsTracker adsTracker, List<Uri> playlist) {
         NRLog.d("Starting Video Agent with ContentsTracker and AdsTracker");
 
         initJNIEnv();
 
-        tracker = tracker1;
-        adsTracker = tracker2;
+        Integer trackerID = createTracker(contentsTracker, adsTracker);
 
-        initializeTracker(playlist);
+        initializeTracker(contentsTracker, adsTracker, playlist);
+
+        return trackerID;
     }
 
-    private static void initializeTracker(List<Uri> playlist) {
-        if (playlist != null && playlist.size() > 0) {
-            tracker.setSrc(playlist);
+    public static void releaseTracker(Integer trackerID) {
+        TrackerContainer tc = getTrackerContainer(trackerID);
+        if (tc != null) {
+            tc.contentsTracker = null;
+            tc.adsTracker = null;
         }
+        destroyTracker(trackerID);
+    }
 
-        tracker.reset();
-        tracker.setup();
+    public static ContentsTracker getContentsTracker(Integer trackerID) {
+        if (trackersTable.containsKey(trackerID)) {
+            return trackersTable.get(trackerID).contentsTracker;
+        }
+        else {
+            return null;
+        }
+    }
+
+    public static AdsTracker getAdsTracker(Integer trackerID) {
+        if (trackersTable.containsKey(trackerID)) {
+            return trackersTable.get(trackerID).adsTracker;
+        }
+        else {
+            return null;
+        }
+    }
+
+    private static TrackerContainer getTrackerContainer(Integer trackerID) {
+        if (trackersTable.containsKey(trackerID)) {
+            return trackersTable.get(trackerID);
+        }
+        else {
+            return null;
+        }
+    }
+
+    private static Integer createTracker(ContentsTracker contentsTracker, AdsTracker adsTracker) {
+        lastTrackerID ++;
+        trackersTable.put(lastTrackerID, new TrackerContainer(contentsTracker, adsTracker));
+        return lastTrackerID;
+    }
+
+    private static Boolean destroyTracker(Integer trackerID) {
+        if (trackersTable.containsKey(trackerID)) {
+            trackersTable.remove(trackerID);
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    private static void initializeTracker(ContentsTracker contentsTracker, AdsTracker adsTracker, List<Uri> playlist) {
+
+        if (contentsTracker != null) {
+            if (playlist != null && playlist.size() > 0) {
+                contentsTracker.setSrc(playlist);
+            }
+            contentsTracker.reset();
+            contentsTracker.setup();
+        }
 
         if (adsTracker != null) {
             adsTracker.reset();
             adsTracker.setup();
         }
-    }
-
-    public static ContentsTracker getTracker() {
-        return tracker;
-    }
-    public static AdsTracker getAdsTracker() {
-        return adsTracker;
-    }
-    public static void setTracker(ContentsTracker obj) {
-        tracker = obj;
-    }
-    public static void setAdsTracker(AdsTracker obj) {
-        adsTracker = obj;
-    }
-    public static void release() {
-        setAdsTracker(null);
-        setTracker(null);
     }
 }

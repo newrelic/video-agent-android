@@ -46,6 +46,7 @@ public class Exo2Activity extends AppCompatActivity {
 
     private SimpleExoPlayer player;
     private CastPlayer castPlayer;
+    private Integer trackerID;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,13 +113,13 @@ public class Exo2Activity extends AppCompatActivity {
         });
 
         // Setup video agent for CastPlayer
-        NewRelicVideoAgent.start(castPlayer, Uri.parse(videoUrl), Exo2TrackerBuilder.class);
+        trackerID = NewRelicVideoAgent.start(castPlayer, Uri.parse(videoUrl), Exo2TrackerBuilder.class);
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        NewRelicVideoAgent.release();
+        NewRelicVideoAgent.releaseTracker(trackerID);
         player.release();
     }
 
@@ -142,7 +143,7 @@ public class Exo2Activity extends AppCompatActivity {
 
         MediaSource videoSource = new ExtractorMediaSource.Factory(dataSourceFactory).createMediaSource(videoUri);
 
-        NewRelicVideoAgent.start(player, videoUri, Exo2TrackerBuilder.class);
+        trackerID = NewRelicVideoAgent.start(player, videoUri, Exo2TrackerBuilder.class);
 
         player.setPlayWhenReady(true);
         player.prepare(videoSource);
@@ -191,8 +192,8 @@ public class Exo2Activity extends AppCompatActivity {
 
         ConcatenatingMediaSource concatenatedSource = new ConcatenatingMediaSource(mediaSourceArray);
 
-        NewRelicVideoAgent.start(player, playlistUri, Exo2TrackerBuilder.class);
-        //NewRelicVideoAgent.start(player, Exo2TrackerBuilder.class);
+        trackerID = NewRelicVideoAgent.start(player, playlistUri, Exo2TrackerBuilder.class);
+        //trackerID = NewRelicVideoAgent.start(player, Exo2TrackerBuilder.class);
 
         player.prepare(concatenatedSource);
         player.setPlayWhenReady(true);
@@ -227,7 +228,7 @@ public class Exo2Activity extends AppCompatActivity {
 
         ConcatenatingMediaSource concatenatedSource = new ConcatenatingMediaSource(mediaSourceArray);
 
-        NewRelicVideoAgent.start(player, playlistUri, Exo2TrackerBuilder.class);
+        trackerID = NewRelicVideoAgent.start(player, playlistUri, Exo2TrackerBuilder.class);
 
         player.prepare(concatenatedSource);
         player.setPlayWhenReady(true);
