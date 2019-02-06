@@ -40,8 +40,6 @@ import com.newrelic.videoagent.trackers.Exo2TrackerBuilder;
 import java.util.ArrayList;
 import java.util.List;
 
-// TODO: MODIFY AGENT TO ALLOW MULTIPLE PLAYERS AT THE SAME TIME WITH INDEPENDANT TRACKERS
-
 public class Exo2Activity extends AppCompatActivity {
 
     private SimpleExoPlayer player;
