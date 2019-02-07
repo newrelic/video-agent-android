@@ -143,29 +143,21 @@ public class CAL {
         callbacks.put(name, new Pair<>(target, method));
     }
 
-    // TODO: once started the timer is never stopped nor restarted.
     public static void startTimer(long trackerPointer, double timeInterval) {
-        // TODO: instead of start/stoping a general timer, set/unset the timerIsActive flag inside the TrackerContainer object
-        //getInstance().trackerPointer = trackerPointer;
+        NRLog.d("startTimer(" + trackerPointer + " , " + timeInterval + ")");
 
         if (getInstance().scheduler == null) {
             getInstance().scheduler = Executors.newScheduledThreadPool(1);
             getInstance().scheduler.scheduleAtFixedRate(getInstance().runnable, (long)timeInterval, (long)timeInterval, TimeUnit.SECONDS);
         }
 
+        // TODO: find the tracker and set the flag true
     }
 
-    // TODO: get trackerPointer as an argument
-    public static void abortTimer() {
-        // TODO: instead of start/stoping a general timer, set/unset the timerIsActive flag inside the TrackerContainer object
-        /*
-        if (getInstance().scheduler != null) {
-            getInstance().scheduler.shutdown();
-            getInstance().scheduler = null;
-        }
-        */
+    public static void abortTimer(long trackerPointer) {
+        NRLog.d("abortTimer(" + trackerPointer + ")");
 
-        // TODO: get the list of trackers, find the one with "long trackerPointer" and set the timerIsActive flag off
+        // TODO: find the tracker and set the flag false
     }
 
     public static ValueHolder convertObjectToHolder(Object object) {
