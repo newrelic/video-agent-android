@@ -58,6 +58,8 @@ public class Core_WrapperJNI {
   public final static native void TrackerCore_abortTimerEvent(long jarg1, TrackerCore jarg1_);
   public final static native void TrackerCore_trackerTimeEvent(long jarg1, TrackerCore jarg1_);
   public final static native boolean TrackerCore_setTimestamp(long jarg1, TrackerCore jarg1_, double jarg2, String jarg3);
+  public final static native void TrackerCore_enableHeartbeat(long jarg1, TrackerCore jarg1_);
+  public final static native void TrackerCore_disableHeartbeat(long jarg1, TrackerCore jarg1_);
   public final static native long new_ContentsTrackerCore();
   public final static native void delete_ContentsTrackerCore(long jarg1);
   public final static native void ContentsTrackerCore_reset(long jarg1, ContentsTrackerCore jarg1_);

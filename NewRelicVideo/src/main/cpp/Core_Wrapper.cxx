@@ -1057,6 +1057,28 @@ SWIGEXPORT jboolean JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJ
 }
 
 
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1enableHeartbeat(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  TrackerCore *arg1 = (TrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(TrackerCore **)&jarg1; 
+  (arg1)->enableHeartbeat();
+}
+
+
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1disableHeartbeat(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
+  TrackerCore *arg1 = (TrackerCore *) 0 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(TrackerCore **)&jarg1; 
+  (arg1)->disableHeartbeat();
+}
+
+
 SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_new_1ContentsTrackerCore(JNIEnv *jenv, jclass jcls) {
   jlong jresult = 0 ;
   ContentsTrackerCore *result = 0 ;

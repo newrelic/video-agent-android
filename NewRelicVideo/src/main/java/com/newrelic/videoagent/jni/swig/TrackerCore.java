@@ -179,4 +179,12 @@ public class TrackerCore {
     return Core_WrapperJNI.TrackerCore_setTimestamp(swigCPtr, this, timestamp, attributeName);
   }
 
+  public void enableHeartbeat() {
+    Core_WrapperJNI.TrackerCore_enableHeartbeat(swigCPtr, this);
+  }
+
+  public void disableHeartbeat() {
+    Core_WrapperJNI.TrackerCore_disableHeartbeat(swigCPtr, this);
+  }
+
 }
