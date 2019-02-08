@@ -8,6 +8,8 @@ import com.newrelic.agent.android.NewRelic;
 import com.newrelic.videoagent.EventDefs;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.NewRelicVideoAgent;
+import com.newrelic.videoagent.basetrackers.AdsTracker;
+import com.newrelic.videoagent.basetrackers.ContentsTracker;
 import com.newrelic.videoagent.jni.swig.ValueHolder;
 import java.lang.reflect.Method;
 import java.util.HashMap;
@@ -31,17 +33,18 @@ public class CAL {
                 @Override
                 public void run () {
 
-                    HashMap<Integer, NewRelicVideoAgent.TrackerContainer> trackersTable = NewRelicVideoAgent.getTrackersTable();
+                    HashMap<Long, NewRelicVideoAgent.TrackerContainer> trackersTable = NewRelicVideoAgent.getTrackersTable();
 
-                    for (Integer trackerID : trackersTable.keySet()) {
+                    for (Long trackerID : trackersTable.keySet()) {
                         NewRelicVideoAgent.TrackerContainer trackerContainer = trackersTable.get(trackerID);
                         if (trackerContainer.timerIsActive) {
-                            if (trackerContainer.contentsTracker != null) {
-                                callTrackerTimeEvent(trackerContainer.contentsTracker.getCppPointer());
-                            }
-
-                            if (trackerContainer.adsTracker!= null) {
-                                callTrackerTimeEvent(trackerContainer.adsTracker.getCppPointer());
+                            if (trackerContainer.tracker != null) {
+                                if (trackerContainer.tracker instanceof ContentsTracker) {
+                                    callTrackerTimeEvent(((ContentsTracker)trackerContainer.tracker).getCppPointer());
+                                }
+                                else if (trackerContainer.tracker instanceof AdsTracker) {
+                                    callTrackerTimeEvent(((AdsTracker)trackerContainer.tracker).getCppPointer());
+                                }
                             }
                         }
                     }
@@ -151,13 +154,15 @@ public class CAL {
             getInstance().scheduler.scheduleAtFixedRate(getInstance().runnable, (long)timeInterval, (long)timeInterval, TimeUnit.SECONDS);
         }
 
-        // TODO: find the tracker and set the flag true
+        NewRelicVideoAgent.TrackerContainer trackerContainer = NewRelicVideoAgent.getTrackersTable().get(trackerPointer);
+        trackerContainer.timerIsActive = true;
     }
 
     public static void abortTimer(long trackerPointer) {
         NRLog.d("abortTimer(" + trackerPointer + ")");
 
-        // TODO: find the tracker and set the flag false
+        NewRelicVideoAgent.TrackerContainer trackerContainer = NewRelicVideoAgent.getTrackersTable().get(trackerPointer);
+        trackerContainer.timerIsActive = false;
     }
 
     public static ValueHolder convertObjectToHolder(Object object) {
@@ -169,6 +174,9 @@ public class CAL {
         }
         else if (object instanceof Double) {
             return new ValueHolder((Double)object);
+        }
+        else if (object instanceof Integer) {
+            return new ValueHolder((Long)object);
         }
         else {
             return new ValueHolder();

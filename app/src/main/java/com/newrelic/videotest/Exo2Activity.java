@@ -44,7 +44,7 @@ public class Exo2Activity extends AppCompatActivity {
 
     private SimpleExoPlayer player;
     private CastPlayer castPlayer;
-    private Integer trackerID;
+    private Long trackerID;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
