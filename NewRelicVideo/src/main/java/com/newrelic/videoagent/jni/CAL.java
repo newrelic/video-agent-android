@@ -155,14 +155,18 @@ public class CAL {
         }
 
         NewRelicVideoAgent.TrackerContainer trackerContainer = NewRelicVideoAgent.getTrackersTable().get(trackerPointer);
-        trackerContainer.timerIsActive = true;
+        if (trackerContainer != null) {
+            trackerContainer.timerIsActive = true;
+        }
     }
 
     public static void abortTimer(long trackerPointer) {
         NRLog.d("abortTimer(" + trackerPointer + ")");
 
         NewRelicVideoAgent.TrackerContainer trackerContainer = NewRelicVideoAgent.getTrackersTable().get(trackerPointer);
-        trackerContainer.timerIsActive = false;
+        if (trackerContainer != null) {
+            trackerContainer.timerIsActive = true;
+        }
     }
 
     public static ValueHolder convertObjectToHolder(Object object) {
