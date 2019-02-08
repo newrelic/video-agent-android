@@ -7,8 +7,10 @@ import android.util.Pair;
 import com.newrelic.agent.android.NewRelic;
 import com.newrelic.videoagent.EventDefs;
 import com.newrelic.videoagent.NRLog;
+import com.newrelic.videoagent.NewRelicVideoAgent;
+import com.newrelic.videoagent.basetrackers.AdsTracker;
+import com.newrelic.videoagent.basetrackers.ContentsTracker;
 import com.newrelic.videoagent.jni.swig.ValueHolder;
-
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
@@ -21,7 +23,6 @@ public class CAL {
 
     private Map<Long, Map<String, Pair<Object, Method>>> callbacksTree;
     private ScheduledExecutorService scheduler;
-    private long trackerPointer;
 
     private Runnable runnable = new Runnable() {
         @Override
@@ -31,7 +32,22 @@ public class CAL {
             new Handler(Looper.getMainLooper()).post(new Runnable () {
                 @Override
                 public void run () {
-                    callTrackerTimeEvent(trackerPointer);
+
+                    HashMap<Long, NewRelicVideoAgent.TrackerContainer> trackersTable = NewRelicVideoAgent.getTrackersTable();
+
+                    for (Long trackerID : trackersTable.keySet()) {
+                        NewRelicVideoAgent.TrackerContainer trackerContainer = trackersTable.get(trackerID);
+                        if (trackerContainer.timerIsActive) {
+                            if (trackerContainer.tracker != null) {
+                                if (trackerContainer.tracker instanceof ContentsTracker) {
+                                    callTrackerTimeEvent(((ContentsTracker)trackerContainer.tracker).getCppPointer());
+                                }
+                                else if (trackerContainer.tracker instanceof AdsTracker) {
+                                    callTrackerTimeEvent(((AdsTracker)trackerContainer.tracker).getCppPointer());
+                                }
+                            }
+                        }
+                    }
                 }
             });
         }
@@ -131,19 +147,25 @@ public class CAL {
     }
 
     public static void startTimer(long trackerPointer, double timeInterval) {
-        getInstance().trackerPointer = trackerPointer;
+        NRLog.d("startTimer(" + trackerPointer + " , " + timeInterval + ")");
 
         if (getInstance().scheduler == null) {
             getInstance().scheduler = Executors.newScheduledThreadPool(1);
+            getInstance().scheduler.scheduleAtFixedRate(getInstance().runnable, (long)timeInterval, (long)timeInterval, TimeUnit.SECONDS);
         }
 
-        getInstance().scheduler.scheduleAtFixedRate(getInstance().runnable, (long)timeInterval, (long)timeInterval, TimeUnit.SECONDS);
+        NewRelicVideoAgent.TrackerContainer trackerContainer = NewRelicVideoAgent.getTrackersTable().get(trackerPointer);
+        if (trackerContainer != null) {
+            trackerContainer.timerIsActive = true;
+        }
     }
 
-    public static void abortTimer() {
-        if (getInstance().scheduler != null) {
-            getInstance().scheduler.shutdown();
-            getInstance().scheduler = null;
+    public static void abortTimer(long trackerPointer) {
+        NRLog.d("abortTimer(" + trackerPointer + ")");
+
+        NewRelicVideoAgent.TrackerContainer trackerContainer = NewRelicVideoAgent.getTrackersTable().get(trackerPointer);
+        if (trackerContainer != null) {
+            trackerContainer.timerIsActive = true;
         }
     }
 
@@ -156,6 +178,9 @@ public class CAL {
         }
         else if (object instanceof Double) {
             return new ValueHolder((Double)object);
+        }
+        else if (object instanceof Integer) {
+            return new ValueHolder((Long)object);
         }
         else {
             return new ValueHolder();

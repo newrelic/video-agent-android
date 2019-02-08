@@ -3,7 +3,10 @@ package com.newrelic.videoagent;
 import android.net.Uri;
 import com.newrelic.videoagent.basetrackers.AdsTracker;
 import com.newrelic.videoagent.basetrackers.ContentsTracker;
+import com.newrelic.videoagent.jni.swig.TrackerCore;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 public class NewRelicVideoAgent {
@@ -12,110 +15,215 @@ public class NewRelicVideoAgent {
         System.loadLibrary("Core");
     }
 
+    public static class TrackerContainer {
+
+        public enum TRACKER_TYPE {
+            CONTENTS, ADS, UNKNOWN
+        }
+
+        public TrackerCore tracker;
+        public TRACKER_TYPE type;
+        public boolean timerIsActive;
+        public Long trackerPartner;
+
+        public TrackerContainer(TrackerCore tracker, Long trackerPartner) {
+            this.tracker = tracker;
+
+            if (tracker instanceof ContentsTracker) {
+                this.type = TRACKER_TYPE.CONTENTS;
+            }
+            else if (tracker instanceof AdsTracker) {
+                this.type = TRACKER_TYPE.ADS;
+            }
+            else {
+                this.type = TRACKER_TYPE.UNKNOWN;
+            }
+
+            this.timerIsActive = false;
+            this.trackerPartner = trackerPartner;
+        }
+
+        public TrackerContainer(TrackerCore tracker) {
+            this(tracker, 0L);
+        }
+    }
+
+    private static HashMap<Long, TrackerContainer> trackersTable = new HashMap<>();
+
     public static native void initJNIEnv();
 
-    private static ContentsTracker tracker;
-    private static AdsTracker adsTracker;
-
-    public static void start(Object player, Uri videoUri, Class c) {
+    public static Long start(Object player, Uri videoUri, Class c) {
 
         initJNIEnv();
 
         try {
             TrackerBuilder trackerBuilder = (TrackerBuilder) c.newInstance();
             trackerBuilder.startWithPlayer(player, videoUri);
-            tracker = trackerBuilder.contents();
+            ContentsTracker contentsTracker = trackerBuilder.contents();
+            Long trackerID = createTracker(contentsTracker, null);
 
             List<Uri> playlist = new ArrayList<>();
             playlist.add(videoUri);
-            initializeTracker(playlist);
+            initializeTracker(contentsTracker, null, playlist);
+
+            return trackerID;
         }
         catch (Exception e) {
             e.printStackTrace();
+            return 0L;
         }
     }
 
-    public static void start(Object player, List<Uri> playlist, Class c) {
+    public static Long start(Object player, List<Uri> playlist, Class c) {
 
         initJNIEnv();
 
         try {
             TrackerBuilder trackerBuilder = (TrackerBuilder) c.newInstance();
             trackerBuilder.startWithPlayer(player, playlist);
-            tracker = trackerBuilder.contents();
+            ContentsTracker contentsTracker = trackerBuilder.contents();
+            Long trackerID = createTracker(contentsTracker, null);
 
-            initializeTracker(playlist);
+            initializeTracker(contentsTracker, null, playlist);
+
+            return trackerID;
         }
         catch (Exception e) {
             e.printStackTrace();
+            return 0L;
         }
     }
 
-    public static void start(Object player, Class c) {
+    public static Long start(Object player, Class c) {
 
         initJNIEnv();
 
         try {
             TrackerBuilder trackerBuilder = (TrackerBuilder) c.newInstance();
             trackerBuilder.startWithPlayer(player);
-            tracker = trackerBuilder.contents();
+            ContentsTracker contentsTracker = trackerBuilder.contents();
+            Long trackerID = createTracker(contentsTracker, null);
 
-            initializeTracker(null);
+            initializeTracker(contentsTracker, null, null);
+
+            return trackerID;
         }
         catch (Exception e) {
             e.printStackTrace();
+            return 0L;
         }
     }
 
-    public static void startWithTracker(ContentsTracker contentsTracker, List<Uri> playlist) {
+    public static Long startWithTracker(ContentsTracker contentsTracker, List<Uri> playlist) {
         NRLog.d("Starting Video Agent with ContentsTracker");
 
         initJNIEnv();
 
-        tracker = contentsTracker;
+        Long trackerID = createTracker(contentsTracker, null);
 
-        initializeTracker(playlist);
+        initializeTracker(contentsTracker, null, playlist);
+
+        return trackerID;
     }
 
-    public static void startWithTracker(ContentsTracker tracker1, AdsTracker tracker2, List<Uri> playlist) {
+    public static Long startWithTracker(ContentsTracker contentsTracker, AdsTracker adsTracker, List<Uri> playlist) {
         NRLog.d("Starting Video Agent with ContentsTracker and AdsTracker");
 
         initJNIEnv();
 
-        tracker = tracker1;
-        adsTracker = tracker2;
+        Long trackerID = createTracker(contentsTracker, adsTracker);
 
-        initializeTracker(playlist);
+        initializeTracker(contentsTracker, adsTracker, playlist);
+
+        return trackerID;
     }
 
-    private static void initializeTracker(List<Uri> playlist) {
-        if (playlist != null && playlist.size() > 0) {
-            tracker.setSrc(playlist);
+    public static void releaseTracker(Long trackerID) {
+        TrackerContainer tc = getTrackerContainer(trackerID);
+
+        if (tc != null) {
+            Long partnerID = tc.trackerPartner;
+            TrackerContainer tcPartner = getTrackerContainer(partnerID);
+
+            if (tcPartner  != null) {
+                tcPartner.tracker = null;
+                tcPartner.trackerPartner = 0L;
+                trackersTable.remove(partnerID);
+            }
+
+            tc.tracker = null;
+            tc.trackerPartner = 0L;
+            trackersTable.remove(trackerID);
+        }
+    }
+
+    public static ContentsTracker getContentsTracker(Long trackerID) {
+        if (trackersTable.containsKey(trackerID)) {
+            return (ContentsTracker)trackersTable.get(trackerID).tracker;
+        }
+        else {
+            return null;
+        }
+    }
+
+    // The tracker ID we return when creating is the ContentsTracker, so we need to reference it and then get the partner
+    public static AdsTracker getAdsTracker(Long trackerID) {
+        if (trackersTable.containsKey(trackerID)) {
+            Long adTrackerID = trackersTable.get(trackerID).trackerPartner;
+            if (trackersTable.containsKey(adTrackerID)) {
+                AdsTracker adsTracker = (AdsTracker)trackersTable.get(adTrackerID).tracker;
+                return adsTracker;
+            }
+            else {
+                return null;
+            }
+        }
+        else {
+            return null;
+        }
+    }
+
+    public static HashMap<Long, TrackerContainer> getTrackersTable() {
+        return trackersTable;
+    }
+
+    private static TrackerContainer getTrackerContainer(Long trackerID) {
+        if (trackersTable.containsKey(trackerID)) {
+            return trackersTable.get(trackerID);
+        }
+        else {
+            return null;
+        }
+    }
+
+    private static Long createTracker(ContentsTracker contentsTracker, AdsTracker adsTracker) {
+
+        TrackerContainer contents = new TrackerContainer(contentsTracker);
+        trackersTable.put(contentsTracker.getCppPointer(), contents);
+
+        if (adsTracker != null) {
+            TrackerContainer ads = new TrackerContainer(adsTracker, contentsTracker.getCppPointer());
+            trackersTable.put(adsTracker.getCppPointer(), ads);
+
+            contents.trackerPartner = adsTracker.getCppPointer();
         }
 
-        tracker.reset();
-        tracker.setup();
+        return contentsTracker.getCppPointer();
+    }
+
+    private static void initializeTracker(ContentsTracker contentsTracker, AdsTracker adsTracker, List<Uri> playlist) {
+
+        if (contentsTracker != null) {
+            if (playlist != null && playlist.size() > 0) {
+                contentsTracker.setSrc(playlist);
+            }
+            contentsTracker.reset();
+            contentsTracker.setup();
+        }
 
         if (adsTracker != null) {
             adsTracker.reset();
             adsTracker.setup();
         }
-    }
-
-    public static ContentsTracker getTracker() {
-        return tracker;
-    }
-    public static AdsTracker getAdsTracker() {
-        return adsTracker;
-    }
-    public static void setTracker(ContentsTracker obj) {
-        tracker = obj;
-    }
-    public static void setAdsTracker(AdsTracker obj) {
-        adsTracker = obj;
-    }
-    public static void release() {
-        setAdsTracker(null);
-        setTracker(null);
     }
 }

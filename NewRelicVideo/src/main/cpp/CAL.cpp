@@ -172,10 +172,10 @@ void startTimer(TrackerCore *trackerCore, double timeInterval) {
     env->CallStaticVoidMethod(cls, mid, (jlong)trackerCore, (jdouble)timeInterval);
 }
 
-void abortTimer() {
+void abortTimer(TrackerCore *trackerCore) {
     jclass cls = env->FindClass("com/newrelic/videoagent/jni/CAL");
-    jmethodID mid = env->GetStaticMethodID(cls, "abortTimer", "()V");
-    env->CallStaticVoidMethod(cls, mid);
+    jmethodID mid = env->GetStaticMethodID(cls, "abortTimer", "(J)V");
+    env->CallStaticVoidMethod(cls, mid, (jlong)trackerCore);
 }
 
 void AV_LOG(const char *format, ...) {

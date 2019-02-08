@@ -77,6 +77,10 @@ public class ContentsTracker extends ContentsTrackerCore {
         }
     }
 
+    public long getCppPointer() {
+        return getCPtr(this);
+    }
+
     public void setSrc(Uri uri) { this.setSrc(Arrays.asList(uri)); }
 
     // To be overwritten
