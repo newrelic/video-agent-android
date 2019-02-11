@@ -58,6 +58,8 @@ public class Exo2Activity extends AppCompatActivity {
         //setupPlayerWithHLSMediaSource();
 
         //setupCastMediaQueue();
+
+        //NewRelicVideoAgent.getContentsTracker(trackerID).disableHeartbeat();
     }
 
     private void setupCastMediaQueue() {
@@ -191,7 +193,6 @@ public class Exo2Activity extends AppCompatActivity {
         ConcatenatingMediaSource concatenatedSource = new ConcatenatingMediaSource(mediaSourceArray);
 
         trackerID = NewRelicVideoAgent.start(player, playlistUri, Exo2TrackerBuilder.class);
-        NewRelicVideoAgent.getContentsTracker(trackerID).disableHeartbeat();
         //trackerID = NewRelicVideoAgent.start(player, Exo2TrackerBuilder.class);
 
         player.prepare(concatenatedSource);
