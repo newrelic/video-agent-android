@@ -1,3 +1,4 @@
 [submodule "NewRelicVideo/src/main/cpp/Core"]
 	path = NewRelicVideo/src/main/cpp/Core
 	url = https://github.com/newrelic/video-agent-core
+	branch = master
