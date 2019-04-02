@@ -15,6 +15,7 @@ public final class CoreTrackerState {
   public final static CoreTrackerState CoreTrackerStatePaused = new CoreTrackerState("CoreTrackerStatePaused");
   public final static CoreTrackerState CoreTrackerStateBuffering = new CoreTrackerState("CoreTrackerStateBuffering");
   public final static CoreTrackerState CoreTrackerStateSeeking = new CoreTrackerState("CoreTrackerStateSeeking");
+  public final static CoreTrackerState CoreTrackerStateUnknown = new CoreTrackerState("CoreTrackerStateUnknown");
 
   public final int swigValue() {
     return swigValue;
@@ -50,7 +51,7 @@ public final class CoreTrackerState {
     swigNext = this.swigValue+1;
   }
 
-  private static CoreTrackerState[] swigValues = { CoreTrackerStateStopped, CoreTrackerStateStarting, CoreTrackerStatePlaying, CoreTrackerStatePaused, CoreTrackerStateBuffering, CoreTrackerStateSeeking };
+  private static CoreTrackerState[] swigValues = { CoreTrackerStateStopped, CoreTrackerStateStarting, CoreTrackerStatePlaying, CoreTrackerStatePaused, CoreTrackerStateBuffering, CoreTrackerStateSeeking, CoreTrackerStateUnknown };
   private static int swigNext = 0;
   private final int swigValue;
   private final String swigName;
