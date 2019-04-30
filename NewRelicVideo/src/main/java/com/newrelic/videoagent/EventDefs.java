@@ -1,7 +1,7 @@
 package com.newrelic.videoagent;
 
 public class EventDefs {
-    public static String VIDEO_EVENT                 = "VideoEvent";
+    public static String VIDEO_EVENT                 = "MobileVideo";
     public static String CONTENT_REQUEST             = "CONTENT_REQUEST";
     public static String CONTENT_START               = "CONTENT_START";
     public static String CONTENT_END                 = "CONTENT_END";
