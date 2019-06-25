@@ -79,6 +79,8 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
     SeekBar progressBar;
     Button playButton;
 
+    private Long trackerID;
+
     Runnable runnable = new Runnable() {
         @Override
         public void run() {
@@ -92,16 +94,15 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_exo1);
         videoProvider = new VideoProvider(
-                Uri.parse(getString(R.string.videoURL_bunny)),
-                Uri.parse(getString(R.string.videoURL_dolby)),
-                Uri.parse(getString(R.string.videoURL_jelly)));
+                Uri.parse(getString(R.string.videoURL_panasonic))
+                );
         setupPlayer();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        NewRelicVideoAgent.release();
+        NewRelicVideoAgent.releaseTracker(trackerID);
         exoPlayer.release();
     }
 
@@ -132,7 +133,7 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
 
         // Enable logs and start Video Agent with ExoPlayer-1 Tracker
         NRLog.enable();
-        NewRelicVideoAgent.start(exoPlayer, url, Exo1TrackerBuilder.class);
+        trackerID = NewRelicVideoAgent.start(exoPlayer, url, Exo1TrackerBuilder.class);
 
         // Autoplay
         exoPlayer.setPlayWhenReady(true);
@@ -176,7 +177,7 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
         SurfaceView surfaceView = (SurfaceView) findViewById(R.id.surface_view);
         exoPlayer.sendMessage(getVideoRenderer(rendererArray), MediaCodecVideoTrackRenderer.MSG_SET_SURFACE, surfaceView.getHolder().getSurface());
 
-        ExoPlayer1ContentsTracker tracker = (ExoPlayer1ContentsTracker)NewRelicVideoAgent.getTracker();
+        ExoPlayer1ContentsTracker tracker = (ExoPlayer1ContentsTracker)NewRelicVideoAgent.getContentsTracker(trackerID);
         tracker.setSrc(url);
     }
 
@@ -184,7 +185,7 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
 
     @Override
     public void onDroppedFrames(int count, long elapsed) {
-        NewRelicVideoAgent.getTracker().sendDroppedFrame(count, (int)elapsed);
+        NewRelicVideoAgent.getContentsTracker(trackerID).sendDroppedFrame(count, (int)elapsed);
     }
 
     @Override
@@ -213,12 +214,17 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
 
     @Override
     public void onClick(View v) {
+        exoPlayer.stop();
+        NewRelicVideoAgent.getContentsTracker(trackerID).sendEnd();
+
+        /*
         if (exoPlayer.getPlayWhenReady()) {
             exoPlayer.setPlayWhenReady(false);
         }
         else {
             exoPlayer.setPlayWhenReady(true);
         }
+        */
     }
 
     // OnSeekBarChangeListener
@@ -233,7 +239,7 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
 
     @Override
     public void onStopTrackingTouch(SeekBar seekBar) {
-        NewRelicVideoAgent.getTracker().sendSeekStart();
+        NewRelicVideoAgent.getContentsTracker(trackerID).sendSeekStart();
         long newPos = (long)(((float)seekBar.getProgress() / 100.0f) * exoPlayer.getDuration());
         exoPlayer.seekTo(newPos);
     }
@@ -243,7 +249,7 @@ public class Exo1Activity extends AppCompatActivity implements MediaCodecVideoTr
     @Override
     public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
 
-        if (NewRelicVideoAgent.getTracker().state() == CoreTrackerState.CoreTrackerStatePaused) {
+        if (NewRelicVideoAgent.getContentsTracker(trackerID).state() == CoreTrackerState.CoreTrackerStatePaused) {
             playButton.setText("Play");
         }
         else {
