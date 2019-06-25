@@ -165,7 +165,7 @@ public class CAL {
 
         NewRelicVideoAgent.TrackerContainer trackerContainer = NewRelicVideoAgent.getTrackersTable().get(trackerPointer);
         if (trackerContainer != null) {
-            trackerContainer.timerIsActive = true;
+            trackerContainer.timerIsActive = false;
         }
     }
 
