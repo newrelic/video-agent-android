@@ -167,7 +167,7 @@ public class Exo2Activity extends AppCompatActivity {
 
         List<Uri> playlistUri = new ArrayList<>();
 
-        playlistUri.add(Uri.parse(getString(R.string.videoURL_bunny)));
+        //playlistUri.add(Uri.parse(getString(R.string.videoURL_bunny)));
         playlistUri.add(Uri.parse(getString(R.string.videoURL_dolby)));
         playlistUri.add(Uri.parse(getString(R.string.videoURL_jelly)));
 
