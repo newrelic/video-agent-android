@@ -54,7 +54,7 @@ dependencies {
         implementation 'com.google.android.exoplayer:exoplayer:r1.5.+'
     }
 
-    implementation "com.newrelic.agent.android:android-agent:5.+"
+    implementation "com.newrelic.agent.android:android-agent:5.20.0"
 
     implementation project(":NewRelicVideo")
 }
