@@ -1,22 +1,25 @@
 package com.newrelic.videoagent.basetrackers;
 
+import com.newrelic.videoagent.Heartbeat;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.jni.CAL;
 import com.newrelic.videoagent.jni.swig.AdsTrackerCore;
 
 public class AdsTracker extends AdsTrackerCore {
 
+    protected Heartbeat heartbeat;
+
     public AdsTracker(ContentsTracker contentsTracker) {
         super(contentsTracker);
-        setupGetters();
+        setupInstance();
     }
 
     public AdsTracker() {
         super();
-        setupGetters();
+        setupInstance();
     }
 
-    private void setupGetters() {
+    private void setupInstance() {
 
         registerGetter("numberOfAds", "getNumberOfAdsAttr");
         registerGetter("trackerName", "getTrackerName");
@@ -42,6 +45,20 @@ public class AdsTracker extends AdsTrackerCore {
         registerGetter("adCreativeId", "getAdCreativeId");
         registerGetter("adPosition", "getAdPosition");
         registerGetter("adPartner", "getAdPartner");
+
+        heartbeat = new Heartbeat(this);
+    }
+
+    @Override
+    public void sendRequest() {
+        heartbeat.startTimer();
+        super.sendRequest();
+    }
+
+    @Override
+    public void sendEnd() {
+        heartbeat.abortTimer();
+        super.sendEnd();
     }
 
     public Object getNumberOfAdsAttr() {

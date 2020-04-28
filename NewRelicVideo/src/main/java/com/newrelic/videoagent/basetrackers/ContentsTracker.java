@@ -1,14 +1,17 @@
 package com.newrelic.videoagent.basetrackers;
 
 import android.net.Uri;
+
+import com.newrelic.videoagent.Heartbeat;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.jni.CAL;
 import com.newrelic.videoagent.jni.swig.ContentsTrackerCore;
-
 import java.util.Arrays;
 import java.util.List;
 
 public class ContentsTracker extends ContentsTrackerCore {
+
+    protected Heartbeat heartbeat;
 
     public ContentsTracker() {
         super();
@@ -37,6 +40,20 @@ public class ContentsTracker extends ContentsTrackerCore {
         registerGetter("contentIsAutoplayed", "getIsAutoplayed");
         registerGetter("contentPreload", "getPreload");
         registerGetter("contentIsFullscreen", "getIsFullscreen");
+
+        heartbeat = new Heartbeat(this);
+    }
+
+    @Override
+    public void sendRequest() {
+        heartbeat.startTimer();
+        super.sendRequest();
+    }
+
+    @Override
+    public void sendEnd() {
+        heartbeat.abortTimer();
+        super.sendEnd();
     }
 
     public Object getIsAd() {

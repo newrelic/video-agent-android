@@ -23,7 +23,6 @@ public class NewRelicVideoAgent {
 
         public TrackerCore tracker;
         public TRACKER_TYPE type;
-        public boolean timerIsActive;
         public Long trackerPartner;
 
         public TrackerContainer(TrackerCore tracker, Long trackerPartner) {
@@ -39,7 +38,6 @@ public class NewRelicVideoAgent {
                 this.type = TRACKER_TYPE.UNKNOWN;
             }
 
-            this.timerIsActive = false;
             this.trackerPartner = trackerPartner;
         }
 

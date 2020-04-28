@@ -163,28 +163,8 @@ public class TrackerCore {
     Core_WrapperJNI.TrackerCore_setOptions__SWIG_1(swigCPtr, this, AttrList.getCPtr(opts), opts, action);
   }
 
-  public void startTimerEvent() {
-    Core_WrapperJNI.TrackerCore_startTimerEvent(swigCPtr, this);
-  }
-
-  public void abortTimerEvent() {
-    Core_WrapperJNI.TrackerCore_abortTimerEvent(swigCPtr, this);
-  }
-
-  public void trackerTimeEvent() {
-    Core_WrapperJNI.TrackerCore_trackerTimeEvent(swigCPtr, this);
-  }
-
   public boolean setTimestamp(double timestamp, String attributeName) {
     return Core_WrapperJNI.TrackerCore_setTimestamp(swigCPtr, this, timestamp, attributeName);
-  }
-
-  public void enableHeartbeat() {
-    Core_WrapperJNI.TrackerCore_enableHeartbeat(swigCPtr, this);
-  }
-
-  public void disableHeartbeat() {
-    Core_WrapperJNI.TrackerCore_disableHeartbeat(swigCPtr, this);
   }
 
 }

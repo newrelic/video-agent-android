@@ -22,38 +22,6 @@ public class CAL {
     private static CAL instance = null;
 
     private Map<Long, Map<String, Pair<Object, Method>>> callbacksTree;
-    private ScheduledExecutorService scheduler;
-
-    private Runnable runnable = new Runnable() {
-        @Override
-        public void run() {
-            // NOTE: we MUST run it in the main thread, because the JNIEnv pointer we stored is the main thread one and in Java JNI every thread has ts own JNIEnv.
-            // Mixing up different JNIEnv instances causes a crash.
-            new Handler(Looper.getMainLooper()).post(new Runnable () {
-                @Override
-                public void run () {
-
-                    HashMap<Long, NewRelicVideoAgent.TrackerContainer> trackersTable = NewRelicVideoAgent.getTrackersTable();
-
-                    for (Long trackerID : trackersTable.keySet()) {
-                        NewRelicVideoAgent.TrackerContainer trackerContainer = trackersTable.get(trackerID);
-                        if (trackerContainer.timerIsActive) {
-                            if (trackerContainer.tracker != null) {
-                                if (trackerContainer.tracker instanceof ContentsTracker) {
-                                    callTrackerTimeEvent(((ContentsTracker)trackerContainer.tracker).getCppPointer());
-                                }
-                                else if (trackerContainer.tracker instanceof AdsTracker) {
-                                    callTrackerTimeEvent(((AdsTracker)trackerContainer.tracker).getCppPointer());
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-    };
-
-    public static native void callTrackerTimeEvent(long trackerPointer);
 
     protected CAL() {
         callbacksTree = new HashMap<>();
@@ -144,29 +112,6 @@ public class CAL {
 
         // Store the new callback indexed by "name" (getter name)
         callbacks.put(name, new Pair<>(target, method));
-    }
-
-    public static void startTimer(long trackerPointer, double timeInterval) {
-        NRLog.d("startTimer(" + trackerPointer + " , " + timeInterval + ")");
-
-        if (getInstance().scheduler == null) {
-            getInstance().scheduler = Executors.newScheduledThreadPool(1);
-            getInstance().scheduler.scheduleAtFixedRate(getInstance().runnable, (long)timeInterval, (long)timeInterval, TimeUnit.SECONDS);
-        }
-
-        NewRelicVideoAgent.TrackerContainer trackerContainer = NewRelicVideoAgent.getTrackersTable().get(trackerPointer);
-        if (trackerContainer != null) {
-            trackerContainer.timerIsActive = true;
-        }
-    }
-
-    public static void abortTimer(long trackerPointer) {
-        NRLog.d("abortTimer(" + trackerPointer + ")");
-
-        NewRelicVideoAgent.TrackerContainer trackerContainer = NewRelicVideoAgent.getTrackersTable().get(trackerPointer);
-        if (trackerContainer != null) {
-            trackerContainer.timerIsActive = false;
-        }
     }
 
     public static ValueHolder convertObjectToHolder(Object object) {
