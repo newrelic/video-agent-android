@@ -27,15 +27,6 @@ Java_com_newrelic_videoagent_ExampleInstrumentedTest_initJNIEnv(JNIEnv *e, jclas
     env = e;
 }
 
-extern "C"
-JNIEXPORT void JNICALL
-Java_com_newrelic_videoagent_jni_CAL_callTrackerTimeEvent(JNIEnv *e, jclass type, jlong trackerPointer) {
-    TrackerCore *pointer = (TrackerCore *)trackerPointer;
-    if (pointer) {
-        pointer->trackerTimeEvent();
-    }
-}
-
 bool recordCustomEvent(std::string name, std::map<std::string, ValueHolder> attr) {
     jclass cls = env->FindClass("com/newrelic/videoagent/jni/CAL");
     jmethodID mid = env->GetStaticMethodID(cls, "recordCustomEvent", "(Ljava/lang/String;Ljava/util/Map;)V");
@@ -164,18 +155,6 @@ ValueHolder callGetter(std::string name, void *origin) {
     env->DeleteLocalRef(jobj);
 
     return retValue;
-}
-
-void startTimer(TrackerCore *trackerCore, double timeInterval) {
-    jclass cls = env->FindClass("com/newrelic/videoagent/jni/CAL");
-    jmethodID mid = env->GetStaticMethodID(cls, "startTimer", "(JD)V");
-    env->CallStaticVoidMethod(cls, mid, (jlong)trackerCore, (jdouble)timeInterval);
-}
-
-void abortTimer(TrackerCore *trackerCore) {
-    jclass cls = env->FindClass("com/newrelic/videoagent/jni/CAL");
-    jmethodID mid = env->GetStaticMethodID(cls, "abortTimer", "(J)V");
-    env->CallStaticVoidMethod(cls, mid, (jlong)trackerCore);
 }
 
 void AV_LOG(const char *format, ...) {

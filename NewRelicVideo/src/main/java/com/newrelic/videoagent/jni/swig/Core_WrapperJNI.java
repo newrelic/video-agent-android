@@ -19,8 +19,7 @@ public class Core_WrapperJNI {
   public final static native void AttrList_del(long jarg1, AttrList jarg1_, String jarg2);
   public final static native boolean AttrList_has_key(long jarg1, AttrList jarg1_, String jarg2);
   public final static native void delete_AttrList(long jarg1);
-  public final static native double OBSERVATION_TIME_get();
-  public final static native double HEARTBEAT_COUNT_get();
+  public final static native double HEARTBEAT_TIME_get();
   public final static native long new_TrackerCore();
   public final static native void delete_TrackerCore(long jarg1);
   public final static native int TrackerCore_state(long jarg1, TrackerCore jarg1_);
@@ -54,12 +53,7 @@ public class Core_WrapperJNI {
   public final static native void TrackerCore_sendCustomAction__SWIG_1(long jarg1, TrackerCore jarg1_, String jarg2, long jarg3, AttrList jarg3_);
   public final static native void TrackerCore_setOptions__SWIG_0(long jarg1, TrackerCore jarg1_, long jarg2, AttrList jarg2_);
   public final static native void TrackerCore_setOptions__SWIG_1(long jarg1, TrackerCore jarg1_, long jarg2, AttrList jarg2_, String jarg3);
-  public final static native void TrackerCore_startTimerEvent(long jarg1, TrackerCore jarg1_);
-  public final static native void TrackerCore_abortTimerEvent(long jarg1, TrackerCore jarg1_);
-  public final static native void TrackerCore_trackerTimeEvent(long jarg1, TrackerCore jarg1_);
   public final static native boolean TrackerCore_setTimestamp(long jarg1, TrackerCore jarg1_, double jarg2, String jarg3);
-  public final static native void TrackerCore_enableHeartbeat(long jarg1, TrackerCore jarg1_);
-  public final static native void TrackerCore_disableHeartbeat(long jarg1, TrackerCore jarg1_);
   public final static native long new_ContentsTrackerCore();
   public final static native void delete_ContentsTrackerCore(long jarg1);
   public final static native void ContentsTrackerCore_reset(long jarg1, ContentsTrackerCore jarg1_);

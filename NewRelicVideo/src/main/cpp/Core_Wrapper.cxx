@@ -469,25 +469,13 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_d
 }
 
 
-SWIGEXPORT jdouble JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_OBSERVATION_1TIME_1get(JNIEnv *jenv, jclass jcls) {
+SWIGEXPORT jdouble JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_HEARTBEAT_1TIME_1get(JNIEnv *jenv, jclass jcls) {
   jdouble jresult = 0 ;
   double result;
   
   (void)jenv;
   (void)jcls;
-  result = (double)(2.0);
-  jresult = (jdouble)result; 
-  return jresult;
-}
-
-
-SWIGEXPORT jdouble JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_HEARTBEAT_1COUNT_1get(JNIEnv *jenv, jclass jcls) {
-  jdouble jresult = 0 ;
-  double result;
-  
-  (void)jenv;
-  (void)jcls;
-  result = (double)((25.0/2.0));
+  result = (double)(30.0);
   jresult = (jdouble)result; 
   return jresult;
 }
@@ -998,39 +986,6 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_T
 }
 
 
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1startTimerEvent(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
-  TrackerCore *arg1 = (TrackerCore *) 0 ;
-  
-  (void)jenv;
-  (void)jcls;
-  (void)jarg1_;
-  arg1 = *(TrackerCore **)&jarg1; 
-  (arg1)->startTimerEvent();
-}
-
-
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1abortTimerEvent(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
-  TrackerCore *arg1 = (TrackerCore *) 0 ;
-  
-  (void)jenv;
-  (void)jcls;
-  (void)jarg1_;
-  arg1 = *(TrackerCore **)&jarg1; 
-  (arg1)->abortTimerEvent();
-}
-
-
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1trackerTimeEvent(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
-  TrackerCore *arg1 = (TrackerCore *) 0 ;
-  
-  (void)jenv;
-  (void)jcls;
-  (void)jarg1_;
-  arg1 = *(TrackerCore **)&jarg1; 
-  (arg1)->trackerTimeEvent();
-}
-
-
 SWIGEXPORT jboolean JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1setTimestamp(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jdouble jarg2, jstring jarg3) {
   jboolean jresult = 0 ;
   TrackerCore *arg1 = (TrackerCore *) 0 ;
@@ -1054,28 +1009,6 @@ SWIGEXPORT jboolean JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJ
   result = (bool)(arg1)->setTimestamp(arg2,arg3);
   jresult = (jboolean)result; 
   return jresult;
-}
-
-
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1enableHeartbeat(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
-  TrackerCore *arg1 = (TrackerCore *) 0 ;
-  
-  (void)jenv;
-  (void)jcls;
-  (void)jarg1_;
-  arg1 = *(TrackerCore **)&jarg1; 
-  (arg1)->enableHeartbeat();
-}
-
-
-SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1disableHeartbeat(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_) {
-  TrackerCore *arg1 = (TrackerCore *) 0 ;
-  
-  (void)jenv;
-  (void)jcls;
-  (void)jarg1_;
-  arg1 = *(TrackerCore **)&jarg1; 
-  (arg1)->disableHeartbeat();
 }
 
 
