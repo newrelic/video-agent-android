@@ -67,7 +67,6 @@ public class CastPlayerContentsTracker extends ContentsTracker implements Sessio
                     setOptionKey("castDeviceId", castContext.getSessionManager().getCurrentCastSession().getCastDevice().getDeviceId());
                     setOptionKey("castDeviceVersion", castContext.getSessionManager().getCurrentCastSession().getCastDevice().getDeviceVersion());
                     setOptionKey("castDeviceModelName", castContext.getSessionManager().getCurrentCastSession().getCastDevice().getModelName());
-                    setOptionKey("castDeviceModelName", castContext.getSessionManager().getCurrentCastSession().getCastDevice().getModelName());
                     setOptionKey("castDeviceFriendlyName", castContext.getSessionManager().getCurrentCastSession().getCastDevice().getFriendlyName());
                 }
 
