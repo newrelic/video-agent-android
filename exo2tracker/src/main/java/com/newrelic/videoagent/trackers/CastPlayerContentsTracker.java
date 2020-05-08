@@ -3,17 +3,20 @@ package com.newrelic.videoagent.trackers;
 import android.net.Uri;
 
 import com.google.android.exoplayer2.ext.cast.CastPlayer;
+import com.google.android.exoplayer2.ext.cast.CastPlayer.SessionAvailabilityListener;
 import com.newrelic.videoagent.BuildConfig;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.basetrackers.ContentsTracker;
+import com.newrelic.videoagent.jni.swig.CoreTrackerState;
 
 import java.util.List;
 
-public class CastPlayerContentsTracker extends ContentsTracker {
+public class CastPlayerContentsTracker extends ContentsTracker implements SessionAvailabilityListener {
     private ExoPlayer2BaseTracker baseTracker;
 
     public CastPlayerContentsTracker(CastPlayer player) {
         baseTracker = new ExoPlayer2BaseTracker(player, this);
+        ((CastPlayer)baseTracker.player).setSessionAvailabilityListener(this);
     }
 
     @Override
@@ -118,5 +121,20 @@ public class CastPlayerContentsTracker extends ContentsTracker {
     @Override
     public void setSrc(List<Uri> uris) {
         baseTracker.setPlaylist(uris);
+    }
+
+    // SessionAvailabilityListener
+
+    @Override
+    public void onCastSessionAvailable() {
+        sendCustomAction("CAST_START_SESSION");
+    }
+
+    @Override
+    public void onCastSessionUnavailable() {
+        if (state() != CoreTrackerState.CoreTrackerStateStopped) {
+            sendEnd();
+        }
+        sendCustomAction("CAST_END_SESSION");
     }
 }

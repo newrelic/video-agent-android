@@ -5,6 +5,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.app.MediaRouteButton;
 import android.view.View;
+import android.widget.Button;
 
 import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.Player;
@@ -35,6 +36,7 @@ import com.google.android.gms.cast.framework.CastStateListener;
 import com.google.android.gms.common.images.WebImage;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.NewRelicVideoAgent;
+import com.newrelic.videoagent.jni.swig.CoreTrackerState;
 import com.newrelic.videoagent.trackers.Exo2TrackerBuilder;
 
 import java.util.ArrayList;
@@ -54,10 +56,10 @@ public class Exo2Activity extends AppCompatActivity {
         NRLog.enable();
 
         //setupPlayer();
-        setupPlayerWithPlaylist();
+        //setupPlayerWithPlaylist();
         //setupPlayerWithHLSMediaSource();
 
-        //setupCastMediaQueue();
+        setupCastMediaQueue();
 
         //NewRelicVideoAgent.getContentsTracker(trackerID).disableHeartbeat();
     }
@@ -99,16 +101,20 @@ public class Exo2Activity extends AppCompatActivity {
         final MediaQueueItem[] mediaItems = {new MediaQueueItem.Builder(mediaInfo).build()};
 
         // Setup Cast Player
-
         castPlayer = new CastPlayer(mCastContext);
-        castPlayer.setSessionAvailabilityListener(new CastPlayer.SessionAvailabilityListener() {
-            @Override
-            public void onCastSessionAvailable() {
-                castPlayer.loadItems(mediaItems, 0, 0, Player.REPEAT_MODE_OFF);
-            }
 
+        Button playerButton  = findViewById(R.id.playButton);
+        playerButton.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onCastSessionUnavailable() {
+            public void onClick(View v) {
+                //is playing?
+                CoreTrackerState state = NewRelicVideoAgent.getContentsTracker(trackerID).state();
+                if (state == CoreTrackerState.CoreTrackerStatePlaying || state == CoreTrackerState.CoreTrackerStatePaused) {
+                    castPlayer.stop();
+                }
+                else {
+                    castPlayer.loadItems(mediaItems, 0, 0, Player.REPEAT_MODE_OFF);
+                }
             }
         });
 
