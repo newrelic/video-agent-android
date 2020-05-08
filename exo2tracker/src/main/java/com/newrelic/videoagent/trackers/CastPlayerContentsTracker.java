@@ -4,11 +4,13 @@ import android.net.Uri;
 
 import com.google.android.exoplayer2.ext.cast.CastPlayer;
 import com.google.android.exoplayer2.ext.cast.CastPlayer.SessionAvailabilityListener;
+import com.google.android.gms.cast.framework.CastContext;
 import com.newrelic.videoagent.BuildConfig;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.basetrackers.ContentsTracker;
 import com.newrelic.videoagent.jni.swig.CoreTrackerState;
 
+import java.lang.reflect.Field;
 import java.util.List;
 
 public class CastPlayerContentsTracker extends ContentsTracker implements SessionAvailabilityListener {
@@ -16,7 +18,11 @@ public class CastPlayerContentsTracker extends ContentsTracker implements Sessio
 
     public CastPlayerContentsTracker(CastPlayer player) {
         baseTracker = new ExoPlayer2BaseTracker(player, this);
-        ((CastPlayer)baseTracker.player).setSessionAvailabilityListener(this);
+        getPlayer().setSessionAvailabilityListener(this);
+    }
+
+    private CastPlayer getPlayer() {
+        return (CastPlayer) baseTracker.player;
     }
 
     @Override
@@ -29,6 +35,45 @@ public class CastPlayerContentsTracker extends ContentsTracker implements Sessio
     public void reset() {
         super.reset();
         baseTracker.reset();
+    }
+
+    public void generateCastAttributes() {
+        CastContext castContext;
+
+        // Try to access the private field "castContext" inside CastPlayer
+        try {
+            Field castContextField = CastPlayer.class.getDeclaredField("castContext");
+            castContextField.setAccessible(true);
+            castContext = (CastContext) castContextField.get(getPlayer());
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            castContext = null;
+        }
+
+        if (castContext != null) {
+            if (castContext.getSessionManager().getCurrentCastSession() != null) {
+
+                setOptionKey("castDeviceStatusText", castContext.getSessionManager().getCurrentCastSession().getApplicationStatus());
+                setOptionKey("castSessionId", castContext.getSessionManager().getCurrentCastSession().getSessionId());
+                setOptionKey("castDeviceCategory", castContext.getSessionManager().getCurrentCastSession().getCategory());
+
+                if (castContext.getSessionManager().getCurrentCastSession().getApplicationMetadata() != null) {
+                    setOptionKey("castAppId", castContext.getSessionManager().getCurrentCastSession().getApplicationMetadata().getApplicationId());
+                    setOptionKey("castAppName", castContext.getSessionManager().getCurrentCastSession().getApplicationMetadata().getName());
+                }
+
+                if (castContext.getSessionManager().getCurrentCastSession().getCastDevice() != null) {
+                    setOptionKey("castDeviceId", castContext.getSessionManager().getCurrentCastSession().getCastDevice().getDeviceId());
+                    setOptionKey("castDeviceVersion", castContext.getSessionManager().getCurrentCastSession().getCastDevice().getDeviceVersion());
+                    setOptionKey("castDeviceModelName", castContext.getSessionManager().getCurrentCastSession().getCastDevice().getModelName());
+                    setOptionKey("castDeviceModelName", castContext.getSessionManager().getCurrentCastSession().getCastDevice().getModelName());
+                    setOptionKey("castDeviceFriendlyName", castContext.getSessionManager().getCurrentCastSession().getCastDevice().getFriendlyName());
+                }
+
+                //TODO: castDeviceUniqueId not found
+            }
+        }
     }
 
     public Object getPlayerName() {
@@ -54,16 +99,6 @@ public class CastPlayerContentsTracker extends ContentsTracker implements Sessio
     public Object getRenditionBitrate() {
         return getBitrate();
     }
-
-    /*
-    public Object getRenditionWidth() {
-        return new Long((long)getPlayer().getVideoFormat().width);
-    }
-
-    public Object getRenditionHeight() {
-        return new Long((long)getPlayer().getVideoFormat().height);
-    }
-    */
 
     public Object getDuration() {
         return new Long(baseTracker.player.getDuration());
@@ -93,30 +128,13 @@ public class CastPlayerContentsTracker extends ContentsTracker implements Sessio
         return new Double(baseTracker.player.getPlaybackParameters().speed);
     }
 
-    /*
-    public Object getFps() {
-        if (getPlayer().getVideoFormat() != null) {
-            if (getPlayer().getVideoFormat().frameRate > 0) {
-                return new Double(getPlayer().getVideoFormat().frameRate);
-            }
-        }
+    /*  TODO: is it possible to implement the following getters in a CastPlayer?
 
-        return null;
-    }
-
-    public Object getIsMuted() {
-        if (getPlayer().getVolume() == 0) {
-            return new Long(1);
-        }
-        else {
-            return new Long(0);
-        }
-    }
+        Object getRenditionWidth()
+        Object getRenditionHeight()
+        Object getFps()
+        Object getIsMuted()
     */
-
-    private CastPlayer getPlayer() {
-        return (CastPlayer) baseTracker.player;
-    }
 
     @Override
     public void setSrc(List<Uri> uris) {
@@ -127,14 +145,88 @@ public class CastPlayerContentsTracker extends ContentsTracker implements Sessio
 
     @Override
     public void onCastSessionAvailable() {
+        generateCastAttributes();
         sendCustomAction("CAST_START_SESSION");
     }
 
     @Override
     public void onCastSessionUnavailable() {
+        generateCastAttributes();
         if (state() != CoreTrackerState.CoreTrackerStateStopped) {
             sendEnd();
         }
         sendCustomAction("CAST_END_SESSION");
+    }
+
+    @Override
+    public void sendRequest() {
+        generateCastAttributes();
+        super.sendRequest();
+    }
+
+    @Override
+    public void sendStart() {
+        generateCastAttributes();
+        super.sendStart();
+    }
+
+    @Override
+    public void sendEnd() {
+        generateCastAttributes();
+        super.sendEnd();
+    }
+
+    @Override
+    public void sendBufferStart() {
+        generateCastAttributes();
+        super.sendBufferStart();
+    }
+
+    @Override
+    public void sendBufferEnd() {
+        generateCastAttributes();
+        super.sendBufferEnd();
+    }
+
+    @Override
+    public void sendPause() {
+        generateCastAttributes();
+        super.sendPause();
+    }
+
+    @Override
+    public void sendResume() {
+        generateCastAttributes();
+        super.sendResume();
+    }
+
+    @Override
+    public void sendSeekStart() {
+        generateCastAttributes();
+        super.sendSeekStart();
+    }
+
+    @Override
+    public void sendSeekEnd() {
+        generateCastAttributes();
+        super.sendSeekEnd();
+    }
+
+    @Override
+    public void sendHeartbeat() {
+        generateCastAttributes();
+        super.sendHeartbeat();
+    }
+
+    @Override
+    public void sendRenditionChange() {
+        generateCastAttributes();
+        super.sendRenditionChange();
+    }
+
+    @Override
+    public void sendError(String message) {
+        generateCastAttributes();
+        super.sendError(message);
     }
 }
