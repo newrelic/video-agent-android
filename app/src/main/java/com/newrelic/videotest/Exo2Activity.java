@@ -38,6 +38,7 @@ import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.NewRelicVideoAgent;
 import com.newrelic.videoagent.jni.swig.CoreTrackerState;
 import com.newrelic.videoagent.trackers.Exo2TrackerBuilder;
+import com.newrelic.videoagent.trackers.ExoPlayer2ContentsTracker;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -56,10 +57,10 @@ public class Exo2Activity extends AppCompatActivity {
         NRLog.enable();
 
         //setupPlayer();
-        //setupPlayerWithPlaylist();
+        setupPlayerWithPlaylist();
         //setupPlayerWithHLSMediaSource();
 
-        setupCastMediaQueue();
+        //setupCastMediaQueue();
 
         //NewRelicVideoAgent.getContentsTracker(trackerID).disableHeartbeat();
     }
@@ -186,7 +187,18 @@ public class Exo2Activity extends AppCompatActivity {
         ConcatenatingMediaSource concatenatedSource = new ConcatenatingMediaSource(mediaSourceArray);
 
         trackerID = NewRelicVideoAgent.start(player, playlistUri, Exo2TrackerBuilder.class);
+
+        ExoPlayer2ContentsTracker tracker = (ExoPlayer2ContentsTracker)NewRelicVideoAgent.getContentsTracker(trackerID);
+        // Do whatever with tracker...
+        NRLog.d("Tracker = " + tracker);
+
         //trackerID = NewRelicVideoAgent.start(player, Exo2TrackerBuilder.class);
+
+        /*
+        NewRelicVideoAgent.initJNIEnv();
+        ExoPlayer2ContentsTracker tracker = new ExoPlayer2ContentsTracker(player);
+        trackerID = NewRelicVideoAgent.startWithTracker(tracker, null);
+         */
 
         player.prepare(concatenatedSource);
         player.setPlayWhenReady(true);
