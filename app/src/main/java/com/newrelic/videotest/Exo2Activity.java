@@ -11,9 +11,11 @@ import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.ext.cast.CastPlayer;
+import com.google.android.exoplayer2.ext.ima.ImaAdsLoader;
 import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
+import com.google.android.exoplayer2.source.ads.AdsMediaSource;
 import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.trackselection.AdaptiveTrackSelection;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
@@ -47,6 +49,7 @@ public class Exo2Activity extends AppCompatActivity {
 
     private SimpleExoPlayer player;
     private CastPlayer castPlayer;
+    private ImaAdsLoader adsLoader;
     private Long trackerID;
 
     @Override
@@ -57,12 +60,43 @@ public class Exo2Activity extends AppCompatActivity {
         NRLog.enable();
 
         //setupPlayer();
-        setupPlayerWithPlaylist();
+        //setupPlayerWithPlaylist();
         //setupPlayerWithHLSMediaSource();
-
         //setupCastMediaQueue();
+        setupIMA();
 
         //NewRelicVideoAgent.getContentsTracker(trackerID).disableHeartbeat();
+    }
+
+    private void setupIMA() {
+        BandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
+
+        TrackSelection.Factory videoTrackSelectionFactory =  new AdaptiveTrackSelection.Factory(bandwidthMeter);
+
+        TrackSelector trackSelector =  new DefaultTrackSelector(videoTrackSelectionFactory);
+
+        player = ExoPlayerFactory.newSimpleInstance(this, trackSelector);
+
+        PlayerView playerView = findViewById(R.id.player);
+        playerView.setPlayer(player);
+
+        adsLoader = new ImaAdsLoader(this, Uri.parse(getString(R.string.ad_tag_url)));
+        adsLoader.setPlayer(player);
+
+        DataSource.Factory dataSourceFactory =
+                new DefaultDataSourceFactory(this, Util.getUserAgent(this, "VideoTestApp"));
+
+        Uri videoUri = Uri.parse(getString(R.string.videoURL_dolby));
+
+        MediaSource videoSource = new ExtractorMediaSource.Factory(dataSourceFactory).createMediaSource(videoUri);
+
+        AdsMediaSource adsMediaSource =
+                new AdsMediaSource(videoSource, dataSourceFactory, adsLoader, playerView);
+
+        trackerID = NewRelicVideoAgent.start(player, videoUri, Exo2TrackerBuilder.class);
+
+        player.setPlayWhenReady(true);
+        player.prepare(adsMediaSource);
     }
 
     private void setupCastMediaQueue() {
