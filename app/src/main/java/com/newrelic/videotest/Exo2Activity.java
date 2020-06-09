@@ -7,6 +7,11 @@ import android.support.v7.app.MediaRouteButton;
 import android.view.View;
 import android.widget.Button;
 
+import com.google.ads.interactivemedia.v3.api.AdErrorEvent;
+import com.google.ads.interactivemedia.v3.api.AdEvent;
+import com.google.ads.interactivemedia.v3.api.AdsLoader;
+import com.google.ads.interactivemedia.v3.api.AdsManager;
+import com.google.ads.interactivemedia.v3.api.AdsManagerLoadedEvent;
 import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
@@ -45,7 +50,7 @@ import com.newrelic.videoagent.trackers.ExoPlayer2ContentsTracker;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Exo2Activity extends AppCompatActivity {
+public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoadedListener, AdErrorEvent.AdErrorListener, AdEvent.AdEventListener {
 
     private SimpleExoPlayer player;
     private CastPlayer castPlayer;
@@ -92,6 +97,10 @@ public class Exo2Activity extends AppCompatActivity {
 
         AdsMediaSource adsMediaSource =
                 new AdsMediaSource(videoSource, dataSourceFactory, adsLoader, playerView);
+
+        adsLoader.getAdsLoader().addAdsLoadedListener(this);
+
+        adsLoader.getAdsLoader().addAdErrorListener(this);
 
         trackerID = NewRelicVideoAgent.start(player, videoUri, Exo2TrackerBuilder.class);
 
@@ -271,5 +280,25 @@ public class Exo2Activity extends AppCompatActivity {
 
         player.prepare(concatenatedSource);
         player.setPlayWhenReady(true);
+    }
+
+    // IMA ad listeners
+
+    @Override
+    public void onAdsManagerLoaded(AdsManagerLoadedEvent adsManagerLoadedEvent) {
+        NRLog.d("On Ads Loader Event");
+
+        AdsManager mAdsManager = adsManagerLoadedEvent.getAdsManager();
+        mAdsManager.addAdEventListener(this);
+    }
+
+    @Override
+    public void onAdError(AdErrorEvent adErrorEvent) {
+        NRLog.d("On Ads Error Event");
+    }
+
+    @Override
+    public void onAdEvent(AdEvent adEvent) {
+        NRLog.d("On Ads Event = " + adEvent);
     }
 }
