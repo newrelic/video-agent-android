@@ -58,11 +58,12 @@ public class NewRelicVideoAgent {
             TrackerBuilder trackerBuilder = (TrackerBuilder) c.newInstance();
             trackerBuilder.startWithPlayer(player, videoUri);
             ContentsTracker contentsTracker = trackerBuilder.contents();
-            Long trackerID = createTracker(contentsTracker, null);
+            AdsTracker adsTracker = trackerBuilder.ads();
+            Long trackerID = createTracker(contentsTracker, adsTracker);
 
             List<Uri> playlist = new ArrayList<>();
             playlist.add(videoUri);
-            initializeTracker(contentsTracker, null, playlist);
+            initializeTracker(contentsTracker, adsTracker, playlist);
 
             return trackerID;
         }
@@ -80,9 +81,10 @@ public class NewRelicVideoAgent {
             TrackerBuilder trackerBuilder = (TrackerBuilder) c.newInstance();
             trackerBuilder.startWithPlayer(player, playlist);
             ContentsTracker contentsTracker = trackerBuilder.contents();
-            Long trackerID = createTracker(contentsTracker, null);
+            AdsTracker adsTracker = trackerBuilder.ads();
+            Long trackerID = createTracker(contentsTracker, adsTracker);
 
-            initializeTracker(contentsTracker, null, playlist);
+            initializeTracker(contentsTracker, adsTracker, playlist);
 
             return trackerID;
         }
@@ -100,9 +102,10 @@ public class NewRelicVideoAgent {
             TrackerBuilder trackerBuilder = (TrackerBuilder) c.newInstance();
             trackerBuilder.startWithPlayer(player);
             ContentsTracker contentsTracker = trackerBuilder.contents();
-            Long trackerID = createTracker(contentsTracker, null);
+            AdsTracker adsTracker = trackerBuilder.ads();
+            Long trackerID = createTracker(contentsTracker, adsTracker);
 
-            initializeTracker(contentsTracker, null, null);
+            initializeTracker(contentsTracker, adsTracker, null);
 
             return trackerID;
         }
