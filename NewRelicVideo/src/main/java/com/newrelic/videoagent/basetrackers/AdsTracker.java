@@ -61,6 +61,10 @@ public class AdsTracker extends AdsTrackerCore {
         super.sendEnd();
     }
 
+    public Heartbeat getHeartbeat() {
+        return heartbeat;
+    }
+
     public Object getNumberOfAdsAttr() {
         return new Long((long)getNumberOfAds());
     }

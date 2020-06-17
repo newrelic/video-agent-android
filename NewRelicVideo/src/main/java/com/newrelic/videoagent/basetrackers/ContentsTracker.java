@@ -56,6 +56,10 @@ public class ContentsTracker extends ContentsTrackerCore {
         super.sendEnd();
     }
 
+    public Heartbeat getHeartbeat() {
+        return heartbeat;
+    }
+
     public Object getIsAd() {
         return new Long(0);
     }

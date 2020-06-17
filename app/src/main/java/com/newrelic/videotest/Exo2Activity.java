@@ -65,12 +65,15 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
         NRLog.enable();
 
         //setupPlayer();
-        //setupPlayerWithPlaylist();
+        setupPlayerWithPlaylist();
         //setupPlayerWithHLSMediaSource();
         //setupCastMediaQueue();
-        setupIMA();
+        //setupIMA();
 
-        //NewRelicVideoAgent.getContentsTracker(trackerID).disableHeartbeat();
+        // Manipulate heartbeat
+        //NewRelicVideoAgent.getContentsTracker(trackerID).getHeartbeat().setHeartbeatInterval(5000);
+        //NewRelicVideoAgent.getContentsTracker(trackerID).getHeartbeat().disableHeartbeat();
+        //NewRelicVideoAgent.getContentsTracker(trackerID).getHeartbeat().enableHeartbeat();
     }
 
     private void setupIMA() {
