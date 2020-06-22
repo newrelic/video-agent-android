@@ -39,6 +39,8 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
 
     private static final long timerTrackTimeMs = 250;
     private long bitrateEstimate;
+    private int lastHeight;
+    private int lastWidth;
     private List<Uri> playlist;
     private int lastWindow;
     private boolean firstFrameHappened;
@@ -97,6 +99,8 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
         bitrateEstimate = 0;
         lastWindow = 0;
         firstFrameHappened = false;
+        lastWidth = 0;
+        lastHeight = 0;
     }
 
     public Boolean isAd() {
@@ -349,19 +353,6 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
     public void onBandwidthEstimate(EventTime eventTime, int totalLoadTimeMs, long totalBytesLoaded, long bitrateEstimate) {
         NRLog.d("onBandwidthEstimate analytics");
 
-        String actionName = isAd() ? EventDefs.AD_RENDITION_CHANGE : EventDefs.CONTENT_RENDITION_CHANGE;
-
-        if (this.bitrateEstimate != 0) {
-            if (bitrateEstimate > this.bitrateEstimate) {
-                trackerCore.updateAttribute("shift", CAL.convertObjectToHolder("up"), actionName);
-                trackerCore.sendRenditionChange();
-            }
-            else if (bitrateEstimate < this.bitrateEstimate) {
-                trackerCore.updateAttribute("shift", CAL.convertObjectToHolder("down"), actionName);
-                trackerCore.sendRenditionChange();
-            }
-        }
-
         this.bitrateEstimate = bitrateEstimate;
     }
 
@@ -418,7 +409,26 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
 
     @Override
     public void onVideoSizeChanged(EventTime eventTime, int width, int height, int unappliedRotationDegrees, float pixelWidthHeightRatio) {
-        NRLog.d("onVideoSizeChanged analytics");
+        NRLog.d("onVideoSizeChanged analytics, H = " + height + " W = " + width);
+
+        String actionName = isAd() ? EventDefs.AD_RENDITION_CHANGE : EventDefs.CONTENT_RENDITION_CHANGE;
+
+        long currMul = width * height;
+        long lastMul = lastWidth * lastHeight;
+
+        if (lastMul != 0) {
+            if (lastMul < currMul) {
+                trackerCore.updateAttribute("shift", CAL.convertObjectToHolder("up"), actionName);
+                trackerCore.sendRenditionChange();
+            }
+            else if (lastMul > currMul) {
+                trackerCore.updateAttribute("shift", CAL.convertObjectToHolder("down"), actionName);
+                trackerCore.sendRenditionChange();
+            }
+        }
+
+        lastHeight = height;
+        lastWidth = width;
     }
 
     @Override
