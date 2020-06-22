@@ -1,6 +1,7 @@
 package com.newrelic.videotest;
 
 import android.net.Uri;
+import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.app.MediaRouteButton;
@@ -21,6 +22,8 @@ import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.ads.AdsMediaSource;
+import com.google.android.exoplayer2.source.dash.DashMediaSource;
+import com.google.android.exoplayer2.source.dash.DefaultDashChunkSource;
 import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.trackselection.AdaptiveTrackSelection;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
@@ -65,10 +68,11 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
         NRLog.enable();
 
         //setupPlayer();
-        setupPlayerWithPlaylist();
+        //setupPlayerWithPlaylist();
         //setupPlayerWithHLSMediaSource();
         //setupCastMediaQueue();
         //setupIMA();
+        setupPlayerHLS();
 
         // Manipulate heartbeat
         //NewRelicVideoAgent.getContentsTracker(trackerID).getHeartbeat().setHeartbeatInterval(5000);
@@ -174,6 +178,33 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
         super.onDestroy();
         NewRelicVideoAgent.releaseTracker(trackerID);
         player.release();
+    }
+
+    private void setupPlayerHLS() {
+        BandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
+
+        TrackSelection.Factory videoTrackSelectionFactory =  new AdaptiveTrackSelection.Factory(bandwidthMeter);
+
+        TrackSelector trackSelector =  new DefaultTrackSelector(videoTrackSelectionFactory);
+
+        player = ExoPlayerFactory.newSimpleInstance(this, trackSelector);
+
+        PlayerView playerView = findViewById(R.id.player);
+        playerView.setPlayer(player);
+
+        DataSource.Factory dataSourceFactory =
+                new DefaultDataSourceFactory(this, Util.getUserAgent(this, "VideoTestApp"));
+
+        Uri videoUri = Uri.parse(getString(R.string.videoURL_hls));
+
+        Handler mainHandler = new Handler();
+        MediaSource mediaSource = new HlsMediaSource(videoUri,
+                dataSourceFactory, mainHandler, null);
+
+        trackerID = NewRelicVideoAgent.start(player, videoUri, Exo2TrackerBuilder.class);
+
+        player.setPlayWhenReady(true);
+        player.prepare(mediaSource);
     }
 
     private void setupPlayer() {
