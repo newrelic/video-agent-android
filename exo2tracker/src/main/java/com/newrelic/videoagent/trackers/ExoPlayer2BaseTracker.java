@@ -38,6 +38,7 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
     protected TrackerCore trackerCore;
 
     private static final long timerTrackTimeMs = 250;
+    private long lastErrorTs = 0;
     private long bitrateEstimate;
     private int lastHeight;
     private int lastWidth;
@@ -133,6 +134,16 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
     }
 
     private void sendError(Exception error) {
+
+        long tsDiff = System.currentTimeMillis() - lastErrorTs;
+        lastErrorTs = System.currentTimeMillis();
+
+        // Guarantee a minimum distance of 4s between errors to make sure we are not sending mmultiple error events for the same cause.
+        if (tsDiff < 4000) {
+            NRLog.d("ERROR TOO CLOSE, DO NOT SEND");
+            return;
+        }
+
         String msg;
         if (error != null) {
             if (error.getMessage() != null) {
