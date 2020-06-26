@@ -59,6 +59,7 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
     private CastPlayer castPlayer;
     private ImaAdsLoader adsLoader;
     private Long trackerID;
+    private int currentVideoIndex = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,12 +73,58 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
         //setupPlayerWithHLSMediaSource();
         //setupCastMediaQueue();
         //setupIMA();
-        setupPlayerHLS();
+        //setupPlayerHLS();
+        setupPlayerDASH();
+        //setupManualPlaylist();
 
         // Manipulate heartbeat
         //NewRelicVideoAgent.getContentsTracker(trackerID).getHeartbeat().setHeartbeatInterval(5000);
         //NewRelicVideoAgent.getContentsTracker(trackerID).getHeartbeat().disableHeartbeat();
         //NewRelicVideoAgent.getContentsTracker(trackerID).getHeartbeat().enableHeartbeat();
+    }
+
+    private void setupManualPlaylist() {
+        List<Uri> playlistUri = new ArrayList<>();
+        playlistUri.add(Uri.parse(getString(R.string.videoURL_dolby)));
+        playlistUri.add(Uri.parse(getString(R.string.videoURL_jelly)));
+        playlistUri.add(Uri.parse(getString(R.string.content_url)));
+
+        BandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
+
+        TrackSelection.Factory videoTrackSelectionFactory =  new AdaptiveTrackSelection.Factory(bandwidthMeter);
+
+        TrackSelector trackSelector =  new DefaultTrackSelector(videoTrackSelectionFactory);
+
+        player = ExoPlayerFactory.newSimpleInstance(this, trackSelector);
+        player.setPlayWhenReady(true);
+
+        PlayerView playerView = findViewById(R.id.player);
+        playerView.setPlayer(player);
+
+        trackerID = NewRelicVideoAgent.start(player, Exo2TrackerBuilder.class);
+
+        DataSource.Factory dataSourceFactory =
+                new DefaultDataSourceFactory(this, Util.getUserAgent(this, "VideoTestApp"));
+
+        Button playerButton  = findViewById(R.id.playButton);
+        playerButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (playlistUri.size() > currentVideoIndex) {
+                    NRLog.d("-----------> PLAY NEXT VIDEO");
+
+                    Uri videoUri = playlistUri.get(currentVideoIndex);
+                    currentVideoIndex++;
+
+                    MediaSource videoSource = new ExtractorMediaSource.Factory(dataSourceFactory).createMediaSource(videoUri);
+
+                    NewRelicVideoAgent.getContentsTracker(trackerID).reset();
+                    NewRelicVideoAgent.getContentsTracker(trackerID).setup();
+
+                    player.prepare(videoSource);
+                }
+            }
+        });
     }
 
     private void setupIMA() {
@@ -207,6 +254,35 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
         player.prepare(mediaSource);
     }
 
+    private void setupPlayerDASH() {
+        BandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
+
+        TrackSelection.Factory videoTrackSelectionFactory =  new AdaptiveTrackSelection.Factory(bandwidthMeter);
+
+        TrackSelector trackSelector =  new DefaultTrackSelector(videoTrackSelectionFactory);
+
+        player = ExoPlayerFactory.newSimpleInstance(this, trackSelector);
+
+        PlayerView playerView = findViewById(R.id.player);
+        playerView.setPlayer(player);
+
+        DataSource.Factory dataSourceFactory =
+                new DefaultDataSourceFactory(this, Util.getUserAgent(this, "VideoTestApp"));
+
+        //Uri videoUri = Uri.parse(getString(R.string.videoURL_bunnydash));
+        //Uri videoUri = Uri.parse(getString(R.string.videoURL_cardash));
+        Uri videoUri = Uri.parse("http://www.bok.net/dash/tears_of_steel/cleartext/stream.mpd");
+
+        Handler mainHandler = new Handler();
+        DashMediaSource dashMediaSource = new DashMediaSource(videoUri, dataSourceFactory,
+                new DefaultDashChunkSource.Factory(dataSourceFactory), null, null);
+
+        trackerID = NewRelicVideoAgent.start(player, videoUri, Exo2TrackerBuilder.class);
+
+        player.setPlayWhenReady(true);
+        player.prepare(dashMediaSource);
+    }
+
     private void setupPlayer() {
 
         BandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
@@ -253,6 +329,7 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
 
         playlistUri.add(Uri.parse(getString(R.string.videoURL_dolby)));
         playlistUri.add(Uri.parse(getString(R.string.videoURL_jelly)));
+        playlistUri.add(Uri.parse(getString(R.string.content_url)));
 
         MediaSource mediaSourceArray[] = new MediaSource[playlistUri.size()];
 
