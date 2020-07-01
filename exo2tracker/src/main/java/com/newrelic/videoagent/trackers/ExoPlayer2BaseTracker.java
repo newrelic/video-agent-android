@@ -42,6 +42,8 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
     private long bitrateEstimate;
     private int lastHeight;
     private int lastWidth;
+    private boolean isSeeking = false;
+    private boolean isBuffering = false;
     private List<Uri> playlist;
     private int lastWindow;
     private boolean firstFrameHappened;
@@ -184,12 +186,14 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
         if (playbackState == Player.STATE_READY) {
             NRLog.d("\tVideo Is Ready");
 
-            if (trackerCore.state() == CoreTrackerState.CoreTrackerStateBuffering) {
+            if (isBuffering) {
                 trackerCore.sendBufferEnd();
+                isBuffering = false;
+            }
 
-                if (trackerCore.state() == CoreTrackerState.CoreTrackerStateSeeking) {
-                    trackerCore.sendSeekEnd();
-                }
+            if (isSeeking) {
+                trackerCore.sendSeekEnd();
+                isSeeking = false;
             }
         }
         else if (playbackState == Player.STATE_ENDED) {
@@ -198,8 +202,9 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
         else if (playbackState == Player.STATE_BUFFERING) {
             NRLog.d("\tVideo Is Buffering");
 
-            if (trackerCore.state() != CoreTrackerState.CoreTrackerStateBuffering) {
+            if (!isBuffering) {
                 trackerCore.sendBufferStart();
+                isBuffering = true;
             }
         }
 
@@ -279,7 +284,10 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
     public void onSeekStarted(EventTime eventTime) {
         NRLog.d("onSeekStarted analytics");
 
-        trackerCore.sendSeekStart();
+        if (!isSeeking) {
+            trackerCore.sendSeekStart();
+            isSeeking = true;
+        }
     }
 
     @Override
@@ -449,22 +457,22 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
 
     @Override
     public void onDrmKeysLoaded(EventTime eventTime) {
-
+        NRLog.d("onDrmKeysLoaded analytics");
     }
 
     @Override
     public void onDrmSessionManagerError(EventTime eventTime, Exception error) {
-
+        NRLog.d("onDrmSessionManagerError analytics");
     }
 
     @Override
     public void onDrmKeysRestored(EventTime eventTime) {
-
+        NRLog.d("onDrmKeysRestored analytics");
     }
 
     @Override
     public void onDrmKeysRemoved(EventTime eventTime) {
-
+        NRLog.d("onDrmKeysRemoved analytics");
     }
 }
 
