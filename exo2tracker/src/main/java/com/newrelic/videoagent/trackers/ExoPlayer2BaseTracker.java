@@ -72,7 +72,7 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
             if (currentTimeSecs + margin >= durationSecs) {
                 if (trackerCore.state() != CoreTrackerState.CoreTrackerStateStopped) {
                     NRLog.d("!! End Of Video !!");
-                    sendEnd();
+                    //sendEnd();
                 }
                 return;
             }
@@ -198,6 +198,17 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
         }
         else if (playbackState == Player.STATE_ENDED) {
             NRLog.d("\tVideo Ended Playing");
+            if (trackerCore.state() != CoreTrackerState.CoreTrackerStateStopped) {
+                if (isBuffering) {
+                    trackerCore.sendBufferEnd();
+                    isBuffering = false;
+                }
+                if (isSeeking) {
+                    trackerCore.sendSeekEnd();
+                    isSeeking = false;
+                }
+                sendEnd();
+            }
         }
         else if (playbackState == Player.STATE_BUFFERING) {
             NRLog.d("\tVideo Is Buffering");
