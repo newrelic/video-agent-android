@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.app.MediaRouteButton;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
@@ -16,6 +17,11 @@ import com.google.ads.interactivemedia.v3.api.AdsManagerLoadedEvent;
 import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.google.android.exoplayer2.drm.DefaultDrmSessionManager;
+import com.google.android.exoplayer2.drm.ExoMediaCrypto;
+import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
+import com.google.android.exoplayer2.drm.HttpMediaDrmCallback;
+import com.google.android.exoplayer2.drm.MediaDrmCallback;
 import com.google.android.exoplayer2.ext.cast.CastPlayer;
 import com.google.android.exoplayer2.ext.ima.ImaAdsLoader;
 import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
@@ -34,6 +40,7 @@ import com.google.android.exoplayer2.upstream.BandwidthMeter;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
+import com.google.android.exoplayer2.upstream.HttpDataSource;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
 import com.google.android.gms.cast.MediaInfo;
@@ -53,6 +60,8 @@ import com.newrelic.videoagent.trackers.ExoPlayer2ContentsTracker;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.google.android.exoplayer2.C.WIDEVINE_UUID;
+
 public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoadedListener, AdErrorEvent.AdErrorListener, AdEvent.AdEventListener {
 
     private SimpleExoPlayer player;
@@ -68,14 +77,17 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
 
         NRLog.enable();
 
+        //setupManualPlaylist();
+
         //setupPlayer();
         //setupPlayerWithPlaylist();
         //setupPlayerWithHLSMediaSource();
         //setupCastMediaQueue();
         //setupIMA();
         //setupPlayerHLS();
-        setupPlayerDASH();
-        //setupManualPlaylist();
+        //setupPlayerDASH();
+        setupPlayerDASHLiveWithIMA();
+
 
         // Manipulate heartbeat
         //NewRelicVideoAgent.getContentsTracker(trackerID).getHeartbeat().setHeartbeatInterval(5000);
@@ -281,6 +293,100 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
 
         player.setPlayWhenReady(true);
         player.prepare(dashMediaSource);
+    }
+
+    private void setupPlayerDASHLiveWithIMA() {
+        BandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
+
+        TrackSelection.Factory videoTrackSelectionFactory =  new AdaptiveTrackSelection.Factory(bandwidthMeter);
+
+        TrackSelector trackSelector =  new DefaultTrackSelector(videoTrackSelectionFactory);
+
+        player = ExoPlayerFactory.newSimpleInstance(this, trackSelector);
+
+        PlayerView playerView = findViewById(R.id.player);
+        playerView.setPlayer(player);
+
+        adsLoader = new ImaAdsLoader(this, Uri.parse(getString(R.string.ad_tag_2_url)));
+        adsLoader.setPlayer(player);
+
+        DataSource.Factory dataSourceFactory =
+                new DefaultDataSourceFactory(this, Util.getUserAgent(this, "VideoTestApp"));
+
+        //Live stream
+        Uri videoUri = Uri.parse("https://pe-ak-lp02a-9c9media.akamaized.net/live/News1Digi/p/dash/00000001/8e377c581da8df4e/manifest.mpd");
+
+        //Normal video
+        //Uri videoUri = Uri.parse("http://www.bok.net/dash/tears_of_steel/cleartext/stream.mpd");
+
+        //Other Version of Normal video
+        //Uri videoUri = Uri.parse("https://storage.googleapis.com/wvmedia/clear/h264/tears/tears.mpd");
+
+        DashMediaSource dashMediaSource = new DashMediaSource(videoUri, dataSourceFactory,
+                new DefaultDashChunkSource.Factory(dataSourceFactory), null, null);
+
+        AdsMediaSource adsMediaSource =
+                new AdsMediaSource(dashMediaSource, dataSourceFactory, adsLoader, playerView);
+
+        adsLoader.getAdsLoader().addAdsLoadedListener(this);
+
+        adsLoader.getAdsLoader().addAdErrorListener(this);
+
+        trackerID = NewRelicVideoAgent.start(player, videoUri, Exo2TrackerBuilder.class);
+
+        player.setPlayWhenReady(true);
+        player.prepare(adsMediaSource);
+    }
+
+    private void setupPlayerDASH_DRM_IMA() {
+        BandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
+
+        TrackSelection.Factory videoTrackSelectionFactory =  new AdaptiveTrackSelection.Factory(bandwidthMeter);
+
+        TrackSelector trackSelector =  new DefaultTrackSelector(videoTrackSelectionFactory);
+
+        player = ExoPlayerFactory.newSimpleInstance(this, trackSelector);
+
+        PlayerView playerView = findViewById(R.id.player);
+        playerView.setPlayer(player);
+
+        adsLoader = new ImaAdsLoader(this, Uri.parse(getString(R.string.ad_tag_2_url)));
+        adsLoader.setPlayer(player);
+
+        DataSource.Factory dataSourceFactory =
+                new DefaultDataSourceFactory(this, Util.getUserAgent(this, "VideoTestApp"));
+
+        //Bell Video (only with VPN from Canada)
+        Uri videoUri = Uri.parse("https://capi.9c9media.com/destinations/ctv_android/platforms/android/contents/58240/contentPackages/2818168/manifest.mpd?did=6dc06635-ab6b-4eef-9fde-f0e64ecaf23e&filter=0x13");
+
+        DashMediaSource dashMediaSource = new DashMediaSource(videoUri, dataSourceFactory,
+                new DefaultDashChunkSource.Factory(dataSourceFactory), null, null);
+
+        //DRM stuff
+        final MediaDrmCallback mediaDrmCallback = new HttpMediaDrmCallback(
+                "https://license.9c9media.ca/widevine",
+                (HttpDataSource.Factory) dataSourceFactory);
+        DefaultDrmSessionManager<FrameworkMediaCrypto> drmSessionManager;
+        try {
+            drmSessionManager = DefaultDrmSessionManager.newWidevineInstance(mediaDrmCallback, null);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            return;
+        }
+        // End DRM Stuff
+
+        AdsMediaSource adsMediaSource =
+                new AdsMediaSource(dashMediaSource, dataSourceFactory, adsLoader, playerView);
+
+        adsLoader.getAdsLoader().addAdsLoadedListener(this);
+
+        adsLoader.getAdsLoader().addAdErrorListener(this);
+
+        trackerID = NewRelicVideoAgent.start(player, videoUri, Exo2TrackerBuilder.class);
+
+        player.setPlayWhenReady(true);
+        player.prepare(adsMediaSource);
     }
 
     private void setupPlayer() {
