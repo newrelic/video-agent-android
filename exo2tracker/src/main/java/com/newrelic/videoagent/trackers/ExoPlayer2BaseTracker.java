@@ -136,6 +136,7 @@ public class ExoPlayer2BaseTracker extends Object implements Player.EventListene
     }
 
     private void sendError(Exception error) {
+        NRLog.d("ERROR RECEIVED = " + error);
 
         long tsDiff = System.currentTimeMillis() - lastErrorTs;
         lastErrorTs = System.currentTimeMillis();

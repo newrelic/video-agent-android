@@ -14,6 +14,7 @@ import com.google.ads.interactivemedia.v3.api.AdEvent;
 import com.google.ads.interactivemedia.v3.api.AdsLoader;
 import com.google.ads.interactivemedia.v3.api.AdsManager;
 import com.google.ads.interactivemedia.v3.api.AdsManagerLoadedEvent;
+import com.google.android.exoplayer2.DefaultRenderersFactory;
 import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
@@ -39,7 +40,9 @@ import com.google.android.exoplayer2.ui.PlayerView;
 import com.google.android.exoplayer2.upstream.BandwidthMeter;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
+import com.google.android.exoplayer2.upstream.DefaultDataSource;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
 import com.google.android.exoplayer2.upstream.HttpDataSource;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
@@ -86,7 +89,8 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
         //setupIMA();
         //setupPlayerHLS();
         //setupPlayerDASH();
-        setupPlayerDASHLiveWithIMA();
+        //setupPlayerDASHLiveWithIMA();
+        setupPlayerDASH_DRM_IMA();
 
 
         // Manipulate heartbeat
@@ -339,42 +343,47 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
     }
 
     private void setupPlayerDASH_DRM_IMA() {
+
+        NRLog.d("Play Bell Video with DRM");
+
+        //Setup Bell Video (only with VPN from Canada)
+
+        Uri videoUri = Uri.parse("https://capi.9c9media.com/destinations/ctv_android/platforms/android/contents/58240/contentPackages/2818168/manifest.mpd?did=6dc06635-ab6b-4eef-9fde-f0e64ecaf23e&filter=0x13");
+        DataSource.Factory dataSourceFactory =
+                new DefaultDataSourceFactory(this, Util.getUserAgent(this, "VideoTestApp"));
+        DashMediaSource dashMediaSource = new DashMediaSource(videoUri, dataSourceFactory, new DefaultDashChunkSource.Factory(dataSourceFactory), null, null);
+
+        // Setup player
+
         BandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
 
         TrackSelection.Factory videoTrackSelectionFactory =  new AdaptiveTrackSelection.Factory(bandwidthMeter);
 
         TrackSelector trackSelector =  new DefaultTrackSelector(videoTrackSelectionFactory);
 
-        player = ExoPlayerFactory.newSimpleInstance(this, trackSelector);
+        //Setup DRM stuff
+        final MediaDrmCallback mediaDrmCallback = new HttpMediaDrmCallback(
+                "https://license.9c9media.ca/widevine",
+                new DefaultHttpDataSourceFactory("VideoDemoApp"));
+
+        DefaultDrmSessionManager<FrameworkMediaCrypto> drmSessionManager;
+        try {
+            drmSessionManager = DefaultDrmSessionManager.newWidevineInstance(mediaDrmCallback, null);
+        }
+        catch (Exception e) {
+            NRLog.d("Unsuported DRM Exception");
+            e.printStackTrace();
+            return;
+        }
+
+        //player = ExoPlayerFactory.newSimpleInstance(this, trackSelector);
+        player = ExoPlayerFactory.newSimpleInstance(this, new DefaultRenderersFactory(this), new DefaultTrackSelector(), drmSessionManager);
 
         PlayerView playerView = findViewById(R.id.player);
         playerView.setPlayer(player);
 
         adsLoader = new ImaAdsLoader(this, Uri.parse(getString(R.string.ad_tag_2_url)));
         adsLoader.setPlayer(player);
-
-        DataSource.Factory dataSourceFactory =
-                new DefaultDataSourceFactory(this, Util.getUserAgent(this, "VideoTestApp"));
-
-        //Bell Video (only with VPN from Canada)
-        Uri videoUri = Uri.parse("https://capi.9c9media.com/destinations/ctv_android/platforms/android/contents/58240/contentPackages/2818168/manifest.mpd?did=6dc06635-ab6b-4eef-9fde-f0e64ecaf23e&filter=0x13");
-
-        DashMediaSource dashMediaSource = new DashMediaSource(videoUri, dataSourceFactory,
-                new DefaultDashChunkSource.Factory(dataSourceFactory), null, null);
-
-        //DRM stuff
-        final MediaDrmCallback mediaDrmCallback = new HttpMediaDrmCallback(
-                "https://license.9c9media.ca/widevine",
-                (HttpDataSource.Factory) dataSourceFactory);
-        DefaultDrmSessionManager<FrameworkMediaCrypto> drmSessionManager;
-        try {
-            drmSessionManager = DefaultDrmSessionManager.newWidevineInstance(mediaDrmCallback, null);
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            return;
-        }
-        // End DRM Stuff
 
         AdsMediaSource adsMediaSource =
                 new AdsMediaSource(dashMediaSource, dataSourceFactory, adsLoader, playerView);
@@ -386,7 +395,8 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
         trackerID = NewRelicVideoAgent.start(player, videoUri, Exo2TrackerBuilder.class);
 
         player.setPlayWhenReady(true);
-        player.prepare(adsMediaSource);
+        //player.prepare(adsMediaSource);
+        player.prepare(dashMediaSource);
     }
 
     private void setupPlayer() {
