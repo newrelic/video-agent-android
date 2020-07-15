@@ -348,7 +348,12 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
 
         //Setup Bell Video (only with VPN from Canada)
 
+        // Akamai CDN
         Uri videoUri = Uri.parse("https://capi.9c9media.com/destinations/ctv_android/platforms/android/contents/58240/contentPackages/2818168/manifest.mpd?did=6dc06635-ab6b-4eef-9fde-f0e64ecaf23e&filter=0x13");
+
+        // Fastly CDN
+        //Uri videoUri = Uri.parse("https://capi.9c9media.com/destinations/crave_atexace/platforms/desktop/bond/contents/1875893/contentpackages/3591283/manifest.mpd?jwt=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJsb2NhbGl6YXRpb24iOiJlbi1DQSIsInVzZXJfbmFtZSI6ImIwYjY4MTllMzFhMzRkMDg0NGFhZjJlZjdkMGRhOGRhMGZhZjQ1Y2FiNWEzY2NhN2M1NTFmMjM5OTU5ZGU4MDJAYmR1LmZha2UuZG9tYWluIiwiY3JlYXRpb25fZGF0ZSI6MTU5NDczNzE5MzkwNCwiYWlzX2lkIjoiYjBiNjgxOWUzMWEzNGQwODQ0YWFmMmVmN2QwZGE4ZGEwZmFmNDVjYWI1YTNjY2E3YzU1MWYyMzk5NTlkZTgwMiIsImJkdV9wcm92aWRlciI6IkJlbGwgTWVkaWEgR3Vlc3QiLCJhdXRob3JpdGllcyI6WyJCRFVfVVNFUiJdLCJjbGllbnRfaWQiOiJ1c2VyLW1hbmFnZW1lbnQtZGVmYXVsdCIsImFjY291bnRfaWQiOiI1YmJmOGYyYTQ0NDA5YzAwMDk0MDgwYWYiLCJwcm9maWxlX2lkIjoiNzNlMTNhODRkOGQ5NGYyZDhhYzhhZDhmZjljMzM4ZjQiLCJzY29wZSI6WyJkZWZhdWx0Iiwib2ZmbGluZV9kb3dubG9hZDoxMCIsIm1hdHVyaXR5OmFkdWx0Iiwic3Vic2NyaXB0aW9uOnN0YXJ6LHNlLGNyYXZlcCxjcmF2ZXR2IiwibWFzdGVyX3Byb2ZpbGUiXSwiZXhwIjoxNTk0NzUxNTkzLCJhY2NvdW50Ijp7InBvc3RhbF9jb2RlIjoiTTVWIiwic3RhdHVzIjoiQUNUSVZFIn0sImp0aSI6ImQ5ZTI3ZTFiLWQ4YTYtNDE5Zi05OTMyLWY3ZmNiNmQyMTU5NyJ9.omaytTJhpexIoouMB9lQZJ0XDPkAChj6AOxGXc4doW1k3oPbuh_UxOtH72P5VERjIrAsqtAj9fImZVn_tBROSoC9NDQIKcr5IusD4JXoJG53RZytvAhbbLqE2iQ188etGhjyup4lnb1hCOVP36ksmWasPLTwFjKman3xckZ0NlQXk56EljlYyARNMzIj8xhVmTqmEqOtCeUJuwkPl17tdouy_gExEksa-8x544MVrbxBVzmoYXfbVrhVTGvXQMQYHmKHrJgMHyfRbvOTfwCBjCwKGDF0YAZN61lMlx4vNgXsTucrfxjr5YqiUgEq56CfcQ7cMVFrMmHaPYY5wM5IOA&dId=5f085ffc66d576000619f169");
+
         DataSource.Factory dataSourceFactory =
                 new DefaultDataSourceFactory(this, Util.getUserAgent(this, "VideoTestApp"));
         DashMediaSource dashMediaSource = new DashMediaSource(videoUri, dataSourceFactory, new DefaultDashChunkSource.Factory(dataSourceFactory), null, null);
@@ -382,7 +387,8 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
         PlayerView playerView = findViewById(R.id.player);
         playerView.setPlayer(player);
 
-        adsLoader = new ImaAdsLoader(this, Uri.parse(getString(R.string.ad_tag_2_url)));
+        //adsLoader = new ImaAdsLoader(this, Uri.parse(getString(R.string.ad_tag_2_url)));
+        adsLoader = new ImaAdsLoader(this, Uri.parse(getString(R.string.ad_tag_url)));
         adsLoader.setPlayer(player);
 
         AdsMediaSource adsMediaSource =
@@ -526,6 +532,8 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
 
     @Override
     public void onAdEvent(AdEvent adEvent) {
-        NRLog.d("On Ads Event = " + adEvent);
+        if (adEvent.getType() != AdEvent.AdEventType.AD_PROGRESS) {
+            NRLog.d("On Ads Event = " + adEvent);
+        }
     }
 }
