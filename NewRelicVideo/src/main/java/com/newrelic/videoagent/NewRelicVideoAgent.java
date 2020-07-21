@@ -147,11 +147,13 @@ public class NewRelicVideoAgent {
             TrackerContainer tcPartner = getTrackerContainer(partnerID);
 
             if (tcPartner  != null) {
+                ((AdsTracker)tcPartner.tracker).releaseTracker();
                 tcPartner.tracker = null;
                 tcPartner.trackerPartner = 0L;
                 trackersTable.remove(partnerID);
             }
 
+            ((ContentsTracker)tc.tracker).releaseTracker();
             tc.tracker = null;
             tc.trackerPartner = 0L;
             trackersTable.remove(trackerID);
