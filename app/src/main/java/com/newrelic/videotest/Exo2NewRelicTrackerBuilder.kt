@@ -42,6 +42,7 @@ class Exo2NewRelicTrackerBuilder : TrackerBuilder() {
             contentsTracker = Exo2NewRelicContentsTracker(trackerBuilderData.player).also {
                 if (trackerBuilderData.adsTrackingEnabled) {
                     adsTracker = GoogleImaNewRelicAdsTracker(it)
+                    NRLog.d("Init Ads Tracker = " + adsTracker)
                 }
             }
         } else {

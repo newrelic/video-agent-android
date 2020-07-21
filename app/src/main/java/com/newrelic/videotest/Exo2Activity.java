@@ -63,7 +63,9 @@ import com.newrelic.videoagent.trackers.ExoPlayer2ContentsTracker;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.google.android.exoplayer2.C.WIDEVINE_UUID;
+import ca.bellmedia.lib.vidi.analytics.qos.trackers.Exo2NewRelicTrackerBuilder;
+import ca.bellmedia.lib.vidi.analytics.qos.trackers.GoogleImaNewRelicAdsTracker;
+import ca.bellmedia.lib.vidi.analytics.qos.trackers.TrackerBuilderData;
 
 public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoadedListener, AdErrorEvent.AdErrorListener, AdEvent.AdEventListener {
 
@@ -80,8 +82,30 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
 
         NRLog.enable();
 
-        //setupManualPlaylist();
+        String video = getIntent().getStringExtra("video");
+        NRLog.d("Got extra video = " + video);
 
+        if (video.equals("DASH_DRM_IMA")) {
+            NRLog.d("call setupPlayerDASH_DRM_IMA");
+            setupPlayerDASH_DRM_IMA();
+        }
+        else if (video.equals("DASH_LIVE_IMA")) {
+            NRLog.d("call setupPlayerDASHLiveWithIMA");
+            setupPlayerDASHLiveWithIMA();
+        }
+        else if (video.equals("DASH")) {
+            NRLog.d("call setupPlayerDASH");
+            setupPlayerDASH();
+        }
+        else if (video.equals("HLS")) {
+            NRLog.d("call setupPlayerHLS");
+            setupPlayerHLS();
+        }
+        else {
+            NRLog.d("Unknown video!!");
+        }
+
+        //setupManualPlaylist();
         //setupPlayer();
         //setupPlayerWithPlaylist();
         //setupPlayerWithHLSMediaSource();
@@ -90,8 +114,7 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
         //setupPlayerHLS();
         //setupPlayerDASH();
         //setupPlayerDASHLiveWithIMA();
-        setupPlayerDASH_DRM_IMA();
-
+        //setupPlayerDASH_DRM_IMA();
 
         // Manipulate heartbeat
         //NewRelicVideoAgent.getContentsTracker(trackerID).getHeartbeat().setHeartbeatInterval(5000);
@@ -238,9 +261,14 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
 
     @Override
     protected void onDestroy() {
+        NRLog.d("Exo2Activity onDestroy");
         super.onDestroy();
-        NewRelicVideoAgent.releaseTracker(trackerID);
-        player.release();
+        if (trackerID != null) {
+            NewRelicVideoAgent.releaseTracker(trackerID);
+        }
+        if (player != null) {
+            player.release();
+        }
     }
 
     private void setupPlayerHLS() {
@@ -381,28 +409,30 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
             return;
         }
 
-        //player = ExoPlayerFactory.newSimpleInstance(this, trackSelector);
         player = ExoPlayerFactory.newSimpleInstance(this, new DefaultRenderersFactory(this), new DefaultTrackSelector(), drmSessionManager);
 
         PlayerView playerView = findViewById(R.id.player);
         playerView.setPlayer(player);
 
-        //adsLoader = new ImaAdsLoader(this, Uri.parse(getString(R.string.ad_tag_2_url)));
-        adsLoader = new ImaAdsLoader(this, Uri.parse(getString(R.string.ad_tag_url)));
+        adsLoader = new ImaAdsLoader(this, Uri.parse(getString(R.string.ad_tag_2_url)));
+        //adsLoader = new ImaAdsLoader(this, Uri.parse(getString(R.string.ad_tag_url)));
         adsLoader.setPlayer(player);
 
         AdsMediaSource adsMediaSource =
                 new AdsMediaSource(dashMediaSource, dataSourceFactory, adsLoader, playerView);
 
         adsLoader.getAdsLoader().addAdsLoadedListener(this);
-
+        /*
+        adsLoader.getAdsLoader().addAdsLoadedListener(this);
         adsLoader.getAdsLoader().addAdErrorListener(this);
-
-        trackerID = NewRelicVideoAgent.start(player, videoUri, Exo2TrackerBuilder.class);
+         */
 
         player.setPlayWhenReady(true);
-        //player.prepare(adsMediaSource);
-        player.prepare(dashMediaSource);
+        player.prepare(adsMediaSource);
+        //player.prepare(dashMediaSource);
+
+        //trackerID = NewRelicVideoAgent.start(player, videoUri, Exo2TrackerBuilder.class);
+        trackerID = NewRelicVideoAgent.start(new TrackerBuilderData(player, true), videoUri, Exo2NewRelicTrackerBuilder.class);
     }
 
     private void setupPlayer() {
@@ -521,8 +551,11 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
     public void onAdsManagerLoaded(AdsManagerLoadedEvent adsManagerLoadedEvent) {
         NRLog.d("On Ads Loader Event");
 
+        //AdsManager mAdsManager = adsManagerLoadedEvent.getAdsManager();
+        //mAdsManager.addAdEventListener(this);
+
         AdsManager mAdsManager = adsManagerLoadedEvent.getAdsManager();
-        mAdsManager.addAdEventListener(this);
+        ((GoogleImaNewRelicAdsTracker)NewRelicVideoAgent.getAdsTracker(trackerID)).setAdsManager(mAdsManager);
     }
 
     @Override

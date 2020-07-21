@@ -3,6 +3,7 @@ package ca.bellmedia.lib.vidi.analytics.qos.trackers
 import com.google.ads.interactivemedia.v3.api.AdErrorEvent
 import com.google.ads.interactivemedia.v3.api.AdEvent
 import com.google.ads.interactivemedia.v3.api.AdsManager
+import com.newrelic.videoagent.NRLog
 import com.newrelic.videoagent.basetrackers.AdsTracker
 import com.newrelic.videoagent.basetrackers.ContentsTracker
 import com.newrelic.videoagent.jni.swig.CoreTrackerState
@@ -15,6 +16,7 @@ class GoogleImaNewRelicAdsTracker(contentsTracker: ContentsTracker) : AdsTracker
 
     var adsManager: AdsManager? = null
         set(value) {
+            NRLog.d("FIELD = " + field)
             field?.removeAdEventListener(this)
             field?.removeAdErrorListener(this)
             field = value
