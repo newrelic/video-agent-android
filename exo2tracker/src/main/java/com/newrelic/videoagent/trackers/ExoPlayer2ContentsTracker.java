@@ -185,12 +185,6 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
     // "Overwritten" senders
 
     @Override
-    public void sendRequest() {
-        NRLog.d("OVERWRITTEN sendRequest");
-        super.sendRequest();
-    }
-
-    @Override
     public void sendEnd() {
         super.sendEnd();
         resetState();
@@ -300,6 +294,15 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
             }
             else if (state() == CoreTrackerState.CoreTrackerStatePaused) {
                 sendResume();
+            }
+            else if (!didRequest && !didStart) {
+                NRLog.d("LAST CHANCE TO SEND REQUEST START. isPlayingAd = " + player.isPlayingAd());
+                if (!player.isPlayingAd()) {
+                    sendRequest();
+                    sendStart();
+                    didRequest = true;
+                    didStart = true;
+                }
             }
         }
         else if (playWhenReady) {
