@@ -6,6 +6,7 @@ import android.view.Surface;
 
 import com.google.android.exoplayer2.BasePlayer;
 import com.google.android.exoplayer2.ExoPlaybackException;
+import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
@@ -38,44 +39,10 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
     private int lastWidth;
     private boolean isSeeking = false;
     private boolean isBuffering = false;
+    private boolean didStart = false;
+    private boolean didRequest = false;
     private List<Uri> playlist;
     private int lastWindow;
-    private boolean firstFrameHappened;
-    private Handler handler = new Handler();
-    private Runnable runnable = new Runnable() {
-        @Override
-        public void run() {
-            double currentTimeSecs = (double)player.getContentPosition() / 1000.0;
-            double durationSecs = (double)player.getDuration() / 1000.0;
-
-            /*
-            NRLog.d("Current content position time = " + currentTimeSecs);
-            NRLog.d("Duration time = " + durationSecs);
-            NRLog.d("Current content position percentage = " + 100.0 * currentTimeSecs / durationSecs);
-            NRLog.d("Get current seek bar postion = " + player.getCurrentPosition());
-            */
-
-            if (currentTimeSecs > 0 && firstFrameHappened == false) {
-                NRLog.d("!! First Frame !!");
-                firstFrameHappened = true;
-                sendStart();
-            }
-
-            // Give it margin to ensure the video won't fin ish before we get the last time event
-            double margin = 2.0 * (double)timerTrackTimeMs / 1000.0;
-            if (currentTimeSecs + margin >= durationSecs) {
-                if (state() != CoreTrackerState.CoreTrackerStateStopped) {
-                    NRLog.d("!! End Of Video !!");
-                    //sendEnd();
-                }
-                return;
-            }
-
-            if (state() != CoreTrackerState.CoreTrackerStateStopped) {
-                handler.postDelayed(this, timerTrackTimeMs );
-            }
-        }
-    };
 
     public ExoPlayer2ContentsTracker(SimpleExoPlayer player) {
         super();
@@ -188,14 +155,20 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
 
     public void reset() {
         super.reset();
-
-        bitrateEstimate = 0;
-        lastWindow = 0;
-        firstFrameHappened = false;
-        lastWidth = 0;
-        lastHeight = 0;
+        resetState();
     }
 
+    private void resetState() {
+        bitrateEstimate = 0;
+        lastWindow = 0;
+        lastWidth = 0;
+        lastHeight = 0;
+
+        didStart = false;
+        didRequest = false;
+        isSeeking = false;
+        isBuffering = false;
+    }
 
     public long getBitrateEstimate() {
         return bitrateEstimate;
@@ -215,13 +188,12 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
     public void sendRequest() {
         NRLog.d("OVERWRITTEN sendRequest");
         super.sendRequest();
-        handler.postDelayed(this.runnable, timerTrackTimeMs);
     }
 
     @Override
     public void sendEnd() {
         super.sendEnd();
-        firstFrameHappened = false;
+        resetState();
     }
 
     void sendError(Exception error) {
@@ -285,6 +257,11 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
                 sendSeekEnd();
                 isSeeking = false;
             }
+
+            if (didRequest && !didStart) {
+                didStart = true;
+                sendStart();
+            }
         }
         else if (playbackState == Player.STATE_ENDED) {
             NRLog.d("\tVideo Ended Playing");
@@ -303,6 +280,11 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
         else if (playbackState == Player.STATE_BUFFERING) {
             NRLog.d("\tVideo Is Buffering");
 
+            if (!didRequest) {
+                sendRequest();
+                didRequest = true;
+            }
+
             if (!isBuffering) {
                 sendBufferStart();
                 isBuffering = true;
@@ -312,8 +294,9 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
         if (playWhenReady && playbackState == Player.STATE_READY) {
             NRLog.d("\tVideo Playing");
 
-            if (state() == CoreTrackerState.CoreTrackerStateStopped) {
-                sendRequest();
+            if (didRequest && !didStart) {
+                didStart = true;
+                sendStart();
             }
             else if (state() == CoreTrackerState.CoreTrackerStatePaused) {
                 sendResume();
@@ -446,7 +429,7 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
         NRLog.d("loadEventInfo.responseHeaders = " + loadEventInfo.responseHeaders);
         NRLog.d("loadEventInfo.uri = " + loadEventInfo.uri);
         NRLog.d("IS PLAYING AD ? " + player.isPlayingAd());
-         */
+        */
     }
 
     @Override
