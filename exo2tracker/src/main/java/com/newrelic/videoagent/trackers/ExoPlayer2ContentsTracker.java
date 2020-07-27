@@ -279,7 +279,7 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
                 didRequest = true;
             }
 
-            if (!isBuffering) {
+            if (!isBuffering && !player.isPlayingAd()) {
                 sendBufferStart();
                 isBuffering = true;
             }
