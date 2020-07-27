@@ -442,9 +442,11 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
     public void onLoadCompleted(AnalyticsListener.EventTime eventTime, MediaSourceEventListener.LoadEventInfo loadEventInfo, MediaSourceEventListener.MediaLoadData mediaLoadData) {
         NRLog.d("onLoadCompleted analytics");
         //TODO: use this to get the real contentSrc (uri) and use responseHeader to obtain CDN identity
+        /*
         NRLog.d("loadEventInfo.responseHeaders = " + loadEventInfo.responseHeaders);
         NRLog.d("loadEventInfo.uri = " + loadEventInfo.uri);
         NRLog.d("IS PLAYING AD ? " + player.isPlayingAd());
+         */
     }
 
     @Override
