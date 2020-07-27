@@ -56,6 +56,7 @@ import com.google.android.gms.cast.framework.CastStateListener;
 import com.google.android.gms.common.images.WebImage;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.NewRelicVideoAgent;
+import com.newrelic.videoagent.basetrackers.AdsTracker;
 import com.newrelic.videoagent.jni.swig.CoreTrackerState;
 import com.newrelic.videoagent.trackers.Exo2TrackerBuilder;
 import com.newrelic.videoagent.trackers.ExoPlayer2ContentsTracker;
@@ -555,7 +556,10 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
         //mAdsManager.addAdEventListener(this);
 
         AdsManager mAdsManager = adsManagerLoadedEvent.getAdsManager();
-        ((GoogleImaNewRelicAdsTracker)NewRelicVideoAgent.getAdsTracker(trackerID)).setAdsManager(mAdsManager);
+        AdsTracker adtracker = NewRelicVideoAgent.getAdsTracker(trackerID);
+        if (adtracker != null) {
+            ((GoogleImaNewRelicAdsTracker)adtracker).setAdsManager(mAdsManager);
+        }
     }
 
     @Override
