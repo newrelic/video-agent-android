@@ -516,12 +516,16 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
     @Override
     public void onDroppedVideoFrames(AnalyticsListener.EventTime eventTime, int droppedFrames, long elapsedMs) {
         NRLog.d("onDroppedVideoFrames analytics");
-        sendDroppedFrame(droppedFrames, (int)elapsedMs);
+        if (!player.isPlayingAd()) {
+            sendDroppedFrame(droppedFrames, (int) elapsedMs);
+        }
     }
 
     @Override
     public void onVideoSizeChanged(AnalyticsListener.EventTime eventTime, int width, int height, int unappliedRotationDegrees, float pixelWidthHeightRatio) {
         NRLog.d("onVideoSizeChanged analytics, H = " + height + " W = " + width);
+
+        if (player.isPlayingAd()) return;
 
         //String actionName = isAd() ? EventDefs.AD_RENDITION_CHANGE : EventDefs.CONTENT_RENDITION_CHANGE;
         String actionName = EventDefs.CONTENT_RENDITION_CHANGE;
