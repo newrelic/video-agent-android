@@ -254,6 +254,10 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
         if (playbackState == Player.STATE_READY && playWhenReady == true) {
             goResume();
         }
+
+        if (playbackState == Player.STATE_ENDED) {
+            sendEnd();
+        }
     }
 
     @Override
