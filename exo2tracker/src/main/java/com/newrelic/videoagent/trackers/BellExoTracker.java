@@ -36,6 +36,7 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
     private boolean didStart = false;
     private boolean isPaused = false;
     private boolean isBuffering = false;
+    private boolean isSeeking = false;
 
     public BellExoTracker(SimpleExoPlayer player) {
         super();
@@ -130,6 +131,28 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
         if (isBuffering) {
             sendBufferEnd();
             isBuffering = false;
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    boolean goSeekStart() {
+        if (!isSeeking) {
+            sendSeekStart();
+            isSeeking = true;
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    boolean goSeekEnd() {
+        if (isSeeking) {
+            sendSeekEnd();
+            isSeeking = false;
             return true;
         }
         else {
@@ -270,17 +293,22 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
         }
         NRLog.d("onPlayerStateChanged, payback state (" + playbackState + ") = " + stateString + ", playWhenReady = " + playWhenReady);
 
-        if (playbackState == Player.STATE_BUFFERING && playWhenReady == true) {
-            goBufferStart();
+        if (playbackState == Player.STATE_BUFFERING) {
+            if (!player.isPlayingAd()) {
+                goBufferStart();
+            }
         }
 
         if (playbackState == Player.STATE_READY && playWhenReady == false) {
             goPause();
         }
 
-        if (playbackState == Player.STATE_READY && playWhenReady == true) {
+        if (playbackState == Player.STATE_READY) {
             goBufferEnd();
-            goResume();
+            goSeekEnd();
+            if (playWhenReady == true) {
+                goResume();
+            }
         }
 
         if (playbackState == Player.STATE_ENDED) {
@@ -338,6 +366,8 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
     @Override
     public void onSeekStarted(AnalyticsListener.EventTime eventTime) {
         NRLog.d("onSeekStarted analytics");
+        goSeekStart();
+
     }
 
     @Override
