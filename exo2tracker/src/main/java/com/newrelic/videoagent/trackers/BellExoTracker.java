@@ -31,12 +31,14 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
     private List<Uri> playlist;
     private int lastHeight;
     private int lastWidth;
+    private long lastErrorTs = 0;
 
     private boolean didRequest = false;
     private boolean didStart = false;
     private boolean isPaused = false;
     private boolean isBuffering = false;
     private boolean isSeeking = false;
+    private boolean isInAdBreak = false;
 
     public BellExoTracker(SimpleExoPlayer player) {
         super();
@@ -117,7 +119,7 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
     }
 
     boolean goBufferStart() {
-        if (!isBuffering) {
+        if (!isBuffering && !isInAdBreak) {
             sendBufferStart();
             isBuffering = true;
             return true;
@@ -158,6 +160,39 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
         else {
             return false;
         }
+    }
+
+    void sendError(Exception error) {
+        NRLog.d("ERROR RECEIVED = " + error);
+
+        long tsDiff = System.currentTimeMillis() - lastErrorTs;
+        lastErrorTs = System.currentTimeMillis();
+
+        // Guarantee a minimum distance of 4s between errors to make sure we are not sending multiple error events for the same cause.
+        if (tsDiff < 4000) {
+            NRLog.d("ERROR TOO CLOSE, DO NOT SEND");
+            return;
+        }
+
+        String msg;
+        if (error != null) {
+            if (error.getMessage() != null) {
+                msg = error.getMessage();
+            }
+            else {
+                msg = error.toString();
+            }
+        }
+        else {
+            msg = "<Unknown error>";
+        }
+
+        super.sendError(msg);
+    }
+
+    public void setInAdBreak(boolean inAdBreak) {
+        isInAdBreak = inAdBreak;
+        NRLog.d("IS IN AD BREAK = " + isInAdBreak);
     }
 
     public Object getPlayerName() {
@@ -329,6 +364,7 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
     @Override
     public void onPlayerError(ExoPlaybackException error) {
         NRLog.d("onPlayerError");
+        sendError(error);
     }
 
     @Override
@@ -481,6 +517,7 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
     @Override
     public void onLoadError(AnalyticsListener.EventTime eventTime, MediaSourceEventListener.LoadEventInfo loadEventInfo, MediaSourceEventListener.MediaLoadData mediaLoadData, IOException error, boolean wasCanceled) {
         NRLog.d("onLoadError analytics");
+        sendError(error);
     }
 
     @Override
