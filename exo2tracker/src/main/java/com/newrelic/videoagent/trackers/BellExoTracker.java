@@ -350,7 +350,11 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
 
         NRLog.d("     IS PLAYING AD ? " + player.isPlayingAd());
 
-        if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA_INITIALIZATION) {
+        // Use MANIFEST loading to CONTENT_REQUEST, if no manifest loaded, then use MEDIA_INITIALIZATION that happens when the actual video data is loaded
+        if (mediaLoadData.dataType == C.DATA_TYPE_MANIFEST) {
+            goRequest();
+        }
+        else if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA_INITIALIZATION) {
             goRequest();
         }
     }
