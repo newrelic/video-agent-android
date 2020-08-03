@@ -34,6 +34,7 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
 
     private boolean didRequest = false;
     private boolean didStart = false;
+    private boolean isPaused = false;
 
     public BellExoTracker(SimpleExoPlayer player) {
         super();
@@ -75,6 +76,38 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
             sendStart();
             didStart = true;
             return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    boolean goPause() {
+        if (didStart) {
+            if (!isPaused) {
+                sendPause();
+                isPaused = true;
+                return true;
+            }
+            else {
+                return false;
+            }
+        }
+        else {
+            return false;
+        }
+    }
+
+    boolean goResume() {
+        if (didStart) {
+            if (isPaused) {
+                sendResume();
+                isPaused = false;
+                return true;
+            }
+            else {
+                return false;
+            }
         }
         else {
             return false;
@@ -213,6 +246,14 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
                 break;
         }
         NRLog.d("onPlayerStateChanged, payback state (" + playbackState + ") = " + stateString + ", playWhenReady = " + playWhenReady);
+
+        if (playbackState == Player.STATE_READY && playWhenReady == false) {
+            goPause();
+        }
+
+        if (playbackState == Player.STATE_READY && playWhenReady == true) {
+            goResume();
+        }
     }
 
     @Override
