@@ -35,6 +35,7 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
     private boolean didRequest = false;
     private boolean didStart = false;
     private boolean isPaused = false;
+    private boolean isBuffering = false;
 
     public BellExoTracker(SimpleExoPlayer player) {
         super();
@@ -108,6 +109,28 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
             else {
                 return false;
             }
+        }
+        else {
+            return false;
+        }
+    }
+
+    boolean goBufferStart() {
+        if (!isBuffering) {
+            sendBufferStart();
+            isBuffering = true;
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    boolean goBufferEnd() {
+        if (isBuffering) {
+            sendBufferEnd();
+            isBuffering = false;
+            return true;
         }
         else {
             return false;
@@ -247,11 +270,16 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
         }
         NRLog.d("onPlayerStateChanged, payback state (" + playbackState + ") = " + stateString + ", playWhenReady = " + playWhenReady);
 
+        if (playbackState == Player.STATE_BUFFERING && playWhenReady == true) {
+            goBufferStart();
+        }
+
         if (playbackState == Player.STATE_READY && playWhenReady == false) {
             goPause();
         }
 
         if (playbackState == Player.STATE_READY && playWhenReady == true) {
+            goBufferEnd();
             goResume();
         }
 
