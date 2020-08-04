@@ -65,6 +65,13 @@ public class AdsTracker extends AdsTrackerCore {
         return heartbeat;
     }
 
+    public void releaseTracker() {
+        if (heartbeat != null) {
+            heartbeat.abortTimer();
+            heartbeat = null;
+        }
+    }
+
     public Object getNumberOfAdsAttr() {
         return new Long((long)getNumberOfAds());
     }

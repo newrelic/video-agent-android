@@ -1,12 +1,10 @@
 package com.newrelic.videoagent.trackers;
 
 import android.net.Uri;
-import android.os.Handler;
 import android.view.Surface;
 
-import com.google.android.exoplayer2.BasePlayer;
+import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
-import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
@@ -23,30 +21,178 @@ import com.newrelic.videoagent.EventDefs;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.basetrackers.ContentsTracker;
 import com.newrelic.videoagent.jni.CAL;
-import com.newrelic.videoagent.jni.swig.CoreTrackerState;
-
 import java.io.IOException;
 import java.util.List;
 
-public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player.EventListener, AnalyticsListener {
+public class BellExoTracker extends ContentsTracker implements Player.EventListener, AnalyticsListener {
 
-    protected BasePlayer player;
-
-    private static final long timerTrackTimeMs = 250;
-    private long lastErrorTs = 0;
+    protected SimpleExoPlayer player;
     private long bitrateEstimate;
+    private List<Uri> playlist;
     private int lastHeight;
     private int lastWidth;
-    private boolean isSeeking = false;
-    private boolean isBuffering = false;
-    private boolean didStart = false;
-    private boolean didRequest = false;
-    private List<Uri> playlist;
-    private int lastWindow;
+    private long lastErrorTs = 0;
 
-    public ExoPlayer2ContentsTracker(SimpleExoPlayer player) {
+    private boolean didRequest = false;
+    private boolean didStart = false;
+    private boolean isPaused = false;
+    private boolean isBuffering = false;
+    private boolean isSeeking = false;
+    private boolean isInAdBreak = false;
+
+    public BellExoTracker(SimpleExoPlayer player) {
         super();
         this.player = player;
+        NRLog.d("BellExoTracker constructor");
+    }
+
+    @Override
+    public void setup() {
+        super.setup();
+
+        player.addListener(this);
+        player.addAnalyticsListener(this);
+
+        sendPlayerReady();
+    }
+
+    @Override
+    public void reset() {
+        super.reset();
+
+        player.removeListener(this);
+        player.removeAnalyticsListener(this);
+    }
+
+    boolean goRequest() {
+        if (!didRequest) {
+            sendRequest();
+            didRequest = true;
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    boolean goStart() {
+        if (didRequest && !didStart) {
+            sendStart();
+            didStart = true;
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    boolean goPause() {
+        if (didStart) {
+            if (!isPaused) {
+                sendPause();
+                isPaused = true;
+                return true;
+            }
+            else {
+                return false;
+            }
+        }
+        else {
+            return false;
+        }
+    }
+
+    boolean goResume() {
+        if (didStart) {
+            if (isPaused) {
+                sendResume();
+                isPaused = false;
+                return true;
+            }
+            else {
+                return false;
+            }
+        }
+        else {
+            return false;
+        }
+    }
+
+    boolean goBufferStart() {
+        if (!isBuffering && !isInAdBreak) {
+            sendBufferStart();
+            isBuffering = true;
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    boolean goBufferEnd() {
+        if (isBuffering) {
+            sendBufferEnd();
+            isBuffering = false;
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    boolean goSeekStart() {
+        if (!isSeeking) {
+            sendSeekStart();
+            isSeeking = true;
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    boolean goSeekEnd() {
+        if (isSeeking) {
+            sendSeekEnd();
+            isSeeking = false;
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    void sendError(Exception error) {
+        NRLog.d("ERROR RECEIVED = " + error);
+
+        long tsDiff = System.currentTimeMillis() - lastErrorTs;
+        lastErrorTs = System.currentTimeMillis();
+
+        // Guarantee a minimum distance of 4s between errors to make sure we are not sending multiple error events for the same cause.
+        if (tsDiff < 4000) {
+            NRLog.d("ERROR TOO CLOSE, DO NOT SEND");
+            return;
+        }
+
+        String msg;
+        if (error != null) {
+            if (error.getMessage() != null) {
+                msg = error.getMessage();
+            }
+            else {
+                msg = error.toString();
+            }
+        }
+        else {
+            msg = "<Unknown error>";
+        }
+
+        super.sendError(msg);
+    }
+
+    public void setInAdBreak(boolean inAdBreak) {
+        isInAdBreak = inAdBreak;
+        NRLog.d("IS IN AD BREAK = " + isInAdBreak);
     }
 
     public Object getPlayerName() {
@@ -129,45 +275,7 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
     }
 
     private SimpleExoPlayer getPlayer() {
-        return (SimpleExoPlayer)player;
-    }
-
-    @Override
-    public void setSrc(List<Uri> uris) {
-        setPlaylist(uris);
-    }
-
-
-// Old basetracker code, now integrated here
-
-
-    public void setup() {
-        super.setup();
-
-        player.addListener(this);
-
-        if (player instanceof SimpleExoPlayer) {
-            ((SimpleExoPlayer)player).addAnalyticsListener(this);
-        }
-
-        sendPlayerReady();
-    }
-
-    public void reset() {
-        super.reset();
-        resetState();
-    }
-
-    private void resetState() {
-        bitrateEstimate = 0;
-        lastWindow = 0;
-        lastWidth = 0;
-        lastHeight = 0;
-
-        didStart = false;
-        didRequest = false;
-        isSeeking = false;
-        isBuffering = false;
+        return player;
     }
 
     public long getBitrateEstimate() {
@@ -182,51 +290,17 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
         this.playlist = playlist;
     }
 
-    // "Overwritten" senders
-
-    @Override
-    public void sendEnd() {
-        super.sendEnd();
-        resetState();
-    }
-
-    void sendError(Exception error) {
-        NRLog.d("ERROR RECEIVED = " + error);
-
-        long tsDiff = System.currentTimeMillis() - lastErrorTs;
-        lastErrorTs = System.currentTimeMillis();
-
-        // Guarantee a minimum distance of 4s between errors to make sure we are not sending mmultiple error events for the same cause.
-        if (tsDiff < 4000) {
-            NRLog.d("ERROR TOO CLOSE, DO NOT SEND");
-            return;
-        }
-
-        String msg;
-        if (error != null) {
-            if (error.getMessage() != null) {
-                msg = error.getMessage();
-            }
-            else {
-                msg = error.toString();
-            }
-        }
-        else {
-            msg = "<Unknown error>";
-        }
-
-        super.sendError(msg);
-    }
 
     // ExoPlayer Player.EventListener
 
     @Override
     public void onTimelineChanged(Timeline timeline, Object manifest, int reason) {
-        NRLog.d("onTimelineChanged");
+        NRLog.d("onTimelineChanged timeline = " + timeline + " manifest = " + manifest);
     }
 
     @Override
     public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
+        NRLog.d("onTracksChanged groups = " + trackGroups + " selections = " + trackSelections);
     }
 
     @Override
@@ -237,86 +311,44 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
     @Override
     public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
 
-        NRLog.d("onPlayerStateChanged, payback state = " + playbackState + " {");
+        String stateString = "?";
+        switch (playbackState) {
+            case Player.STATE_IDLE:
+                stateString =  "Idle";
+                break;
+            case Player.STATE_BUFFERING:
+                stateString =  "Buffering";
+                break;
+            case Player.STATE_READY:
+                stateString =  "Ready";
+                break;
+            case Player.STATE_ENDED:
+                stateString =  "Ended";
+                break;
+        }
+        NRLog.d("onPlayerStateChanged, payback state (" + playbackState + ") = " + stateString + ", playWhenReady = " + playWhenReady);
+
+        if (playbackState == Player.STATE_BUFFERING) {
+            if (!player.isPlayingAd()) {
+                goBufferStart();
+            }
+        }
+
+        if (playbackState == Player.STATE_READY && playWhenReady == false) {
+            goPause();
+        }
 
         if (playbackState == Player.STATE_READY) {
-            NRLog.d("\tVideo Is Ready");
-
-            if (isBuffering) {
-                sendBufferEnd();
-                isBuffering = false;
-            }
-
-            if (isSeeking) {
-                sendSeekEnd();
-                isSeeking = false;
-            }
-
-            if (didRequest && !didStart) {
-                didStart = true;
-                sendStart();
-            }
-        }
-        else if (playbackState == Player.STATE_ENDED) {
-            NRLog.d("\tVideo Ended Playing");
-            if (state() != CoreTrackerState.CoreTrackerStateStopped) {
-                if (isBuffering) {
-                    sendBufferEnd();
-                    isBuffering = false;
-                }
-                if (isSeeking) {
-                    sendSeekEnd();
-                    isSeeking = false;
-                }
-                sendEnd();
-            }
-        }
-        else if (playbackState == Player.STATE_BUFFERING) {
-            NRLog.d("\tVideo Is Buffering");
-
-            if (!didRequest) {
-                sendRequest();
-                didRequest = true;
-            }
-
-            if (!isBuffering && !player.isPlayingAd()) {
-                sendBufferStart();
-                isBuffering = true;
+            goBufferEnd();
+            goSeekEnd();
+            if (playWhenReady == true) {
+                goResume();
             }
         }
 
-        if (playWhenReady && playbackState == Player.STATE_READY) {
-            NRLog.d("\tVideo Playing");
-
-            if (didRequest && !didStart) {
-                didStart = true;
-                sendStart();
-            }
-            else if (state() == CoreTrackerState.CoreTrackerStatePaused) {
-                sendResume();
-            }
-            else if (!didRequest && !didStart) {
-                NRLog.d("LAST CHANCE TO SEND REQUEST START. isPlayingAd = " + player.isPlayingAd());
-                if (!player.isPlayingAd()) {
-                    sendRequest();
-                    sendStart();
-                    didRequest = true;
-                    didStart = true;
-                }
-            }
+        if (playbackState == Player.STATE_ENDED) {
+            sendEnd();
         }
-        else if (playWhenReady) {
-            NRLog.d("\tVideo Not Playing");
-        }
-        else {
-            NRLog.d("\tVideo Paused");
-
-            if (state() == CoreTrackerState.CoreTrackerStatePlaying) {
-                sendPause();
-            }
-        }
-
-        NRLog.d("}");
     }
 
     @Override
@@ -337,7 +369,7 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
 
     @Override
     public void onPositionDiscontinuity(int reason) {
-        NRLog.d("onPositionDiscontinuity");
+        NRLog.d("onPositionDiscontinuity = " + reason);
     }
 
     @Override
@@ -354,27 +386,24 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
 
     @Override
     public void onPlayerStateChanged(AnalyticsListener.EventTime eventTime, boolean playWhenReady, int playbackState) {
-        NRLog.d("onPlayerStateChanged analytics");
+        NRLog.d("onPlayerStateChanged analytics payback state = " + playbackState + " , playWhenReady = " + playWhenReady);
     }
 
     @Override
     public void onTimelineChanged(AnalyticsListener.EventTime eventTime, int reason) {
-        NRLog.d("onTimelineChanged analytics");
+        NRLog.d("onTimelineChanged analytics = " + reason);
     }
 
     @Override
     public void onPositionDiscontinuity(AnalyticsListener.EventTime eventTime, int reason) {
-        NRLog.d("onPositionDiscontinuity analytics");
+        NRLog.d("onPositionDiscontinuity analytics = " + reason);
     }
 
     @Override
     public void onSeekStarted(AnalyticsListener.EventTime eventTime) {
         NRLog.d("onSeekStarted analytics");
+        goSeekStart();
 
-        if (!isSeeking) {
-            sendSeekStart();
-            isSeeking = true;
-        }
     }
 
     @Override
@@ -410,18 +439,63 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
     @Override
     public void onTracksChanged(AnalyticsListener.EventTime eventTime, TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
         NRLog.d("onTracksChanged analytics");
-
-        // Next track in the playlist
-        if (player.getCurrentWindowIndex() != lastWindow) {
-            NRLog.d("Next video in the playlist starts");
-            lastWindow = player.getCurrentWindowIndex();
-            sendRequest();
-        }
     }
 
     @Override
     public void onLoadStarted(AnalyticsListener.EventTime eventTime, MediaSourceEventListener.LoadEventInfo loadEventInfo, MediaSourceEventListener.MediaLoadData mediaLoadData) {
         NRLog.d("onLoadStarted analytics");
+        NRLog.d("     loadEventInfo.uri = " + loadEventInfo.uri);
+        NRLog.d("     loadEventInfo.dataSpec.key = " + loadEventInfo.dataSpec.key);
+        NRLog.d("     loadEventInfo.dataSpec.absoluteStreamPosition = " + loadEventInfo.dataSpec.absoluteStreamPosition);
+        NRLog.d("     SRC = " + getSrc());
+
+        switch (mediaLoadData.dataType){
+            case C.DATA_TYPE_AD:
+                NRLog.d("     mediaLoadData.dataType = " + mediaLoadData.dataType + " DATA_TYPE_AD");
+                break;
+            case C.DATA_TYPE_CUSTOM_BASE:
+                NRLog.d("     mediaLoadData.dataType = " + mediaLoadData.dataType + " DATA_TYPE_CUSTOM_BASE");
+                break;
+            case C.DATA_TYPE_DRM:
+                NRLog.d("     mediaLoadData.dataType = " + mediaLoadData.dataType + " DATA_TYPE_DRM");
+                break;
+            case C.DATA_TYPE_MANIFEST:
+                NRLog.d("     mediaLoadData.dataType = " + mediaLoadData.dataType + " DATA_TYPE_MANIFEST");
+                break;
+            case C.DATA_TYPE_MEDIA:
+                NRLog.d("     mediaLoadData.dataType = " + mediaLoadData.dataType + " DATA_TYPE_MEDIA");
+                break;
+            case C.DATA_TYPE_MEDIA_INITIALIZATION:
+                NRLog.d("     mediaLoadData.dataType = " + mediaLoadData.dataType + " DATA_TYPE_MEDIA_INITIALIZATION");
+                break;
+            case C.DATA_TYPE_MEDIA_PROGRESSIVE_LIVE:
+                NRLog.d("     mediaLoadData.dataType = " + mediaLoadData.dataType + " DATA_TYPE_MEDIA_PROGRESSIVE_LIVE");
+                break;
+            case C.DATA_TYPE_TIME_SYNCHRONIZATION:
+                NRLog.d("     mediaLoadData.dataType = " + mediaLoadData.dataType + " DATA_TYPE_TIME_SYNCHRONIZATION");
+                break;
+            case C.DATA_TYPE_UNKNOWN:
+                NRLog.d("     mediaLoadData.dataType = " + mediaLoadData.dataType + " DATA_TYPE_UNKNOWN");
+                break;
+            default:
+                NRLog.d("     mediaLoadData.dataType = " + mediaLoadData.dataType);
+        }
+
+        NRLog.d("     mediaLoadData.trackType = " + mediaLoadData.trackType);
+
+        if (mediaLoadData.trackFormat != null) {
+            NRLog.d("     mediaLoadData.trackFormat.containerMimeType = " + mediaLoadData.trackFormat.containerMimeType);
+        }
+
+        NRLog.d("     IS PLAYING AD ? " + player.isPlayingAd());
+
+        // Use MANIFEST loading to CONTENT_REQUEST, if no manifest loaded, then use MEDIA_INITIALIZATION that happens when the actual video data is loaded
+        if (mediaLoadData.dataType == C.DATA_TYPE_MANIFEST) {
+            goRequest();
+        }
+        else if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA_INITIALIZATION) {
+            goRequest();
+        }
     }
 
     @Override
@@ -448,12 +522,12 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
 
     @Override
     public void onDownstreamFormatChanged(AnalyticsListener.EventTime eventTime, MediaSourceEventListener.MediaLoadData mediaLoadData) {
-
+        NRLog.d("onDownstreamFormatChanged analytics");
     }
 
     @Override
     public void onMediaPeriodReleased(AnalyticsListener.EventTime eventTime) {
-
+        NRLog.d("onMediaPeriodReleased analytics");
     }
 
     @Override
@@ -470,47 +544,47 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
 
     @Override
     public void onMetadata(AnalyticsListener.EventTime eventTime, Metadata metadata) {
-
+        NRLog.d("onMetadata analytics");
     }
 
     @Override
     public void onDecoderEnabled(AnalyticsListener.EventTime eventTime, int trackType, DecoderCounters decoderCounters) {
-
+        NRLog.d("onDecoderEnabled analytics");
     }
 
     @Override
     public void onDecoderInitialized(AnalyticsListener.EventTime eventTime, int trackType, String decoderName, long initializationDurationMs) {
-
+        NRLog.d("onDecoderInitialized analytics");
     }
 
     @Override
     public void onDecoderInputFormatChanged(AnalyticsListener.EventTime eventTime, int trackType, Format format) {
-
+        NRLog.d("onDecoderInputFormatChanged analytics");
     }
 
     @Override
     public void onUpstreamDiscarded(AnalyticsListener.EventTime eventTime, MediaSourceEventListener.MediaLoadData mediaLoadData) {
-
+        NRLog.d("onUpstreamDiscarded analytics");
     }
 
     @Override
     public void onMediaPeriodCreated(AnalyticsListener.EventTime eventTime) {
-
+        NRLog.d("onMediaPeriodCreated analytics");
     }
 
     @Override
     public void onDecoderDisabled(AnalyticsListener.EventTime eventTime, int trackType, DecoderCounters decoderCounters) {
-
+        NRLog.d("onDecoderDisabled analytics");
     }
 
     @Override
     public void onAudioSessionId(AnalyticsListener.EventTime eventTime, int audioSessionId) {
-
+        NRLog.d("onAudioSessionId analytics");
     }
 
     @Override
     public void onAudioUnderrun(AnalyticsListener.EventTime eventTime, int bufferSize, long bufferSizeMs, long elapsedSinceLastFeedMs) {
-
+        NRLog.d("onAudioUnderrun analytics");
     }
 
     @Override
@@ -551,6 +625,16 @@ public class ExoPlayer2ContentsTracker extends ContentsTracker implements Player
     @Override
     public void onRenderedFirstFrame(AnalyticsListener.EventTime eventTime, Surface surface) {
         NRLog.d("onRenderedFirstFrame analytics");
+        NRLog.d("     adGroupIndex = " + eventTime.mediaPeriodId.adGroupIndex);
+        NRLog.d("     adIndexInAdGroup = " + eventTime.mediaPeriodId.adIndexInAdGroup);
+        NRLog.d("     windowSequenceNumber = " + eventTime.mediaPeriodId.windowSequenceNumber);
+        NRLog.d("     windowsIndex = " + eventTime.windowIndex);
+        NRLog.d("     currentPlaybackPositionMs = " + eventTime.currentPlaybackPositionMs);
+        NRLog.d("     eventPlaybackPositionMs = " + eventTime.eventPlaybackPositionMs);
+
+        if (eventTime.mediaPeriodId.adIndexInAdGroup < 0 || eventTime.mediaPeriodId.adIndexInAdGroup > 200) {
+            goStart();
+        }
     }
 
     @Override

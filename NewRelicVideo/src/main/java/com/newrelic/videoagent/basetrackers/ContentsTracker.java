@@ -60,6 +60,13 @@ public class ContentsTracker extends ContentsTrackerCore {
         return heartbeat;
     }
 
+    public void releaseTracker() {
+        if (heartbeat != null) {
+            heartbeat.abortTimer();
+            heartbeat = null;
+        }
+    }
+
     public Object getIsAd() {
         return new Long(0);
     }

@@ -56,6 +56,7 @@ import com.google.android.gms.cast.framework.CastStateListener;
 import com.google.android.gms.common.images.WebImage;
 import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.NewRelicVideoAgent;
+import com.newrelic.videoagent.basetrackers.AdsTracker;
 import com.newrelic.videoagent.jni.swig.CoreTrackerState;
 import com.newrelic.videoagent.trackers.Exo2TrackerBuilder;
 import com.newrelic.videoagent.trackers.ExoPlayer2ContentsTracker;
@@ -63,7 +64,9 @@ import com.newrelic.videoagent.trackers.ExoPlayer2ContentsTracker;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.google.android.exoplayer2.C.WIDEVINE_UUID;
+import ca.bellmedia.lib.vidi.analytics.qos.trackers.Exo2NewRelicTrackerBuilder;
+import ca.bellmedia.lib.vidi.analytics.qos.trackers.GoogleImaNewRelicAdsTracker;
+import ca.bellmedia.lib.vidi.analytics.qos.trackers.TrackerBuilderData;
 
 public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoadedListener, AdErrorEvent.AdErrorListener, AdEvent.AdEventListener {
 
@@ -80,8 +83,30 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
 
         NRLog.enable();
 
-        //setupManualPlaylist();
+        String video = getIntent().getStringExtra("video");
+        NRLog.d("Got extra video = " + video);
 
+        if (video.equals("DASH_DRM_IMA")) {
+            NRLog.d("call setupPlayerDASH_DRM_IMA");
+            setupPlayerDASH_DRM_IMA();
+        }
+        else if (video.equals("DASH_LIVE_IMA")) {
+            NRLog.d("call setupPlayerDASHLiveWithIMA");
+            setupPlayerDASHLiveWithIMA();
+        }
+        else if (video.equals("DASH")) {
+            NRLog.d("call setupPlayerDASH");
+            setupPlayerDASH();
+        }
+        else if (video.equals("HLS")) {
+            NRLog.d("call setupPlayerHLS");
+            setupPlayerHLS();
+        }
+        else {
+            NRLog.d("Unknown video!!");
+        }
+
+        //setupManualPlaylist();
         //setupPlayer();
         //setupPlayerWithPlaylist();
         //setupPlayerWithHLSMediaSource();
@@ -90,8 +115,7 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
         //setupPlayerHLS();
         //setupPlayerDASH();
         //setupPlayerDASHLiveWithIMA();
-        setupPlayerDASH_DRM_IMA();
-
+        //setupPlayerDASH_DRM_IMA();
 
         // Manipulate heartbeat
         //NewRelicVideoAgent.getContentsTracker(trackerID).getHeartbeat().setHeartbeatInterval(5000);
@@ -238,9 +262,14 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
 
     @Override
     protected void onDestroy() {
+        NRLog.d("Exo2Activity onDestroy");
         super.onDestroy();
-        NewRelicVideoAgent.releaseTracker(trackerID);
-        player.release();
+        if (trackerID != null) {
+            NewRelicVideoAgent.releaseTracker(trackerID);
+        }
+        if (player != null) {
+            player.release();
+        }
     }
 
     private void setupPlayerHLS() {
@@ -348,7 +377,12 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
 
         //Setup Bell Video (only with VPN from Canada)
 
+        // Akamai CDN
         Uri videoUri = Uri.parse("https://capi.9c9media.com/destinations/ctv_android/platforms/android/contents/58240/contentPackages/2818168/manifest.mpd?did=6dc06635-ab6b-4eef-9fde-f0e64ecaf23e&filter=0x13");
+
+        // Fastly CDN
+        //Uri videoUri = Uri.parse("https://capi.9c9media.com/destinations/crave_atexace/platforms/desktop/bond/contents/1875893/contentpackages/3591283/manifest.mpd?jwt=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJsb2NhbGl6YXRpb24iOiJlbi1DQSIsInVzZXJfbmFtZSI6ImIwYjY4MTllMzFhMzRkMDg0NGFhZjJlZjdkMGRhOGRhMGZhZjQ1Y2FiNWEzY2NhN2M1NTFmMjM5OTU5ZGU4MDJAYmR1LmZha2UuZG9tYWluIiwiY3JlYXRpb25fZGF0ZSI6MTU5NDczNzE5MzkwNCwiYWlzX2lkIjoiYjBiNjgxOWUzMWEzNGQwODQ0YWFmMmVmN2QwZGE4ZGEwZmFmNDVjYWI1YTNjY2E3YzU1MWYyMzk5NTlkZTgwMiIsImJkdV9wcm92aWRlciI6IkJlbGwgTWVkaWEgR3Vlc3QiLCJhdXRob3JpdGllcyI6WyJCRFVfVVNFUiJdLCJjbGllbnRfaWQiOiJ1c2VyLW1hbmFnZW1lbnQtZGVmYXVsdCIsImFjY291bnRfaWQiOiI1YmJmOGYyYTQ0NDA5YzAwMDk0MDgwYWYiLCJwcm9maWxlX2lkIjoiNzNlMTNhODRkOGQ5NGYyZDhhYzhhZDhmZjljMzM4ZjQiLCJzY29wZSI6WyJkZWZhdWx0Iiwib2ZmbGluZV9kb3dubG9hZDoxMCIsIm1hdHVyaXR5OmFkdWx0Iiwic3Vic2NyaXB0aW9uOnN0YXJ6LHNlLGNyYXZlcCxjcmF2ZXR2IiwibWFzdGVyX3Byb2ZpbGUiXSwiZXhwIjoxNTk0NzUxNTkzLCJhY2NvdW50Ijp7InBvc3RhbF9jb2RlIjoiTTVWIiwic3RhdHVzIjoiQUNUSVZFIn0sImp0aSI6ImQ5ZTI3ZTFiLWQ4YTYtNDE5Zi05OTMyLWY3ZmNiNmQyMTU5NyJ9.omaytTJhpexIoouMB9lQZJ0XDPkAChj6AOxGXc4doW1k3oPbuh_UxOtH72P5VERjIrAsqtAj9fImZVn_tBROSoC9NDQIKcr5IusD4JXoJG53RZytvAhbbLqE2iQ188etGhjyup4lnb1hCOVP36ksmWasPLTwFjKman3xckZ0NlQXk56EljlYyARNMzIj8xhVmTqmEqOtCeUJuwkPl17tdouy_gExEksa-8x544MVrbxBVzmoYXfbVrhVTGvXQMQYHmKHrJgMHyfRbvOTfwCBjCwKGDF0YAZN61lMlx4vNgXsTucrfxjr5YqiUgEq56CfcQ7cMVFrMmHaPYY5wM5IOA&dId=5f085ffc66d576000619f169");
+
         DataSource.Factory dataSourceFactory =
                 new DefaultDataSourceFactory(this, Util.getUserAgent(this, "VideoTestApp"));
         DashMediaSource dashMediaSource = new DashMediaSource(videoUri, dataSourceFactory, new DefaultDashChunkSource.Factory(dataSourceFactory), null, null);
@@ -376,27 +410,30 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
             return;
         }
 
-        //player = ExoPlayerFactory.newSimpleInstance(this, trackSelector);
         player = ExoPlayerFactory.newSimpleInstance(this, new DefaultRenderersFactory(this), new DefaultTrackSelector(), drmSessionManager);
 
         PlayerView playerView = findViewById(R.id.player);
         playerView.setPlayer(player);
 
         adsLoader = new ImaAdsLoader(this, Uri.parse(getString(R.string.ad_tag_2_url)));
+        //adsLoader = new ImaAdsLoader(this, Uri.parse(getString(R.string.ad_tag_url)));
         adsLoader.setPlayer(player);
 
         AdsMediaSource adsMediaSource =
                 new AdsMediaSource(dashMediaSource, dataSourceFactory, adsLoader, playerView);
 
         adsLoader.getAdsLoader().addAdsLoadedListener(this);
-
+        /*
+        adsLoader.getAdsLoader().addAdsLoadedListener(this);
         adsLoader.getAdsLoader().addAdErrorListener(this);
-
-        trackerID = NewRelicVideoAgent.start(player, videoUri, Exo2TrackerBuilder.class);
+         */
 
         player.setPlayWhenReady(true);
-        //player.prepare(adsMediaSource);
-        player.prepare(dashMediaSource);
+        player.prepare(adsMediaSource);
+        //player.prepare(dashMediaSource);
+
+        //trackerID = NewRelicVideoAgent.start(player, videoUri, Exo2TrackerBuilder.class);
+        trackerID = NewRelicVideoAgent.start(new TrackerBuilderData(player, true), videoUri, Exo2NewRelicTrackerBuilder.class);
     }
 
     private void setupPlayer() {
@@ -515,8 +552,14 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
     public void onAdsManagerLoaded(AdsManagerLoadedEvent adsManagerLoadedEvent) {
         NRLog.d("On Ads Loader Event");
 
+        //AdsManager mAdsManager = adsManagerLoadedEvent.getAdsManager();
+        //mAdsManager.addAdEventListener(this);
+
         AdsManager mAdsManager = adsManagerLoadedEvent.getAdsManager();
-        mAdsManager.addAdEventListener(this);
+        AdsTracker adtracker = NewRelicVideoAgent.getAdsTracker(trackerID);
+        if (adtracker != null) {
+            ((GoogleImaNewRelicAdsTracker)adtracker).setAdsManager(mAdsManager);
+        }
     }
 
     @Override
@@ -526,6 +569,8 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
 
     @Override
     public void onAdEvent(AdEvent adEvent) {
-        NRLog.d("On Ads Event = " + adEvent);
+        if (adEvent.getType() != AdEvent.AdEventType.AD_PROGRESS) {
+            NRLog.d("On Ads Event = " + adEvent);
+        }
     }
 }
