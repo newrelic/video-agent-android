@@ -491,7 +491,8 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
 
         // Use MANIFEST loading to CONTENT_REQUEST, if no manifest loaded, then use MEDIA_INITIALIZATION that happens when the actual video data is loaded
         if (mediaLoadData.dataType == C.DATA_TYPE_MANIFEST) {
-            goRequest();
+            //goRequest();
+            sendCustomAction("CONTENT_NRMANIFEST_REQUEST");
         }
         else if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA_INITIALIZATION) {
             goRequest();
