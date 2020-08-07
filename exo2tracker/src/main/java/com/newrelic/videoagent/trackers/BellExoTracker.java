@@ -40,6 +40,8 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
     private boolean isSeeking = false;
     private boolean isInAdBreak = false;
 
+    private long timeOfNRManifestRequest = 0;
+
     public BellExoTracker(SimpleExoPlayer player) {
         super();
         this.player = player;
@@ -190,6 +192,18 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
         super.sendError(msg);
     }
 
+    @Override
+    public void sendStart() {
+        setOptionKey("timeSinceNrmanifestRequest",  System.currentTimeMillis() - timeOfNRManifestRequest, EventDefs.CONTENT_START);
+        super.sendStart();
+    }
+
+    @Override
+    public void sendEnd() {
+        setOptionKey("timeSinceNrmanifestRequest",  System.currentTimeMillis() - timeOfNRManifestRequest, EventDefs.CONTENT_END);
+        super.sendEnd();
+    }
+
     public void setInAdBreak(boolean inAdBreak) {
         isInAdBreak = inAdBreak;
         NRLog.d("IS IN AD BREAK = " + isInAdBreak);
@@ -208,7 +222,7 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
     }
 
     public Object getTrackerVersion() {
-        return BuildConfig.VERSION_NAME;
+        return "0.9.0";/*BuildConfig.VERSION_NAME;*/
     }
 
     public Object getBitrate() {
@@ -493,6 +507,7 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
         if (mediaLoadData.dataType == C.DATA_TYPE_MANIFEST) {
             //goRequest();
             sendCustomAction("CONTENT_NRMANIFEST_REQUEST");
+            timeOfNRManifestRequest = System.currentTimeMillis();
         }
         else if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA_INITIALIZATION) {
             goRequest();
