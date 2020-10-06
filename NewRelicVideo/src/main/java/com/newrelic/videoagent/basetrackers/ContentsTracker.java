@@ -46,13 +46,17 @@ public class ContentsTracker extends ContentsTrackerCore {
 
     @Override
     public void sendRequest() {
-        heartbeat.startTimer();
+        if (heartbeat != null) {
+            heartbeat.startTimer();
+        }
         super.sendRequest();
     }
 
     @Override
     public void sendEnd() {
-        heartbeat.abortTimer();
+        if (heartbeat != null) {
+            heartbeat.abortTimer();
+        }
         super.sendEnd();
     }
 
