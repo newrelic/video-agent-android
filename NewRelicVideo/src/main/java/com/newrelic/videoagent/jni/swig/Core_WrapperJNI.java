@@ -78,6 +78,7 @@ public class Core_WrapperJNI {
   public final static native void ContentsTrackerCore_sendCustomAction__SWIG_0(long jarg1, ContentsTrackerCore jarg1_, String jarg2);
   public final static native void ContentsTrackerCore_sendCustomAction__SWIG_1(long jarg1, ContentsTrackerCore jarg1_, String jarg2, long jarg3, AttrList jarg3_);
   public final static native void ContentsTrackerCore_sendCustomAction__SWIG_2(long jarg1, ContentsTrackerCore jarg1_, String jarg2, String jarg3, long jarg4, AttrList jarg4_);
+  public final static native void ContentsTrackerCore_sendCustomAction__SWIG_3(long jarg1, ContentsTrackerCore jarg1_, String jarg2, String jarg3);
   public final static native boolean ContentsTrackerCore_setTimestamp(long jarg1, ContentsTrackerCore jarg1_, double jarg2, String jarg3);
   public final static native void ContentsTrackerCore_adHappened(long jarg1, ContentsTrackerCore jarg1_, double jarg2);
   public final static native long new_AdsTrackerCore__SWIG_0(long jarg1, ContentsTrackerCore jarg1_);

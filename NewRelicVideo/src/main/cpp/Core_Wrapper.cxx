@@ -1393,6 +1393,35 @@ SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_C
 }
 
 
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1sendCustomAction_1_1SWIG_13(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2, jstring jarg3) {
+  ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
+  std::string arg2 ;
+  std::string arg3 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(ContentsTrackerCore **)&jarg1; 
+  if(!jarg2) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null string");
+    return ;
+  } 
+  const char *arg2_pstr = (const char *)jenv->GetStringUTFChars(jarg2, 0); 
+  if (!arg2_pstr) return ;
+  (&arg2)->assign(arg2_pstr);
+  jenv->ReleaseStringUTFChars(jarg2, arg2_pstr); 
+  if(!jarg3) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null string");
+    return ;
+  } 
+  const char *arg3_pstr = (const char *)jenv->GetStringUTFChars(jarg3, 0); 
+  if (!arg3_pstr) return ;
+  (&arg3)->assign(arg3_pstr);
+  jenv->ReleaseStringUTFChars(jarg3, arg3_pstr); 
+  (arg1)->sendCustomAction(arg2,arg3);
+}
+
+
 SWIGEXPORT jboolean JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_ContentsTrackerCore_1setTimestamp(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jdouble jarg2, jstring jarg3) {
   jboolean jresult = 0 ;
   ContentsTrackerCore *arg1 = (ContentsTrackerCore *) 0 ;
