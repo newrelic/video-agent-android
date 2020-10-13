@@ -59,6 +59,10 @@ public class TrackerCore {
     Core_WrapperJNI.TrackerCore_setup(swigCPtr, this);
   }
 
+  public void setTimeSinceAttribute(String name) {
+    Core_WrapperJNI.TrackerCore_setTimeSinceAttribute(swigCPtr, this, name);
+  }
+
   public String getViewId() {
     return Core_WrapperJNI.TrackerCore_getViewId(swigCPtr, this);
   }
@@ -153,6 +157,14 @@ public class TrackerCore {
 
   public void sendCustomAction(String name, AttrList attr) {
     Core_WrapperJNI.TrackerCore_sendCustomAction__SWIG_1(swigCPtr, this, name, AttrList.getCPtr(attr), attr);
+  }
+
+  public void sendCustomAction(String name, String timeSinceAttribute, AttrList attr) {
+    Core_WrapperJNI.TrackerCore_sendCustomAction__SWIG_2(swigCPtr, this, name, timeSinceAttribute, AttrList.getCPtr(attr), attr);
+  }
+
+  public void sendCustomAction(String name, String timeSinceAttribute) {
+    Core_WrapperJNI.TrackerCore_sendCustomAction__SWIG_3(swigCPtr, this, name, timeSinceAttribute);
   }
 
   public void setOptions(AttrList opts) {

@@ -27,6 +27,7 @@ public class Core_WrapperJNI {
   public final static native void TrackerCore_updateAttribute__SWIG_1(long jarg1, TrackerCore jarg1_, String jarg2, long jarg3, ValueHolder jarg3_);
   public final static native void TrackerCore_reset(long jarg1, TrackerCore jarg1_);
   public final static native void TrackerCore_setup(long jarg1, TrackerCore jarg1_);
+  public final static native void TrackerCore_setTimeSinceAttribute(long jarg1, TrackerCore jarg1_, String jarg2);
   public final static native String TrackerCore_getViewId(long jarg1, TrackerCore jarg1_);
   public final static native int TrackerCore_getNumberOfVideos(long jarg1, TrackerCore jarg1_);
   public final static native String TrackerCore_getCoreVersion(long jarg1, TrackerCore jarg1_);
@@ -51,6 +52,8 @@ public class Core_WrapperJNI {
   public final static native void TrackerCore_sendDownload(long jarg1, TrackerCore jarg1_);
   public final static native void TrackerCore_sendCustomAction__SWIG_0(long jarg1, TrackerCore jarg1_, String jarg2);
   public final static native void TrackerCore_sendCustomAction__SWIG_1(long jarg1, TrackerCore jarg1_, String jarg2, long jarg3, AttrList jarg3_);
+  public final static native void TrackerCore_sendCustomAction__SWIG_2(long jarg1, TrackerCore jarg1_, String jarg2, String jarg3, long jarg4, AttrList jarg4_);
+  public final static native void TrackerCore_sendCustomAction__SWIG_3(long jarg1, TrackerCore jarg1_, String jarg2, String jarg3);
   public final static native void TrackerCore_setOptions__SWIG_0(long jarg1, TrackerCore jarg1_, long jarg2, AttrList jarg2_);
   public final static native void TrackerCore_setOptions__SWIG_1(long jarg1, TrackerCore jarg1_, long jarg2, AttrList jarg2_, String jarg3);
   public final static native boolean TrackerCore_setTimestamp(long jarg1, TrackerCore jarg1_, double jarg2, String jarg3);
@@ -74,6 +77,7 @@ public class Core_WrapperJNI {
   public final static native void ContentsTrackerCore_sendDownload(long jarg1, ContentsTrackerCore jarg1_);
   public final static native void ContentsTrackerCore_sendCustomAction__SWIG_0(long jarg1, ContentsTrackerCore jarg1_, String jarg2);
   public final static native void ContentsTrackerCore_sendCustomAction__SWIG_1(long jarg1, ContentsTrackerCore jarg1_, String jarg2, long jarg3, AttrList jarg3_);
+  public final static native void ContentsTrackerCore_sendCustomAction__SWIG_2(long jarg1, ContentsTrackerCore jarg1_, String jarg2, String jarg3, long jarg4, AttrList jarg4_);
   public final static native boolean ContentsTrackerCore_setTimestamp(long jarg1, ContentsTrackerCore jarg1_, double jarg2, String jarg3);
   public final static native void ContentsTrackerCore_adHappened(long jarg1, ContentsTrackerCore jarg1_, double jarg2);
   public final static native long new_AdsTrackerCore__SWIG_0(long jarg1, ContentsTrackerCore jarg1_);

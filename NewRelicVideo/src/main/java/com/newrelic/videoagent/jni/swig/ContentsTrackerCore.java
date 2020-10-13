@@ -111,6 +111,10 @@ public class ContentsTrackerCore extends TrackerCore {
     Core_WrapperJNI.ContentsTrackerCore_sendCustomAction__SWIG_1(swigCPtr, this, name, AttrList.getCPtr(attr), attr);
   }
 
+  public void sendCustomAction(String name, String timeSinceAttribute, AttrList attr) {
+    Core_WrapperJNI.ContentsTrackerCore_sendCustomAction__SWIG_2(swigCPtr, this, name, timeSinceAttribute, AttrList.getCPtr(attr), attr);
+  }
+
   public boolean setTimestamp(double timestamp, String attributeName) {
     return Core_WrapperJNI.ContentsTrackerCore_setTimestamp(swigCPtr, this, timestamp, attributeName);
   }

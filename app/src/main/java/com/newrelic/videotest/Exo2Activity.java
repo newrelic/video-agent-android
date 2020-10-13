@@ -324,6 +324,9 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
 
         trackerID = NewRelicVideoAgent.start(player, videoUri, Exo2TrackerBuilder.class);
 
+        // Create a custom action with timeSince attribute
+        NewRelicVideoAgent.getContentsTracker(trackerID).sendCustomAction("CUSTOM_ACTION", "timeSinceCustomAction");
+
         player.setPlayWhenReady(true);
         player.prepare(dashMediaSource);
     }
