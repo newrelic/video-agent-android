@@ -291,7 +291,8 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
         DataSource.Factory dataSourceFactory =
                 new DefaultDataSourceFactory(this, Util.getUserAgent(this, "VideoTestApp"));
 
-        Uri videoUri = Uri.parse(getString(R.string.videoURL_hls));
+        //Uri videoUri = Uri.parse(getString(R.string.videoURL_hls));
+        Uri videoUri = Uri.parse("http://cdn3.viblast.com/streams/hls/airshow/playlist.m3u8");
 
         Handler mainHandler = new Handler();
         MediaSource mediaSource = new HlsMediaSource(videoUri,
