@@ -23,6 +23,7 @@ public class VideoList extends AppCompatActivity implements View.OnClickListener
         findViewById(R.id.video1).setOnClickListener(this);
         findViewById(R.id.video2).setOnClickListener(this);
         findViewById(R.id.video3).setOnClickListener(this);
+        findViewById(R.id.video4).setOnClickListener(this);
     }
 
     @Override

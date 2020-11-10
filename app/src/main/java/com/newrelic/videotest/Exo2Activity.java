@@ -102,6 +102,10 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
             NRLog.d("call setupPlayerHLS");
             setupPlayerHLS();
         }
+        else if (video.equals("Cast")) {
+            NRLog.d("call setupCastMediaQueue");
+            setupCastMediaQueue();
+        }
         else {
             NRLog.d("Unknown video!!");
         }
