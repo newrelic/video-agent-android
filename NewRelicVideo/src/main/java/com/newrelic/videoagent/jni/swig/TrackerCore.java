@@ -179,4 +179,8 @@ public class TrackerCore {
     return Core_WrapperJNI.TrackerCore_setTimestamp(swigCPtr, this, timestamp, attributeName);
   }
 
+  public void setCustomViewId(String viewId) {
+    Core_WrapperJNI.TrackerCore_setCustomViewId(swigCPtr, this, viewId);
+  }
+
 }

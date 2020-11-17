@@ -1099,6 +1099,26 @@ SWIGEXPORT jboolean JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJ
 }
 
 
+SWIGEXPORT void JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_TrackerCore_1setCustomViewId(JNIEnv *jenv, jclass jcls, jlong jarg1, jobject jarg1_, jstring jarg2) {
+  TrackerCore *arg1 = (TrackerCore *) 0 ;
+  std::string arg2 ;
+  
+  (void)jenv;
+  (void)jcls;
+  (void)jarg1_;
+  arg1 = *(TrackerCore **)&jarg1; 
+  if(!jarg2) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null string");
+    return ;
+  } 
+  const char *arg2_pstr = (const char *)jenv->GetStringUTFChars(jarg2, 0); 
+  if (!arg2_pstr) return ;
+  (&arg2)->assign(arg2_pstr);
+  jenv->ReleaseStringUTFChars(jarg2, arg2_pstr); 
+  (arg1)->setCustomViewId(arg2);
+}
+
+
 SWIGEXPORT jlong JNICALL Java_com_newrelic_videoagent_jni_swig_Core_1WrapperJNI_new_1ContentsTrackerCore(JNIEnv *jenv, jclass jcls) {
   jlong jresult = 0 ;
   ContentsTrackerCore *result = 0 ;

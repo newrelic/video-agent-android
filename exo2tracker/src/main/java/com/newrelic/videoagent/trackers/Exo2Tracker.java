@@ -24,7 +24,7 @@ import com.newrelic.videoagent.jni.CAL;
 import java.io.IOException;
 import java.util.List;
 
-public class BellExoTracker extends ContentsTracker implements Player.EventListener, AnalyticsListener {
+public class Exo2Tracker extends ContentsTracker implements Player.EventListener, AnalyticsListener {
 
     protected SimpleExoPlayer player;
     private long bitrateEstimate;
@@ -42,7 +42,7 @@ public class BellExoTracker extends ContentsTracker implements Player.EventListe
 
     private long timeOfNRManifestRequest = 0;
 
-    public BellExoTracker(SimpleExoPlayer player) {
+    public Exo2Tracker(SimpleExoPlayer player) {
         super();
         this.player = player;
         NRLog.d("BellExoTracker constructor");

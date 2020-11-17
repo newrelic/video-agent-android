@@ -58,8 +58,8 @@ import com.newrelic.videoagent.NRLog;
 import com.newrelic.videoagent.NewRelicVideoAgent;
 import com.newrelic.videoagent.basetrackers.AdsTracker;
 import com.newrelic.videoagent.jni.swig.CoreTrackerState;
+import com.newrelic.videoagent.trackers.Exo2Tracker;
 import com.newrelic.videoagent.trackers.Exo2TrackerBuilder;
-import com.newrelic.videoagent.trackers.ExoPlayer2ContentsTracker;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -105,6 +105,10 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
         else if (video.equals("Cast")) {
             NRLog.d("call setupCastMediaQueue");
             setupCastMediaQueue();
+        }
+        else if (video.equals("Playlist")) {
+            NRLog.d("call setupPlayerWithPlaylist");
+            setupPlayerWithPlaylist();
         }
         else {
             NRLog.d("Unknown video!!");
@@ -502,19 +506,6 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
         ConcatenatingMediaSource concatenatedSource = new ConcatenatingMediaSource(mediaSourceArray);
 
         trackerID = NewRelicVideoAgent.start(player, playlistUri, Exo2TrackerBuilder.class);
-
-        ExoPlayer2ContentsTracker tracker = (ExoPlayer2ContentsTracker)NewRelicVideoAgent.getContentsTracker(trackerID);
-        // Do whatever with tracker...
-        NRLog.d("Tracker = " + tracker);
-
-        //trackerID = NewRelicVideoAgent.start(player, Exo2TrackerBuilder.class);
-
-        /*
-        NewRelicVideoAgent.initJNIEnv();
-        ExoPlayer2ContentsTracker tracker = new ExoPlayer2ContentsTracker(player);
-        trackerID = NewRelicVideoAgent.startWithTracker(tracker, null);
-         */
-
         player.prepare(concatenatedSource);
         player.setPlayWhenReady(true);
     }

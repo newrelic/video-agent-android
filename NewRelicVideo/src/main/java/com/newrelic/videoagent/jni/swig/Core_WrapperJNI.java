@@ -57,6 +57,7 @@ public class Core_WrapperJNI {
   public final static native void TrackerCore_setOptions__SWIG_0(long jarg1, TrackerCore jarg1_, long jarg2, AttrList jarg2_);
   public final static native void TrackerCore_setOptions__SWIG_1(long jarg1, TrackerCore jarg1_, long jarg2, AttrList jarg2_, String jarg3);
   public final static native boolean TrackerCore_setTimestamp(long jarg1, TrackerCore jarg1_, double jarg2, String jarg3);
+  public final static native void TrackerCore_setCustomViewId(long jarg1, TrackerCore jarg1_, String jarg2);
   public final static native long new_ContentsTrackerCore();
   public final static native void delete_ContentsTrackerCore(long jarg1);
   public final static native void ContentsTrackerCore_reset(long jarg1, ContentsTrackerCore jarg1_);

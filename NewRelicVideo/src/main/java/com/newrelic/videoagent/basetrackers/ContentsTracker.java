@@ -8,6 +8,7 @@ import com.newrelic.videoagent.jni.CAL;
 import com.newrelic.videoagent.jni.swig.ContentsTrackerCore;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 public class ContentsTracker extends ContentsTrackerCore {
 
@@ -97,6 +98,11 @@ public class ContentsTracker extends ContentsTrackerCore {
 
     public void setOptionKey(String name, Object value, String action) {
         updateAttribute(name, CAL.convertObjectToHolder(value), action);
+    }
+
+    public void generateCustomViewId() {
+        UUID uuid = UUID.randomUUID();
+        setCustomViewId(uuid.toString());
     }
 
     protected void registerGetter(String name, String methodName) {
