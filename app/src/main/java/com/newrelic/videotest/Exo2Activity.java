@@ -506,6 +506,10 @@ public class Exo2Activity extends AppCompatActivity implements AdsLoader.AdsLoad
         ConcatenatingMediaSource concatenatedSource = new ConcatenatingMediaSource(mediaSourceArray);
 
         trackerID = NewRelicVideoAgent.start(player, playlistUri, Exo2TrackerBuilder.class);
+
+        NewRelicVideoAgent.getContentsTracker(trackerID).setOptionKey("key", "value");
+        NewRelicVideoAgent.getContentsTracker(trackerID).setOptionKey("key", "value", "CONTENT_START");
+
         player.prepare(concatenatedSource);
         player.setPlayWhenReady(true);
     }
