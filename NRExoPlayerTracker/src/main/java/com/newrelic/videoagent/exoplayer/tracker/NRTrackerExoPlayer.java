@@ -511,8 +511,6 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
 
         if (player.isPlayingAd()) return;
 
-        String actionName = getState().isAd ? AD_RENDITION_CHANGE : CONTENT_RENDITION_CHANGE;
-
         long currMul = width * height;
         long lastMul = lastWidth * lastHeight;
 
