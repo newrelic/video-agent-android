@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 
+import com.newrelic.agent.android.NewRelic;
 import com.newrelic.videoagent.core.utils.NRLog;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
@@ -18,6 +19,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         findViewById(R.id.video0).setOnClickListener(this);
         findViewById(R.id.video1).setOnClickListener(this);
         findViewById(R.id.video2).setOnClickListener(this);
+
+        NewRelic.withApplicationToken("AAd70f1744b7d2515913925c397ec9500f60e62b7b").start(this.getApplication());
 
         NRLog.enable();
     }

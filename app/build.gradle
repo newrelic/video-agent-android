@@ -27,6 +27,8 @@ android {
     }
 }
 
+apply plugin: 'newrelic'
+
 dependencies {
 
     implementation 'androidx.appcompat:appcompat:1.1.0'
@@ -41,4 +43,6 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
 
     implementation 'com.google.android.exoplayer:exoplayer:+'
+
+    implementation 'com.newrelic.agent.android:android-agent:+'
 }
