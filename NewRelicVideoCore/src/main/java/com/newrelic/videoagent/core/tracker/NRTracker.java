@@ -1,7 +1,6 @@
 package com.newrelic.videoagent.core.tracker;
 
 import com.newrelic.agent.android.NewRelic;
-import com.newrelic.videoagent.core.NRDef;
 import com.newrelic.videoagent.core.NewRelicVideoAgent;
 import com.newrelic.videoagent.core.model.NREventAttributes;
 import com.newrelic.videoagent.core.model.NRTimeSince;
@@ -89,8 +88,7 @@ public class NRTracker {
         if (preSend(action, attributes)) {
             attributes.put("actionName", action);
 
-            //TODO: record NewRelic custom event
-            if (NewRelic.recordCustomEvent(NR_VIDEO_EVENT, attributes) == false) {
+            if (!NewRelic.recordCustomEvent(NR_VIDEO_EVENT, attributes)) {
                 NRLog.e("⚠️ Failed to recordCustomEvent. Maybe the NewRelicAgent is not initialized or the attribute list contains invalid/empty values. ⚠️");
             }
         }
