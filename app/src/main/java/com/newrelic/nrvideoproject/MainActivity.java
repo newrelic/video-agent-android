@@ -19,6 +19,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         findViewById(R.id.video0).setOnClickListener(this);
         findViewById(R.id.video1).setOnClickListener(this);
         findViewById(R.id.video2).setOnClickListener(this);
+        findViewById(R.id.video3).setOnClickListener(this);
 
         //WARNING: DEFINE THE APP TOKEN HERE
         NewRelic.withApplicationToken("APP TOKEN").start(this.getApplication());

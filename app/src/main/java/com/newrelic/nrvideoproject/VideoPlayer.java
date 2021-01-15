@@ -24,18 +24,22 @@ public class VideoPlayer extends AppCompatActivity {
 
         if (video.equals("Tears")) {
             Log.v("VideoPlayer", "Play Tears");
-            playDash("http://www.bok.net/dash/tears_of_steel/cleartext/stream.mpd");
+            playVideo("http://www.bok.net/dash/tears_of_steel/cleartext/stream.mpd");
         }
         else if (video.equals("Playhouse")) {
             Log.v("VideoPlayer", "Play Playhouse");
-            playDash("https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd");
+            playVideo("https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd");
         }
         else if (video.equals("Kite")) {
             Log.v("VideoPlayer", "Play Kite");
-            playDash("https://demos.transloadit.com/dashtest/my_playlist.mpd");
+            playVideo("https://demos.transloadit.com/dashtest/my_playlist.mpd");
+        }
+        else if (video.equals("Live")) {
+            Log.v("VideoPlayer", "Play Live");
+            playVideo("https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd");
         }
         else {
-            Log.v("VideoPlayer","Unknown video!!");
+            Log.v("VideoPlayer","Unknown video");
         }
     }
 
@@ -46,7 +50,7 @@ public class VideoPlayer extends AppCompatActivity {
         NewRelicVideoAgent.getInstance().releaseTracker(trackerId);
     }
 
-    private void playDash(String videoUrl) {
+    private void playVideo(String videoUrl) {
         player = new SimpleExoPlayer.Builder(this).build();
 
         trackerId = NewRelicVideoAgent.getInstance().start(new NRTrackerExoPlayer(player));
