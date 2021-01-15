@@ -17,8 +17,6 @@ The video tracker for ExoPlayer2 player. It depends on NewRelicVideoCore.
 
 ## Build & Setup
 
-There are two ways to build and setup the video agent:
-
 ### Install manually using AAR files
 
 With this method the dependencies are not automatically installed, you have to manually install the [New Relic Android Agent](https://docs.newrelic.com/docs/mobile-monitoring/new-relic-mobile-android/install-configure/install-android-apps-gradle-android-studio) first.
@@ -57,3 +55,7 @@ dependencies {
 	implementation project(":NRExoPlayerTracker")
 }
 ```
+
+## Examples
+
+The `app` folder contains a usage example that shows the basics of video tracking using ExoPlayer.

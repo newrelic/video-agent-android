@@ -58,31 +58,5 @@ public class VideoPlayer extends AppCompatActivity {
         // Prepare the player.
         player.setPlayWhenReady(true);
         player.prepare();
-
-        /*
-        NRVideoTracker tracker = new NRVideoTracker();
-        NRVideoTracker adTracker = new NRVideoTracker();
-        trackerId = NewRelicVideoAgent.getInstance().start(tracker, adTracker);
-
-        tracker.setAttribute("generic", "Per tots");
-        tracker.setAttribute("contEnd", "Per CONTENT_END", "^CONTENT_END$");
-        tracker.setAttribute("anyEnd", "Per *_END", "^[A-Z_]+_END$");
-
-        tracker.setHeartbeatTime(5);
-        tracker.sendRequest();
-        tracker.sendStart();
-        tracker.sendBufferStart();
-        tracker.sendBufferEnd();
-        tracker.sendPause();
-        adTracker.sendAdBreakStart();
-        adTracker.sendRequest();
-        adTracker.sendStart();
-        adTracker.sendEnd();
-        adTracker.sendRequest();
-        adTracker.sendStart();
-        adTracker.sendEnd();
-        adTracker.sendAdBreakEnd();
-        tracker.sendResume();
-         */
     }
 }
