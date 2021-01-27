@@ -10,6 +10,9 @@ import com.newrelic.videoagent.core.NewRelicVideoAgent;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class VideoPlayer extends AppCompatActivity {
 
     private SimpleExoPlayer player;
@@ -56,6 +59,11 @@ public class VideoPlayer extends AppCompatActivity {
         NRTrackerExoPlayer tracker = new NRTrackerExoPlayer();
 
         trackerId = NewRelicVideoAgent.getInstance().start(tracker);
+
+        Map<String, Object> attr = new HashMap<>();
+        attr.put("myAttrStr", "Hello");
+        attr.put("myAttrInt", 101);
+        tracker.sendEvent("CUSTOM_ACTION", attr);
 
         PlayerView playerView = findViewById(R.id.player);
         playerView.setPlayer(player);

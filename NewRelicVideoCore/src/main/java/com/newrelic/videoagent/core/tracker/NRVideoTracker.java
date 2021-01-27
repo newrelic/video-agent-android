@@ -69,6 +69,7 @@ public class NRVideoTracker extends NRTracker {
 
     public void startHeartbeat() {
         NRLog.d("START HEARTBEAT");
+        if (heartbeatTimeInterval == 0) return;
         isHeartbeatRunning = true;
         heartbeatHandler.postDelayed(heartbeatRunnable, heartbeatTimeInterval * 1000);
     }
@@ -86,6 +87,10 @@ public class NRVideoTracker extends NRTracker {
                 stopHeartbeat();
                 startHeartbeat();
             }
+        }
+        else {
+            //if < 1 disable HB
+            heartbeatTimeInterval = 0;
         }
     }
 
