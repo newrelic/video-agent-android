@@ -39,6 +39,8 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
     private int lastWindow;
     private String renditionChangeShift;
 
+    public NRTrackerExoPlayer() {}
+
     public NRTrackerExoPlayer(SimpleExoPlayer player) {
         setPlayer(player);
     }
@@ -94,32 +96,34 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
     }
 
     public Long getRenditionWidth() {
-        try {
-            return (long) getPlayer().getVideoFormat().width;
-        }
-        catch (Exception e) {
-            return null;
-        }
+        if (player == null) return null;
+        else if (getPlayer().getVideoFormat() == null) return null;
+
+        return (long) getPlayer().getVideoFormat().width;
     }
 
     public Long getRenditionHeight() {
-        try {
-            return (long)getPlayer().getVideoFormat().height;
-        }
-        catch (Exception e) {
-            return 0L;
-        }
+        if (player == null) return null;
+        else if (getPlayer().getVideoFormat() == null) return null;
+
+        return (long)getPlayer().getVideoFormat().height;
     }
 
     public Long getDuration() {
+        if (player == null) return null;
+
         return player.getDuration();
     }
 
     public Long getPlayhead() {
+        if (player == null) return null;
+
         return player.getContentPosition();
     }
 
     public String getSrc() {
+        if (player == null) return null;
+
         if (getPlaylist() != null) {
             NRLog.d("Current window index = " + player.getCurrentWindowIndex());
             try {
@@ -136,10 +140,14 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
     }
 
     public Double getPlayrate() {
+        if (player == null) return null;
+
         return (double)player.getPlaybackParameters().speed;
     }
 
     public Double getFps() {
+        if (player == null) return null;
+
         if (getPlayer().getVideoFormat() != null) {
             if (getPlayer().getVideoFormat().frameRate > 0) {
                 return (double)getPlayer().getVideoFormat().frameRate;
@@ -150,6 +158,8 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
     }
 
     public Boolean getIsMuted() {
+        if (player == null) return null;
+
         return (getPlayer().getVolume() == 0);
     }
 

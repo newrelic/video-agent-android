@@ -14,7 +14,8 @@ import static com.newrelic.videoagent.core.NRDef.*;
 
 public class NRVideoTracker extends NRTracker {
 
-    private final NRTrackerState state;
+    public final NRTrackerState state;
+
     private Integer heartbeatTimeInterval;
     private final Handler heartbeatHandler;
     private final Runnable heartbeatRunnable;
@@ -30,7 +31,6 @@ public class NRVideoTracker extends NRTracker {
     private Long playtimeSinceLastEvent;
     private String bufferType;
     private NRTimeSince lastAdTimeSince;
-    private Long lastErrorTs = 0L;
 
     public NRVideoTracker() {
         state = new NRTrackerState();
@@ -321,22 +321,10 @@ public class NRVideoTracker extends NRTracker {
     }
 
     public void sendError() {
-        sendError(null);
+        sendError((String) null);
     }
 
     public void sendError(Exception error) {
-        long tsDiff = System.currentTimeMillis() - lastErrorTs;
-        lastErrorTs = System.currentTimeMillis();
-
-        // Guarantee a minimum distance of 4s between errors to make sure we are not sending mmultiple error events for the same cause.
-        if (tsDiff < 4000) {
-            return;
-        }
-
-        Map<String, Object> errAttr = new HashMap<>();
-
-        numberOfErrors++;
-
         String msg;
         if (error != null) {
             if (error.getMessage() != null) {
@@ -350,7 +338,16 @@ public class NRVideoTracker extends NRTracker {
             msg = "<Unknown error>";
         }
 
-        errAttr.put("errorMessage", msg);
+        sendError(msg);
+    }
+
+    public void sendError(String errorMessage) {
+        if (errorMessage == null) {
+            errorMessage = "<Unknown error>";
+        }
+        numberOfErrors++;
+        Map<String, Object> errAttr = new HashMap<>();
+        errAttr.put("errorMessage", errorMessage);
 
         if (state.isAd) {
             sendEvent(AD_ERROR, errAttr);

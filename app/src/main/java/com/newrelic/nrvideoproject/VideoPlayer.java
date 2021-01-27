@@ -53,10 +53,14 @@ public class VideoPlayer extends AppCompatActivity {
     private void playVideo(String videoUrl) {
         player = new SimpleExoPlayer.Builder(this).build();
 
-        trackerId = NewRelicVideoAgent.getInstance().start(new NRTrackerExoPlayer(player));
+        NRTrackerExoPlayer tracker = new NRTrackerExoPlayer();
+
+        trackerId = NewRelicVideoAgent.getInstance().start(tracker);
 
         PlayerView playerView = findViewById(R.id.player);
         playerView.setPlayer(player);
+
+        tracker.setPlayer(player);
 
         player.setMediaItem(MediaItem.fromUri(videoUrl));
         // Prepare the player.
