@@ -363,14 +363,14 @@ public class NRVideoTracker extends NRTracker {
     }
 
     public void sendAdBreakStart() {
-        if (state.isAd) {
+        if (state.isAd && state.goAdBreakStart()) {
             adBreakIdIndex++;
             sendEvent(AD_BREAK_START);
         }
     }
 
     public void sendAdBreakEnd() {
-        if (state.isAd) {
+        if (state.isAd && state.goAdBreakEnd()) {
             sendEvent(AD_BREAK_END);
         }
     }
