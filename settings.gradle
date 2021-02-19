@@ -1,1 +1,4 @@
-include ':app', ':NewRelicVideo', ':exo2tracker', ':exo1tracker'
+include ':NRExoPlayerTracker'
+include ':NewRelicVideoCore'
+include ':app'
+rootProject.name = "NRVideoProject"
