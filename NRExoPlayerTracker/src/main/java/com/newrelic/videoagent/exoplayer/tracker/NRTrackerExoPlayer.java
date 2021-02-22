@@ -1,16 +1,10 @@
 package com.newrelic.videoagent.exoplayer.tracker;
 
 import android.net.Uri;
-import android.view.Surface;
 import com.google.android.exoplayer2.ExoPlaybackException;
-import com.google.android.exoplayer2.Format;
-import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
-import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.analytics.AnalyticsListener;
-import com.google.android.exoplayer2.decoder.DecoderCounters;
-import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.source.LoadEventInfo;
 import com.google.android.exoplayer2.source.MediaLoadData;
 import com.google.android.exoplayer2.source.TrackGroupArray;
@@ -26,12 +20,13 @@ import java.util.Map;
 
 import static com.newrelic.videoagent.core.NRDef.*;
 
+/**
+ * New Relic Video tracker for ExoPlayer.
+ */
 public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventListener, AnalyticsListener {
 
     protected SimpleExoPlayer player;
 
-    private static final long timerTrackTimeMs = 250;
-    private long lastErrorTs = 0;
     private long bitrateEstimate;
     private int lastHeight;
     private int lastWidth;
@@ -39,12 +34,25 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
     private int lastWindow;
     private String renditionChangeShift;
 
+    /**
+     * Init a new ExoPlayer tracker.
+     */
     public NRTrackerExoPlayer() {}
 
+    /**
+     * Init a new ExoPlayer tracker.
+     *
+     * @param player ExoPlayer instance.
+     */
     public NRTrackerExoPlayer(SimpleExoPlayer player) {
         setPlayer(player);
     }
 
+    /**
+     * Set player.
+     *
+     * @param player Player instance.
+     */
     @Override
     public void setPlayer(Object player) {
         this.player = (SimpleExoPlayer) player;
@@ -52,6 +60,13 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
         super.setPlayer(player);
     }
 
+    /**
+     * Generate ExoPlayer attributes.
+     *
+     * @param action Action being generated.
+     * @param attributes Specific attributes sent along the action.
+     * @return
+     */
     @Override
     public Map<String, Object> getAttributes(String action, Map<String, Object> attributes) {
         Map<String, Object> attr = super.getAttributes(action, attributes);
@@ -71,30 +86,65 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
         return attr;
     }
 
+    /**
+     * Get player name.
+     *
+     * @return Attribute.
+     */
     public String getPlayerName() {
         return "ExoPlayer2";
     }
 
+    /**
+     * Get player version.
+     *
+     * @return Attribute.
+     */
     public String getPlayerVersion() {
         return "2.x";
     }
 
+    /**
+     * Get tracker name.
+     *
+     * @return Atribute.
+     */
     public String getTrackerName() {
         return "ExoPlayer2Tracker";
     }
 
+    /**
+     * Get tracker version.
+     *
+     * @return Attribute.
+     */
     public String getTrackerVersion() {
         return BuildConfig.VERSION_NAME;
     }
 
+    /**
+     * Get bitrate.
+     *
+     * @return Attribute.
+     */
     public Long getBitrate() {
         return bitrateEstimate;
     }
 
+    /**
+     * Get rendition bitrate.
+     *
+     * @return Attribute.
+     */
     public Long getRenditionBitrate() {
         return getBitrate();
     }
 
+    /**
+     * Get rendition width.
+     *
+     * @return Attribute.
+     */
     public Long getRenditionWidth() {
         if (player == null) return null;
         else if (getPlayer().getVideoFormat() == null) return null;
@@ -102,6 +152,11 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
         return (long) getPlayer().getVideoFormat().width;
     }
 
+    /**
+     * Get rendition height.
+     *
+     * @return Attribute.
+     */
     public Long getRenditionHeight() {
         if (player == null) return null;
         else if (getPlayer().getVideoFormat() == null) return null;
@@ -109,18 +164,33 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
         return (long)getPlayer().getVideoFormat().height;
     }
 
+    /**
+     * Get stream duration.
+     *
+     * @return Attribute.
+     */
     public Long getDuration() {
         if (player == null) return null;
 
         return player.getDuration();
     }
 
+    /**
+     * Get current playhead.
+     *
+     * @return Attribute.
+     */
     public Long getPlayhead() {
         if (player == null) return null;
 
         return player.getContentPosition();
     }
 
+    /**
+     * Get stream source.
+     *
+     * @return Attribute.
+     */
     public String getSrc() {
         if (player == null) return null;
 
@@ -139,12 +209,22 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
         }
     }
 
+    /**
+     * Get playrate.
+     *
+     * @return Attribute.
+     */
     public Double getPlayrate() {
         if (player == null) return null;
 
         return (double)player.getPlaybackParameters().speed;
     }
 
+    /**
+     * Get video frames per second.
+     *
+     * @return Attribute.
+     */
     public Double getFps() {
         if (player == null) return null;
 
@@ -157,20 +237,38 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
         return null;
     }
 
+    /**
+     * Get is muted.
+     *
+     * @return Attribute.
+     */
     public Boolean getIsMuted() {
         if (player == null) return null;
 
         return (getPlayer().getVolume() == 0);
     }
 
+    /**
+     * Get player instance.
+     *
+     * @return Attribute.
+     */
     private SimpleExoPlayer getPlayer() {
         return player;
     }
 
+    /**
+     * Set source URL.
+     *
+     * @param uris List of URIs.
+     */
     public void setSrc(List<Uri> uris) {
         setPlaylist(uris);
     }
 
+    /**
+     * Register ExoPlayer listeners and analytics listeners.
+     */
     @Override
     public void registerListeners() {
         super.registerListeners();
@@ -179,6 +277,9 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
         player.addAnalyticsListener(this);
     }
 
+    /**
+     * Unregister ExoPlayer listeners and analytics listeners, and reset state.
+     */
     @Override
     public void unregisterListeners() {
         super.unregisterListeners();
@@ -194,10 +295,20 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
         lastHeight = 0;
     }
 
+    /**
+     * Get playlist URIs.
+     *
+     * @return Playlist URIs.
+     */
     public List<Uri> getPlaylist() {
         return playlist;
     }
 
+    /**
+     * Set playlist URIs.
+     *
+     * @param playlist Playlist URIs.
+     */
     public void setPlaylist(List<Uri> playlist) {
         this.playlist = playlist;
     }
@@ -210,6 +321,12 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
         resetState();
     }
 
+    /**
+     * Send dropped frames event.
+     *
+     * @param count Number of dropped frames.
+     * @param elapsed Time elapsed.
+     */
     public void sendDroppedFrame(int count, int elapsed) {
         Map<String, Object> attr = new HashMap<>();
         attr.put("lostFrames", count);
@@ -223,21 +340,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
     }
 
     // ExoPlayer Player.EventListener
-/*
-    @Override
-    public void onTimelineChanged(Timeline timeline, Object manifest, int reason) {
-        NRLog.d("onTimelineChanged");
-    }
 
-    @Override
-    public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
-    }
-
-    @Override
-    public void onLoadingChanged(boolean isLoading) {
-        NRLog.d("onLoadingChanged, Is Loading = " + isLoading);
-    }
-*/
     @Override
     public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
 
@@ -312,55 +415,15 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
 
         NRLog.d("}");
     }
-/*
-    @Override
-    public void onRepeatModeChanged(int repeatMode) {
-        NRLog.d("onRepeatModeChanged");
-    }
 
-    @Override
-    public void onShuffleModeEnabledChanged(boolean shuffleModeEnabled) {
-        NRLog.d("onShuffleModeEnabledChanged");
-    }
-*/
     @Override
     public void onPlayerError(ExoPlaybackException error) {
         NRLog.d("onPlayerError");
         sendError(error);
     }
-/*
-    @Override
-    public void onPositionDiscontinuity(int reason) {
-        NRLog.d("onPositionDiscontinuity");
-    }
 
-    @Override
-    public void onPlaybackParametersChanged(PlaybackParameters playbackParameters) {
-        NRLog.d("onPlaybackParametersChanged");
-    }
-
-    @Override
-    public void onSeekProcessed() {
-        NRLog.d("onSeekProcessed");
-    }
-*/
     // ExoPlayer AnalyticsListener
-/*
-    @Override
-    public void onPlayerStateChanged(AnalyticsListener.EventTime eventTime, boolean playWhenReady, int playbackState) {
-        NRLog.d("onPlayerStateChanged analytics");
-    }
 
-    @Override
-    public void onTimelineChanged(AnalyticsListener.EventTime eventTime, int reason) {
-        NRLog.d("onTimelineChanged analytics");
-    }
-
-    @Override
-    public void onPositionDiscontinuity(AnalyticsListener.EventTime eventTime, int reason) {
-        NRLog.d("onPositionDiscontinuity analytics");
-    }
-*/
     @Override
     public void onSeekStarted(AnalyticsListener.EventTime eventTime) {
         NRLog.d("onSeekStarted analytics");
@@ -369,37 +432,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
             sendSeekStart();
         }
     }
-/*
-    @Override
-    public void onSeekProcessed(AnalyticsListener.EventTime eventTime) {
-        NRLog.d("onSeekProcessed analytics");
-    }
 
-    @Override
-    public void onPlaybackParametersChanged(AnalyticsListener.EventTime eventTime, PlaybackParameters playbackParameters) {
-        NRLog.d("onPlaybackParametersChanged analytics");
-    }
-
-    @Override
-    public void onRepeatModeChanged(AnalyticsListener.EventTime eventTime, int repeatMode) {
-        NRLog.d("onRepeatModeChanged analytics");
-    }
-
-    @Override
-    public void onShuffleModeChanged(AnalyticsListener.EventTime eventTime, boolean shuffleModeEnabled) {
-        NRLog.d("onShuffleModeChanged analytics");
-    }
-
-    @Override
-    public void onLoadingChanged(AnalyticsListener.EventTime eventTime, boolean isLoading) {
-        NRLog.d("onLoadingChanged analytics");
-    }
-
-    @Override
-    public void onPlayerError(AnalyticsListener.EventTime eventTime, ExoPlaybackException error) {
-        NRLog.d("onPlayerError analytics");
-    }
-*/
     @Override
     public void onTracksChanged(AnalyticsListener.EventTime eventTime, TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
         NRLog.d("onTracksChanged analytics");
@@ -418,95 +451,13 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
         sendError(error);
     }
 
-    /*
-            @Override
-            public void onLoadStarted(AnalyticsListener.EventTime eventTime, MediaSourceEventListener.LoadEventInfo loadEventInfo, MediaSourceEventListener.MediaLoadData mediaLoadData) {
-                NRLog.d("onLoadStarted analytics");
-            }
-
-            @Override
-            public void onLoadCompleted(AnalyticsListener.EventTime eventTime, MediaSourceEventListener.LoadEventInfo loadEventInfo, MediaSourceEventListener.MediaLoadData mediaLoadData) {
-                NRLog.d("onLoadCompleted analytics");
-            }
-
-            @Override
-            public void onLoadCanceled(AnalyticsListener.EventTime eventTime, MediaSourceEventListener.LoadEventInfo loadEventInfo, MediaSourceEventListener.MediaLoadData mediaLoadData) {
-                NRLog.d("onLoadCanceled analytics");
-            }
-
-            @Override
-            public void onLoadError(AnalyticsListener.EventTime eventTime, MediaSourceEventListener.LoadEventInfo loadEventInfo, MediaSourceEventListener.MediaLoadData mediaLoadData, IOException error, boolean wasCanceled) {
-                NRLog.d("onLoadError analytics");
-                sendError(error);
-            }
-
-            @Override
-            public void onDownstreamFormatChanged(AnalyticsListener.EventTime eventTime, MediaSourceEventListener.MediaLoadData mediaLoadData) {
-
-            }
-
-            @Override
-            public void onMediaPeriodReleased(AnalyticsListener.EventTime eventTime) {
-
-            }
-
-            @Override
-            public void onReadingStarted(AnalyticsListener.EventTime eventTime) {
-                NRLog.d("onReadingStarted analytics");
-            }
-        */
     @Override
     public void onBandwidthEstimate(AnalyticsListener.EventTime eventTime, int totalLoadTimeMs, long totalBytesLoaded, long bitrateEstimate) {
         NRLog.d("onBandwidthEstimate analytics");
 
         this.bitrateEstimate = bitrateEstimate;
     }
-/*
-    @Override
-    public void onMetadata(AnalyticsListener.EventTime eventTime, Metadata metadata) {
 
-    }
-
-    @Override
-    public void onDecoderEnabled(AnalyticsListener.EventTime eventTime, int trackType, DecoderCounters decoderCounters) {
-
-    }
-
-    @Override
-    public void onDecoderInitialized(AnalyticsListener.EventTime eventTime, int trackType, String decoderName, long initializationDurationMs) {
-
-    }
-
-    @Override
-    public void onDecoderInputFormatChanged(AnalyticsListener.EventTime eventTime, int trackType, Format format) {
-
-    }
-
-    @Override
-    public void onUpstreamDiscarded(AnalyticsListener.EventTime eventTime, MediaSourceEventListener.MediaLoadData mediaLoadData) {
-
-    }
-
-    @Override
-    public void onMediaPeriodCreated(AnalyticsListener.EventTime eventTime) {
-
-    }
-
-    @Override
-    public void onDecoderDisabled(AnalyticsListener.EventTime eventTime, int trackType, DecoderCounters decoderCounters) {
-
-    }
-
-    @Override
-    public void onAudioSessionId(AnalyticsListener.EventTime eventTime, int audioSessionId) {
-
-    }
-
-    @Override
-    public void onAudioUnderrun(AnalyticsListener.EventTime eventTime, int bufferSize, long bufferSizeMs, long elapsedSinceLastFeedMs) {
-
-    }
-*/
     @Override
     public void onDroppedVideoFrames(AnalyticsListener.EventTime eventTime, int droppedFrames, long elapsedMs) {
         NRLog.d("onDroppedVideoFrames analytics");
@@ -538,30 +489,4 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
         lastHeight = height;
         lastWidth = width;
     }
-/*
-    @Override
-    public void onRenderedFirstFrame(AnalyticsListener.EventTime eventTime, Surface surface) {
-        NRLog.d("onRenderedFirstFrame analytics");
-    }
-
-    @Override
-    public void onDrmKeysLoaded(AnalyticsListener.EventTime eventTime) {
-        NRLog.d("onDrmKeysLoaded analytics");
-    }
-
-    @Override
-    public void onDrmSessionManagerError(AnalyticsListener.EventTime eventTime, Exception error) {
-        NRLog.d("onDrmSessionManagerError analytics");
-    }
-
-    @Override
-    public void onDrmKeysRestored(AnalyticsListener.EventTime eventTime) {
-        NRLog.d("onDrmKeysRestored analytics");
-    }
-
-    @Override
-    public void onDrmKeysRemoved(AnalyticsListener.EventTime eventTime) {
-        NRLog.d("onDrmKeysRemoved analytics");
-    }
- */
 }

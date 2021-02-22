@@ -16,7 +16,7 @@ public class NRTimeSince {
      *
      * @param action Action.
      * @param attribute Attribute name.
-     * @param filter Filter for the actions where the attribute applies.
+     * @param filter Filter for the actions where the attribute applies, a regular expression.
      */
     public NRTimeSince(String action, String attribute, String filter) {
         this.action = action;
