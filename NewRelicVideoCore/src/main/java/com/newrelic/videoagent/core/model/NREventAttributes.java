@@ -4,14 +4,27 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+/**
+ * Event attributes model.
+ */
 public class NREventAttributes {
 
     private Map<String, Map<String, Object>> attributeBuckets;
 
+    /**
+     * Ïnit a new event attributes model.
+     */
     public NREventAttributes() {
         attributeBuckets = new HashMap<>();
     }
 
+    /**
+     * Set attribute for a given action filter.
+     *
+     * @param key Attribute name.
+     * @param value Attribute value.
+     * @param filter Action filter, a regular expression.
+     */
     public void setAttribute(String key, Object value, String filter) {
         // If no filter defined, use universal filter that matches any action name
         if (filter == null) {
@@ -26,6 +39,13 @@ public class NREventAttributes {
         attributeBuckets.get(filter).put(key, value);
     }
 
+    /**
+     * Generate list of attributes for a given action.
+     *
+     * @param action Action.
+     * @param attributes Append attributes.
+     * @return Map of attributes.
+     */
     public Map<String, Object> generateAttributes(String action, Map<String, Object> attributes) {
         Map<String, Object> attr = new HashMap<>();
 

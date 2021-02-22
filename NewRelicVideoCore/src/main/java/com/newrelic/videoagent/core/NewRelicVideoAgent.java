@@ -47,10 +47,23 @@ public class NewRelicVideoAgent {
         return uuid;
     }
 
+    /**
+     * Start a content tracker.
+     *
+     * @param contentTracker Tracker instance for contents.
+     * @return Tracker ID.
+     */
     public Integer start(NRTracker contentTracker) {
         return start(contentTracker, null);
     }
 
+    /**
+     * Start a content and an ads tracker.
+     *
+     * @param contentTracker Tracker instance for contents.
+     * @param adTracker Tracker instance for ads.
+     * @return Tracker ID.
+     */
     public Integer start(NRTracker contentTracker, NRTracker adTracker) {
         NRTrackerPair pair = new NRTrackerPair(contentTracker, adTracker);
         Integer trackerId = trackerIdIndex++;
@@ -76,6 +89,11 @@ public class NewRelicVideoAgent {
         return trackerId;
     }
 
+    /**
+     * Release a tracker.
+     *
+     * @param trackerId Tracker ID.
+     */
     public void releaseTracker(Integer trackerId) {
         if (getContentTracker(trackerId) != null) {
             getContentTracker(trackerId).dispose();
@@ -87,11 +105,23 @@ public class NewRelicVideoAgent {
         trackerPairs.remove(trackerId);
     }
 
+    /**
+     * Get content tracker.
+     *
+     * @param trackerId Tracker ID.
+     * @return Content tracker.
+     */
     public NRTracker getContentTracker(Integer trackerId) {
         NRTrackerPair pair = trackerPairs.get(trackerId);
         return pair.getFirst();
     }
 
+    /**
+     * Get ad tracker.
+     *
+     * @param trackerId Tracker ID.
+     * @return Content tracker.
+     */
     public NRTracker getAdTracker(Integer trackerId) {
         NRTrackerPair pair = trackerPairs.get(trackerId);
         return pair.getSecond();

@@ -12,8 +12,14 @@ import java.util.Random;
 
 import static com.newrelic.videoagent.core.NRDef.*;
 
+/**
+ * `NRVideoTracker` defines the basic behaviour of a video tracker.
+ */
 public class NRVideoTracker extends NRTracker {
 
+    /**
+     * Tracker state.
+     */
     public final NRTrackerState state;
 
     private Integer heartbeatTimeInterval;
@@ -32,6 +38,9 @@ public class NRVideoTracker extends NRTracker {
     private String bufferType;
     private NRTimeSince lastAdTimeSince;
 
+    /**
+     * Create a new NRVideoTracker.
+     */
     public NRVideoTracker() {
         state = new NRTrackerState();
         numberOfAds = 0;
@@ -58,15 +67,28 @@ public class NRVideoTracker extends NRTracker {
         };
     }
 
+    /**
+     * Dispose of the tracker.
+     *
+     * Stop heartbeats and call `super.dispose()`.
+     */
     public void dispose() {
         super.dispose();
         stopHeartbeat();
     }
 
+    /**
+     * Set player.
+     *
+     * @param player Player instance.
+     */
     public void setPlayer(Object player) {
         sendEvent(PLAYER_READY);
     }
 
+    /**
+     * Start heartbeat timer.
+     */
     public void startHeartbeat() {
         NRLog.d("START HEARTBEAT");
         if (heartbeatTimeInterval == 0) return;
@@ -74,12 +96,20 @@ public class NRVideoTracker extends NRTracker {
         heartbeatHandler.postDelayed(heartbeatRunnable, heartbeatTimeInterval * 1000);
     }
 
+    /**
+     * Stop heartbeat timer.
+     */
     public void stopHeartbeat() {
         NRLog.d("STOP HEARTBEAT");
         isHeartbeatRunning = false;
         heartbeatHandler.removeCallbacks(heartbeatRunnable, null);
     }
 
+    /**
+     * Set heartbeat interval.
+     *
+     * @param seconds Time interval in seconds. Min 1 second. 0 disables HB.
+     */
     public void setHeartbeatTime(int seconds) {
         if (seconds >= 1) {
             heartbeatTimeInterval = seconds;
@@ -94,14 +124,33 @@ public class NRVideoTracker extends NRTracker {
         }
     }
 
+    /**
+     * Set number of ads.
+     *
+     * @param numberOfAds Number of ads.
+     */
     public void setNumberOfAds(int numberOfAds) {
         this.numberOfAds = numberOfAds;
     }
 
+    /**
+     * Return tracker state.
+     *
+     * @return Tracker state..
+     */
     public NRTrackerState getState() {
         return state;
     }
 
+    /**
+     * Generate attributes for a given action.
+     *
+     * Generate all video related attributes.
+     *
+     * @param action Action being generated.
+     * @param attributes Specific attributes sent along the action.
+     * @return Map of attributes.
+     */
     @Override
     public Map<String, Object> getAttributes(String action, Map<String, Object> attributes) {
         Map<String, Object> attr = super.getAttributes(action, attributes);
@@ -168,6 +217,14 @@ public class NRVideoTracker extends NRTracker {
         return attr;
     }
 
+    /**
+     * Send event with attributes.
+     *
+     * Generate playtimeSinceLastEvent and totalPlaytime attributes. Then call `super.sendEvent(...)`.
+     *
+     * @param action Action name.
+     * @param attributes Action attributes.
+     */
     @Override
     public void sendEvent(String action, Map<String, Object> attributes) {
 
@@ -182,6 +239,9 @@ public class NRVideoTracker extends NRTracker {
         super.sendEvent(action, attributes);
     }
 
+    /**
+     * Send request event.
+     */
     public void sendRequest() {
         if (state.goRequest()) {
             playtimeSinceLastEventTimestamp = 0L;
@@ -195,6 +255,9 @@ public class NRVideoTracker extends NRTracker {
         }
     }
 
+    /**
+     * Send start event.
+     */
     public void sendStart() {
         if (state.goStart()) {
             startHeartbeat();
@@ -212,6 +275,9 @@ public class NRVideoTracker extends NRTracker {
         }
     }
 
+    /**
+     * Send pause event.
+     */
     public void sendPause() {
         if (state.goPause()) {
             if (state.isAd) {
@@ -223,6 +289,9 @@ public class NRVideoTracker extends NRTracker {
         }
     }
 
+    /**
+     * Send resume event.
+     */
     public void sendResume() {
         if (state.goResume()) {
             if (state.isAd) {
@@ -236,6 +305,9 @@ public class NRVideoTracker extends NRTracker {
         }
     }
 
+    /**
+     * Send end event.
+     */
     public void sendEnd() {
         if (state.goEnd()) {
             if (state.isAd) {
@@ -256,6 +328,9 @@ public class NRVideoTracker extends NRTracker {
         }
     }
 
+    /**
+     * Send seek start event.
+     */
     public void sendSeekStart() {
         if (state.goSeekStart()) {
             if (state.isAd) {
@@ -267,6 +342,9 @@ public class NRVideoTracker extends NRTracker {
         }
     }
 
+    /**
+     * Send seek end event.
+     */
     public void sendSeekEnd() {
         if (state.goSeekEnd()) {
             if (state.isAd) {
@@ -280,6 +358,9 @@ public class NRVideoTracker extends NRTracker {
         }
     }
 
+    /**
+     * Send buffer start event.
+     */
     public void sendBufferStart() {
         if (state.goBufferStart()) {
             bufferType = calculateBufferType();
@@ -292,6 +373,9 @@ public class NRVideoTracker extends NRTracker {
         }
     }
 
+    /**
+     * Send buffer end event.
+     */
     public void sendBufferEnd() {
         if (state.goBufferEnd()) {
             if (bufferType == null) {
@@ -309,6 +393,9 @@ public class NRVideoTracker extends NRTracker {
         }
     }
 
+    /**
+     * Send heartbeat event.
+     */
     public void sendHeartbeat() {
         if (state.isAd) {
             sendEvent(AD_HEARTBEAT);
@@ -317,6 +404,9 @@ public class NRVideoTracker extends NRTracker {
         }
     }
 
+    /**
+     * Send rendition change event.
+     */
     public void sendRenditionChange() {
         if (state.isAd) {
             sendEvent(AD_RENDITION_CHANGE);
@@ -325,10 +415,18 @@ public class NRVideoTracker extends NRTracker {
         }
     }
 
+    /**
+     * Send error event.
+     */
     public void sendError() {
         sendError((String) null);
     }
 
+    /**
+     * Send request event.
+     *
+     * @param error Exception.
+     */
     public void sendError(Exception error) {
         String msg;
         if (error != null) {
@@ -346,6 +444,11 @@ public class NRVideoTracker extends NRTracker {
         sendError(msg);
     }
 
+    /**
+     * Send request event.
+     *
+     * @param errorMessage Error message.
+     */
     public void sendError(String errorMessage) {
         if (errorMessage == null) {
             errorMessage = "<Unknown error>";
@@ -362,6 +465,9 @@ public class NRVideoTracker extends NRTracker {
         }
     }
 
+    /**
+     * Send Ad Break Start event.
+     */
     public void sendAdBreakStart() {
         if (state.isAd && state.goAdBreakStart()) {
             adBreakIdIndex++;
@@ -369,121 +475,254 @@ public class NRVideoTracker extends NRTracker {
         }
     }
 
+    /**
+     * Send Ad Break End event.
+     */
     public void sendAdBreakEnd() {
         if (state.isAd && state.goAdBreakEnd()) {
             sendEvent(AD_BREAK_END);
         }
     }
 
+    /**
+     * Send Ad Quartile event.
+     */
     public void sendAdQuartile() {
         if (state.isAd) {
             sendEvent(AD_QUARTILE);
         }
     }
 
+    /**
+     * Send Ad Click event.
+     */
     public void sendAdClick() {
         if (state.isAd) {
             sendEvent(AD_CLICK);
         }
     }
 
-
+    /**
+     * Tracker is for Ads or not. To be overwritten by a subclass that inplements an Ads tracker.
+     *
+     * @return True if tracker is for Ads. Default False.
+     */
     public Boolean getIsAd() {
         return state.isAd;
     }
 
+    /**
+     * Get the tracker version.
+     *
+     * @return Attribute.
+     */
     public String getTrackerVersion() {
         return null;
     }
 
+    /**
+     * Get the tracker name.
+     *
+     * @return Attribute.
+     */
     public String getTrackerName() {
         return null;
     }
 
+    /**
+     * Get the player version.
+     *
+     * @return Attribute.
+     */
     public String getPlayerVersion() {
         return null;
     }
 
+    /**
+     * Get the player name.
+     *
+     * @return Attribute.
+     */
     public String getPlayerName() {
         return null;
     }
 
+    /**
+     * Get the video title.
+     *
+     * @return Attribute.
+     */
     public String getTitle() {
         return null;
     }
 
+    /**
+     * Get the video bitrate.
+     *
+     * @return Attribute.
+     */
     public Long getBitrate() {
         return null;
     }
 
+    /**
+     * Get the video rendition bitrate.
+     *
+     * @return Attribute.
+     */
     public Long getRenditionBitrate() {
         return null;
     }
 
+    /**
+     * Get the video rendition width.
+     *
+     * @return Attribute.
+     */
     public Long getRenditionWidth() {
         return null;
     }
 
+    /**
+     * Get the video rendition height.
+     *
+     * @return Attribute.
+     */
     public Long getRenditionHeight() {
         return null;
     }
 
+    /**
+     * Get the video duration.
+     *
+     * @return Attribute.
+     */
     public Long getDuration() {
         return null;
     }
 
+    /**
+     * Get current playback position in milliseconds.
+     *
+     * @return Attribute.
+     */
     public Long getPlayhead() {
         return null;
     }
 
+    /**
+     * Get video language.
+     *
+     * @return Attribute.
+     */
     public String getLanguage() {
         return null;
     }
 
+    /**
+     * Get video source. Usually a URL.
+     *
+     * @return Attribute.
+     */
     public String getSrc() {
         return null;
     }
 
+    /**
+     * Get whether video is muted or not.
+     *
+     * @return Attribute.
+     */
     public Boolean getIsMuted() {
         return null;
     }
 
+    /**
+     * Get video frames per second.
+     *
+     * @return Attribute.
+     */
     public Double getFps() {
         return null;
     }
 
+    /**
+     * Get whether video playback is live or not.
+     *
+     * @return Attribute.
+     */
     public Boolean getIsLive() {
         return null;
     }
 
+    /**
+     * Get Ad creative ID.
+     *
+     * @return Attribute.
+     */
     public String getAdCreativeId() {
         return null;
     }
 
+    /**
+     * Get Ad position, pre, mid or post.
+     *
+     * @return Attribute.
+     */
     public String getAdPosition() {
         return null;
     }
 
+    /**
+     * Get Ad quartile.
+     *
+     * @return Attribute.
+     */
     public Long getAdQuartile() {
         return null;
     }
 
+    /**
+     * Get ad partner name.
+     *
+     * @return Attribute.
+     */
     public String getAdPartner() {
         return null;
     }
 
+    /**
+     * Get ad break id.
+     *
+     * @return Attribute.
+     */
     public String getAdBreakId() {
         return getViewSession() + "-" + adBreakIdIndex;
     }
 
+    /**
+     * Get view session.
+     *
+     * @return Attribute.
+     */
     public String getViewSession() {
         return viewSessionId;
     }
 
+    /**
+     * Get view ID.
+     *
+     * @return Attribute.
+     */
     public String getViewId() {
         return getViewSession() + "-" + viewIdIndex;
     }
 
+    /**
+     * Get video ID.
+     *
+     * @return Attribute.
+     */
     public String getVideoId() {
         MessageDigest md;
         try {
@@ -505,10 +744,18 @@ public class NRVideoTracker extends NRTracker {
                 result[12], result[13], result[14], result[15]);
     }
 
+    /**
+     * Get bufferType.
+     *
+     * @return Attribute.
+     */
     public String getBufferType() {
         return bufferType;
     }
 
+    /**
+     * Notify that an Ad just ended.
+     */
     public void adHappened() {
         // Create an NRTimeSince entry without action (won't by updated by any action) and force a "now" to set the current timestamp reference
         if (lastAdTimeSince == null) {
@@ -519,6 +766,11 @@ public class NRVideoTracker extends NRTracker {
         lastAdTimeSince.now();
     }
 
+    /**
+     * Generate table of timeSince attributes.
+     *
+     * Genberate all video related timeSince attributes.
+     */
     @Override
     public void generateTimeSinceTable() {
         super.generateTimeSinceTable();
