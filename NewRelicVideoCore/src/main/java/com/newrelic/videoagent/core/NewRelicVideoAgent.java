@@ -8,6 +8,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * `NewRelicVideoAgent` contains the methods to start the Video Agent and access tracker instances.
+ */
 public class NewRelicVideoAgent {
 
     private static NewRelicVideoAgent singleton = null;
@@ -16,6 +19,11 @@ public class NewRelicVideoAgent {
     private Integer trackerIdIndex;
     private String uuid;
 
+    /**
+     * Get shared instance.
+     *
+     * @return Singleton.
+     */
     public static NewRelicVideoAgent getInstance() {
         if (singleton == null) {
             singleton = new NewRelicVideoAgent();
@@ -30,6 +38,11 @@ public class NewRelicVideoAgent {
         trackerPairs = new HashMap<>();
     }
 
+    /**
+     * Get session ID.
+     *
+     * @return Session ID.
+     */
     public String getSessionId() {
         return uuid;
     }
