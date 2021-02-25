@@ -56,6 +56,12 @@ dependencies {
 }
 ```
 
+## Documentation
+
+To generate the javadocs, open the project in Android Studio and then go to `Tools > Generate JavaDoc...`, select `Whole Project`, then select the `Output directory` and click `OK`.
+
+You can also read the [tutorial](tutorial.md).
+
 ## Examples
 
 The `app` folder contains a usage example that shows the basics of video tracking using ExoPlayer.
