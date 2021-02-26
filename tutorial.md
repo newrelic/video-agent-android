@@ -207,7 +207,7 @@ Or only for specific events, specifiying a regexp filter for the action:
 
 ```Objective-C
 // Match events with action that starts with CONTENT_
-[tracker setAttribute:@"myAttr" value:@"myVal", @"^CONTENT_[A-Z_]+$"];
+[tracker setAttribute:@"myAttr" value:@"myVal" forAction:@"^CONTENT_[A-Z_]+$"];
 ```
 
 </p>
