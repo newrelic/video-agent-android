@@ -176,6 +176,54 @@ tracker.sendEvent("MY_TEST_ACTION", att);
 </p>
 </details>
 
+We can alse set custom attributes for all events:
+
+<details>
+<summary>iOS</summary>
+<p>
+
+```Objective-C
+[tracker setAttribute:@"myAttr" value:@"myVal"];
+```
+
+</p>
+</details>
+<details>
+<summary>Android</summary>
+<p>
+
+```Java
+tracker.setAttribute("myAttr", "myVal");
+```
+
+</p>
+</details>
+
+Or only for specific events, specifiying a regexp filter for the action:
+
+<details>
+<summary>iOS</summary>
+<p>
+
+```Objective-C
+// Match events with action that starts with CONTENT_
+[tracker setAttribute:@"myAttr" value:@"myVal", @"^CONTENT_[A-Z_]+$"];
+```
+
+</p>
+</details>
+<details>
+<summary>Android</summary>
+<p>
+
+```Java
+// Match events with action that starts with CONTENT_
+tracker.setAttribute("myAttr", "myVal", "^CONTENT_[A-Z_]+$");
+```
+
+</p>
+</details>
+
 And once the tracker is no longer needed, we can release it:
 
 <details>
