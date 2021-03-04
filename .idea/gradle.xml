@@ -13,6 +13,7 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/NRExoPlayerTracker" />
+            <option value="$PROJECT_DIR$/NRIMATracker" />
             <option value="$PROJECT_DIR$/NewRelicVideoCore" />
             <option value="$PROJECT_DIR$/app" />
           </set>
