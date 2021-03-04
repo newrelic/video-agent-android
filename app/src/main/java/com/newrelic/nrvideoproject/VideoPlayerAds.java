@@ -1,10 +1,16 @@
 package com.newrelic.nrvideoproject;
 
+import android.net.Uri;
 import android.os.Bundle;
 
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.google.android.exoplayer2.ext.ima.ImaAdsLoader;
+import com.google.android.exoplayer2.source.DefaultMediaSourceFactory;
 import com.google.android.exoplayer2.ui.PlayerView;
+import com.google.android.exoplayer2.upstream.DataSource;
+import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
+import com.google.android.exoplayer2.util.Util;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.snackbar.Snackbar;
 import com.newrelic.videoagent.core.NewRelicVideoAgent;
@@ -24,11 +30,16 @@ public class VideoPlayerAds extends AppCompatActivity {
 
     private SimpleExoPlayer player;
     private Integer trackerId;
+    private ImaAdsLoader adsLoader;
+    private PlayerView playerView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_video_player_ads);
+
+        playerView = findViewById(R.id.player);
+        adsLoader = new ImaAdsLoader.Builder(this).build();
 
         String video = getIntent().getStringExtra("video");
 
@@ -58,28 +69,47 @@ public class VideoPlayerAds extends AppCompatActivity {
         super.onDestroy();
         ((NRVideoTracker) NewRelicVideoAgent.getInstance().getContentTracker(trackerId)).sendEnd();
         NewRelicVideoAgent.getInstance().releaseTracker(trackerId);
+        releasePlayer();
+    }
+
+    private void releasePlayer() {
+        adsLoader.setPlayer(null);
+        playerView.setPlayer(null);
+        player.release();
+        player = null;
     }
 
     private void playVideo(String videoUrl) {
-        player = new SimpleExoPlayer.Builder(this).build();
+        //TODO: init IMA tracker
 
         NRTrackerExoPlayer tracker = new NRTrackerExoPlayer();
 
         trackerId = NewRelicVideoAgent.getInstance().start(tracker);
 
-        Map<String, Object> attr = new HashMap<>();
-        attr.put("myAttrStr", "Hello");
-        attr.put("myAttrInt", 101);
-        tracker.sendEvent("CUSTOM_ACTION", attr);
+        // Set up the factory for media sources, passing the ads loader and ad view providers.
+        DataSource.Factory dataSourceFactory =
+                new DefaultDataSourceFactory(this, Util.getUserAgent(this, getString(R.string.app_name)));
+        DefaultMediaSourceFactory mediaSourceFactory = new DefaultMediaSourceFactory(dataSourceFactory);
+        mediaSourceFactory.setAdsLoaderProvider(unusedAdTagUri -> adsLoader);
+        mediaSourceFactory.setAdViewProvider(playerView);
 
-        PlayerView playerView = findViewById(R.id.player);
+        // Create a SimpleExoPlayer and set it as the player for content and ads.
+        player = new SimpleExoPlayer.Builder(this).setMediaSourceFactory(mediaSourceFactory).build();
         playerView.setPlayer(player);
+        adsLoader.setPlayer(player);
 
         tracker.setPlayer(player);
 
-        player.setMediaItem(MediaItem.fromUri(videoUrl));
-        // Prepare the player.
-        player.setPlayWhenReady(true);
+        // Create the MediaItem to play, specifying the content URI and ad tag URI.
+        Uri contentUri = Uri.parse(videoUrl);
+        Uri adTagUri = Uri.parse(getString(R.string.ad_tag_url));
+        MediaItem mediaItem = new MediaItem.Builder().setUri(contentUri).setAdTagUri(adTagUri).build();
+
+        // Prepare the content and ad to be played with the SimpleExoPlayer.
+        player.setMediaItem(mediaItem);
         player.prepare();
+
+        // Set PlayWhenReady. If true, content and ads will autoplay.
+        player.setPlayWhenReady(true);
     }
 }
