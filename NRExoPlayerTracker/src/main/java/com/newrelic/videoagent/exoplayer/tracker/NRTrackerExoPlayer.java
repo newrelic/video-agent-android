@@ -285,6 +285,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.EventLi
         super.unregisterListeners();
         player.removeListener(this);
         player.removeAnalyticsListener(this);
+        player = null;
         resetState();
     }
 
