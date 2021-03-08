@@ -113,7 +113,12 @@ public class NewRelicVideoAgent {
      */
     public NRTracker getContentTracker(Integer trackerId) {
         NRTrackerPair pair = trackerPairs.get(trackerId);
-        return pair.getFirst();
+        if (pair != null) {
+            return pair.getFirst();
+        }
+        else {
+            return null;
+        }
     }
 
     /**
@@ -124,6 +129,11 @@ public class NewRelicVideoAgent {
      */
     public NRTracker getAdTracker(Integer trackerId) {
         NRTrackerPair pair = trackerPairs.get(trackerId);
-        return pair.getSecond();
+        if (pair != null) {
+            return pair.getSecond();
+        }
+        else {
+            return null;
+        }
     }
 }
