@@ -10,15 +10,39 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     @Override
     public void onAdError(AdErrorEvent adErrorEvent) {
         NRLog.d("AdErrorEvent = " + adErrorEvent);
+        sendError(adErrorEvent.getError());
     }
 
     @Override
     public void onAdEvent(AdEvent adEvent) {
-        NRLog.d("AdEvent = " + adEvent);
+        if (adEvent.getType() != AdEvent.AdEventType.AD_PROGRESS) {
+            NRLog.d("AdEvent = " + adEvent);
+        }
+
+        switch (adEvent.getType()) {
+            case CONTENT_PAUSE_REQUESTED:
+                sendAdBreakStart();
+                break;
+            case CONTENT_RESUME_REQUESTED:
+                sendAdBreakEnd();
+                break;
+            case STARTED:
+                sendRequest();
+                sendStart();
+                break;
+            case COMPLETED:
+                sendEnd();
+                break;
+            case CLICKED:
+                sendAdClick();
+                break;
+            case FIRST_QUARTILE:
+            case MIDPOINT:
+            case THIRD_QUARTILE:
+                sendAdQuartile();
+                break;
+        }
     }
 
-    @Override
-    public void unregisterListeners() {
-        super.unregisterListeners();
-    }
+    //TODO: getters
 }
