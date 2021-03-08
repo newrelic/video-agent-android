@@ -14,7 +14,6 @@ import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
 import com.newrelic.videoagent.core.NewRelicVideoAgent;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
-import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer;
 import com.newrelic.videoagent.ima.tracker.NRTrackerIMA;
 import androidx.appcompat.app.AppCompatActivity;
@@ -76,8 +75,6 @@ public class VideoPlayerAds extends AppCompatActivity implements AdErrorEvent.Ad
         builder.setAdErrorListener(this);
         builder.setAdEventListener(this);
         adsLoader = builder.build();
-
-        NRLog.d("getAdsLoader = " + adsLoader.getAdsLoader());
 
         // Set up the factory for media sources, passing the ads loader and ad view providers.
         DataSource.Factory dataSourceFactory =
