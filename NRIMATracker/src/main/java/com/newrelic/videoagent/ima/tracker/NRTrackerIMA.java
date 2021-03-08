@@ -4,6 +4,7 @@ import com.google.ads.interactivemedia.v3.api.AdErrorEvent;
 import com.google.ads.interactivemedia.v3.api.AdEvent;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.core.utils.NRLog;
+import com.newrelic.videoagent.ima.BuildConfig;
 
 public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdErrorListener, AdEvent.AdEventListener {
 
@@ -33,6 +34,7 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
             case COMPLETED:
                 sendEnd();
                 break;
+            case TAPPED:
             case CLICKED:
                 sendAdClick();
                 break;
@@ -44,5 +46,30 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
         }
     }
 
-    //TODO: getters
+    /**
+     * Get player name.
+     *
+     * @return Attribute.
+     */
+    public String getPlayerName() {
+        return "IMA";
+    }
+
+    /**
+     * Get tracker name.
+     *
+     * @return Atribute.
+     */
+    public String getTrackerName() {
+        return "IMATracker";
+    }
+
+    /**
+     * Get tracker version.
+     *
+     * @return Attribute.
+     */
+    public String getTrackerVersion() {
+        return BuildConfig.VERSION_NAME;
+    }
 }
