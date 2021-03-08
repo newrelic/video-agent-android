@@ -15,6 +15,10 @@ Contains all the base classes necessary to create trackers and send data to New 
 
 The video tracker for ExoPlayer2 player. It depends on NewRelicVideoCore.
 
+### NRIMATracker
+
+The video tracker for Google IMA Ads library. It depends on NewRelicVideoCore.
+
 ## Build & Setup
 
 ### Install manually using AAR files
@@ -35,6 +39,7 @@ dependencies {
 	...
 	implementation project(":NewRelicVideoCore")
 	implementation project(":NRExoPlayerTracker")
+	implementation project(':NRIMATracker')
 }
 ```
 
@@ -53,6 +58,7 @@ dependencies {
 	...
 	implementation project(":NewRelicVideoCore")
 	implementation project(":NRExoPlayerTracker")
+	implementation project(':NRIMATracker')
 }
 ```
 
