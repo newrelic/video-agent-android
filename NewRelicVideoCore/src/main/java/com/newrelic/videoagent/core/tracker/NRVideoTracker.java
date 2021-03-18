@@ -155,11 +155,6 @@ public class NRVideoTracker extends NRTracker {
     public Map<String, Object> getAttributes(String action, Map<String, Object> attributes) {
         Map<String, Object> attr = super.getAttributes(action, attributes);
 
-        if (action.startsWith("CONTENT_")) {
-            attr.put("playtimeSinceLastEvent", playtimeSinceLastEvent);
-            attr.put("totalPlaytime", totalPlaytime);
-        }
-
         if (action.endsWith("_BUFFER_START") || action.endsWith("_BUFFER_END")) {
             attr.put("bufferType", getBufferType());
         }
@@ -199,6 +194,8 @@ public class NRVideoTracker extends NRTracker {
             }
         }
         else {
+            attr.put("playtimeSinceLastEvent", playtimeSinceLastEvent);
+            attr.put("totalPlaytime", totalPlaytime);
             attr.put("contentTitle", getTitle());
             attr.put("contentBitrate", getBitrate());
             attr.put("contentRenditionBitrate", getRenditionBitrate());
