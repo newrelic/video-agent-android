@@ -84,6 +84,7 @@ public class NRVideoTracker extends NRTracker {
      */
     public void setPlayer(Object player) {
         sendEvent(PLAYER_READY);
+        state.goPlayerReady();
     }
 
     /**
