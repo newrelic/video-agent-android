@@ -138,12 +138,7 @@ class Test3 : TestInterface {
         }
 
         override fun getPlayhead() : Long {
-            if (startTimestamp > 0) {
-                return System.currentTimeMillis() - startTimestamp
-            }
-            else {
-                return 0
-            }
+            return if (startTimestamp > 0) System.currentTimeMillis() - startTimestamp else 0
         }
     }
 }

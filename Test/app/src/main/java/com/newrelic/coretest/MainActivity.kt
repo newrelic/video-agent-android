@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.newrelic.coretest.tests.Test1
 import com.newrelic.coretest.tests.Test2
 import com.newrelic.coretest.tests.Test3
+import com.newrelic.coretest.tests.Test4
 
 class MainActivity : AppCompatActivity() {
     lateinit var textView : TextView
@@ -15,7 +16,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         textView = findViewById<TextView>(R.id.text_view)
-        val testArray = arrayOf(Test1(), Test2(), Test3())
+        val testArray = arrayOf(Test1(), Test2(), Test3(), Test4())
 
         appendLine("Running " + testArray.size + " tests...\n\n\n")
 
