@@ -1,25 +1,40 @@
 package com.newrelic.coretest
 
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
 import com.newrelic.coretest.tests.Test1
 import com.newrelic.coretest.tests.Test2
 
 class MainActivity : AppCompatActivity() {
+    lateinit var textView : TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
+        textView = findViewById<TextView>(R.id.text_view)
         val testArray = arrayOf(Test1(), Test2())
 
-        testArray.forEach {
-            it.doTest(::testResult)
-        }
+        appendLine("Running " + testArray.size + " tests...\n\n\n")
+
+        Thread(Runnable {
+                    kotlin.run {
+                        testArray.forEach {
+                            it.doTest(::testResult)
+                        }
+                    }
+                }).start()
     }
 
     fun testResult(name: String, result: Boolean) {
-        Log.v("CoreTest", "Test Result called = " + name + " " + result)
+        runOnUiThread {
+            Log.v("CoreTest", "Test Result called = " + name + " " + result)
+            appendLine(name + "\t\t" + (if (result) "✅" else "❌") + "\n\n")
+        }
+    }
+
+    fun appendLine(text: String) {
+        textView.text = textView.text.toString() + text
     }
 }
