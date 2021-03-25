@@ -7,7 +7,6 @@ class MainApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        NRLog.enable()
-        NRLog.d("App created")
+        NRLog.disable()
     }
 }
