@@ -811,6 +811,14 @@ public class NRVideoTracker extends NRTracker {
     private String calculateBufferType() {
         Long playhead = getPlayhead();
 
+        if (!this.state.isAd) {
+            if (this.linkedTracker instanceof NRVideoTracker) {
+                if (((NRVideoTracker)this.linkedTracker).state.isAdBreak) {
+                    return "ad";
+                }
+            }
+        }
+
         if (playhead == null) {
             playhead = 0L;
         }
