@@ -13,7 +13,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         textView = findViewById<TextView>(R.id.text_view)
-        val testArray = arrayOf(Test1(), Test2(), Test3(), Test4(), Test5())
+        val testArray = arrayOf(Test1(), Test2(), Test3(), Test4(), Test5(), Test6())
 
         appendLine("Running " + testArray.size + " tests...\n\n\n")
 
