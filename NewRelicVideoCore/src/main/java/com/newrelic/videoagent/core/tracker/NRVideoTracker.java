@@ -34,6 +34,7 @@ public class NRVideoTracker extends NRTracker {
     private Integer adBreakIdIndex;
     private Long playtimeSinceLastEventTimestamp;
     private Long totalPlaytime;
+    private Long totalAdPlaytime;
     private Long playtimeSinceLastEvent;
     private String bufferType;
     private NRTimeSince lastAdTimeSince;
@@ -51,6 +52,7 @@ public class NRVideoTracker extends NRTracker {
         viewSessionId = getAgentSession() + "-" + (System.currentTimeMillis() / 1000) + "" + (int)((new Random()).nextDouble()*10000) ;
         playtimeSinceLastEventTimestamp = 0L;
         totalPlaytime = 0L;
+        totalAdPlaytime = 0L;
         playtimeSinceLastEvent = 0L;
         bufferType = null;
         isHeartbeatRunning = false;
@@ -170,6 +172,8 @@ public class NRVideoTracker extends NRTracker {
         attr.put("numberOfAds", numberOfAds);
         attr.put("numberOfVideos", numberOfVideos);
         attr.put("numberOfErrors", numberOfErrors);
+        attr.put("playtimeSinceLastEvent", playtimeSinceLastEvent);
+        attr.put("totalPlaytime", totalPlaytime);
 
         if (state.isAd) {
             attr.put("adTitle", getTitle());
@@ -192,11 +196,23 @@ public class NRVideoTracker extends NRTracker {
 
             if (action.startsWith("AD_BREAK_")) {
                 attr.remove("viewId");
+                if (linkedTracker instanceof NRVideoTracker) {
+                    Long playhead = ((NRVideoTracker) linkedTracker).getPlayhead();
+                    if (playhead < 100) {
+                        attr.put("adPosition", "pre");
+                    }
+                }
+            }
+
+            if (action.equals(AD_BREAK_END)) {
+                attr.put("totalAdPlaytime", totalAdPlaytime);
             }
         }
         else {
-            attr.put("playtimeSinceLastEvent", playtimeSinceLastEvent);
-            attr.put("totalPlaytime", totalPlaytime);
+            if (action.equals(CONTENT_START)) {
+                attr.put("totalAdPlaytime", totalAdPlaytime);
+            }
+
             attr.put("contentTitle", getTitle());
             attr.put("contentBitrate", getBitrate());
             attr.put("contentRenditionBitrate", getRenditionBitrate());
@@ -266,6 +282,9 @@ public class NRVideoTracker extends NRTracker {
                 }
                 sendEvent(AD_START);
             } else {
+                if (linkedTracker instanceof NRVideoTracker) {
+                    totalAdPlaytime = ((NRVideoTracker)linkedTracker).getTotalAdPlaytime();
+                }
                 numberOfVideos++;
                 sendEvent(CONTENT_START);
             }
@@ -313,6 +332,7 @@ public class NRVideoTracker extends NRTracker {
                 if (linkedTracker instanceof NRVideoTracker) {
                     ((NRVideoTracker) linkedTracker).adHappened();
                 }
+                totalAdPlaytime = totalAdPlaytime + totalPlaytime;
             } else {
                 sendEvent(CONTENT_END);
             }
@@ -469,6 +489,7 @@ public class NRVideoTracker extends NRTracker {
     public void sendAdBreakStart() {
         if (state.isAd && state.goAdBreakStart()) {
             adBreakIdIndex++;
+            totalAdPlaytime = 0L;
             sendEvent(AD_BREAK_START);
         }
     }
@@ -696,6 +717,15 @@ public class NRVideoTracker extends NRTracker {
      */
     public String getAdBreakId() {
         return getViewSession() + "-" + adBreakIdIndex;
+    }
+
+    /**
+     * Get total ad playtime of the last ad break.
+     *
+     * @return Attribute.
+     */
+    public Long getTotalAdPlaytime() {
+        return totalAdPlaytime;
     }
 
     /**
