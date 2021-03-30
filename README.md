@@ -21,7 +21,7 @@ The video tracker for ExoPlayer2 player. It depends on NewRelicVideoCore.
 
 The video tracker for Google IMA Ads library. It depends on NewRelicVideoCore.
 
-## Build & Setup
+## Installation
 
 ### Prerequisites
 
@@ -97,6 +97,53 @@ dependencies {
 	implementation project(':NRIMATracker')
 }
 ```
+## Usage
+
+To start the video agent with ExoPlayer tracker only:
+
+<details>
+<summary>Java</summary>
+<p>
+
+```Java
+Integer trackerId = NewRelicVideoAgent.getInstance().start(new NRTrackerExoPlayer(player));
+```
+
+</p>
+</details>
+<details>
+<summary>Kotlin</summary>
+<p>
+
+```Kotlin
+val trackerId = NewRelicVideoAgent.getInstance().start(NRTrackerExoPlayer(player))
+```
+
+</p>
+</details>
+
+To start the video agent with ExoPlayer and IMA trackers:
+
+<details>
+<summary>Java</summary>
+<p>
+
+```Java
+Integer trackerId = NewRelicVideoAgent.getInstance().start(new NRTrackerExoPlayer(player), new NRTrackerIMA());
+```
+
+</p>
+</details>
+<details>
+<summary>Kotlin</summary>
+<p>
+
+```Kotlin
+val trackerId = NewRelicVideoAgent.getInstance().start(NRTrackerExoPlayer(player), NRTrackerIMA())
+```
+
+</p>
+</details>
 
 ## Documentation
 
