@@ -23,9 +23,45 @@ The video tracker for Google IMA Ads library. It depends on NewRelicVideoCore.
 
 ## Build & Setup
 
-### Install manually using AAR files
+### Prerequisites
 
-With this method the dependencies are not automatically installed, you have to manually install the [New Relic Android Agent](https://docs.newrelic.com/docs/mobile-monitoring/new-relic-mobile-android/install-configure/install-android-apps-gradle-android-studio) first.
+Install the [New Relic Android Agent](https://docs.newrelic.com/docs/mobile-monitoring/new-relic-mobile-android/install-configure/install-android-apps-gradle-android-studio), and any other needed dependency, like ExoPlayer or Google IMA.
+
+### Install automatically using JitPack
+
+Add the following line inside your root build.gradle:
+
+```
+allprojects {
+    repositories {
+        ...
+        
+        // Add this line at the end of your repositories
+        maven { url 'https://jitpack.io' }
+    }
+}
+```
+
+And inside your app's build.gradle, add the following dependencies:
+
+```
+dependencies {
+    ...
+
+    // Add this to install the NewRelicVideoCore (required)
+    implementation 'com.github.newrelic.video-agent-android:NewRelicVideoCore:master-SNAPSHOT'
+    
+    // Add this to install the ExoPlayer tracker
+    implementation 'com.github.newrelic.video-agent-android:NRExoPlayerTracker:master-SNAPSHOT'
+    
+    // Add this to install the Google IMA library tracker
+    implementation 'com.github.newrelic.video-agent-android:NRIMATracker:master-SNAPSHOT'
+}
+```
+
+To install an specific version, replace the `master-SNAPSHOT` by a version tag.
+
+### Install manually using AAR files
 
 1. Clone this repo.
 2. Open it with Android Studio.
@@ -46,8 +82,6 @@ dependencies {
 ```
 
 ### Install manually using source code
-
-With this method the dependencies are not automatically installed, you have to manually install the [New Relic Android Agent](https://docs.newrelic.com/docs/mobile-monitoring/new-relic-mobile-android/install-configure/install-android-apps-gradle-android-studio) first.
 
 1. Clone this repo.
 2. In your project, click **File > New > Import Module**.
