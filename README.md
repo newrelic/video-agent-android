@@ -7,7 +7,7 @@ The New Relic Video Agent for Android contains multiple modules necessary to ins
 
 ## Modules
 
-There are two modules available:
+There are three modules available:
 
 ### NewRelicVideoCore
 
