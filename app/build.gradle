@@ -3,12 +3,12 @@ plugins {
 }
 
 android {
-    compileSdkVersion 29
+    compileSdkVersion 31
 
     defaultConfig {
         applicationId "com.newrelic.nrvideoproject"
         minSdkVersion 16
-        targetSdkVersion 29
+        targetSdkVersion 30
         versionCode 1
         versionName "1.0"
 
@@ -26,6 +26,10 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    packagingOptions {
+        exclude("META-INF/*.kotlin_module")
     }
 }
 
@@ -45,7 +49,7 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
 
-    implementation 'com.google.android.exoplayer:exoplayer:+'
+    implementation 'com.google.android.exoplayer:exoplayer:2.17.0'
     implementation 'com.google.android.exoplayer:extension-ima:+'
 
     implementation 'com.newrelic.agent.android:android-agent:+'
