@@ -50,7 +50,7 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
 
     implementation 'com.google.android.exoplayer:exoplayer:2.17.0'
-    implementation 'com.google.android.exoplayer:extension-ima:+'
+    implementation 'com.google.android.exoplayer:extension-ima:2.17.0'
 
     implementation 'com.newrelic.agent.android:android-agent:+'
 
