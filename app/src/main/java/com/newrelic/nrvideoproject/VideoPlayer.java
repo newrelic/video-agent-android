@@ -58,12 +58,15 @@ public class VideoPlayer extends AppCompatActivity {
 
         NRTrackerExoPlayer tracker = new NRTrackerExoPlayer();
 
+        tracker.setAttribute("customAttr", 12345, "CUSTOM_ACTION");
+
         trackerId = NewRelicVideoAgent.getInstance().start(tracker);
 
         Map<String, Object> attr = new HashMap<>();
         attr.put("myAttrStr", "Hello");
         attr.put("myAttrInt", 101);
         tracker.sendEvent("CUSTOM_ACTION", attr);
+        tracker.sendEvent("CUSTOM_ACTION_2", attr);
 
         PlayerView playerView = findViewById(R.id.player);
         playerView.setPlayer(player);

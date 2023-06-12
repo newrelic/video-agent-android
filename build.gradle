@@ -10,7 +10,7 @@ buildscript {
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
-        classpath "com.newrelic.agent.android:agent-gradle-plugin:+"
+        classpath "com.newrelic.agent.android:agent-gradle-plugin:6.9.2"
     }
 }
 

@@ -159,8 +159,9 @@ public class NRTracker {
 
         NRLog.d("SEND EVENT " + action + " , attr = " + attributes);
 
-        // Remove null values
+        // Remove null and empty values
         while (attributes.values().remove(null));
+        while (attributes.values().remove(""));
 
         if (preSend(action, attributes)) {
             attributes.put("actionName", action);
