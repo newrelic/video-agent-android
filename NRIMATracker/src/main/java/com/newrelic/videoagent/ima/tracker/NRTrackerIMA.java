@@ -68,6 +68,12 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
                 quartile = 3L;
                 sendAdQuartile();
                 break;
+            case PAUSED:
+                sendPause();
+                break;
+            case RESUMED:
+                sendResume();
+                break;
         }
     }
 
