@@ -195,7 +195,6 @@ public class NRVideoTracker extends NRTracker {
             attr.put("adBreakId", getAdBreakId());
 
             if (action.startsWith("AD_BREAK_")) {
-                attr.remove("viewId");
                 if (linkedTracker instanceof NRVideoTracker) {
                     Long playhead = ((NRVideoTracker) linkedTracker).getPlayhead();
                     if (playhead < 100) {
@@ -259,7 +258,6 @@ public class NRVideoTracker extends NRTracker {
     public void sendRequest() {
         if (state.goRequest()) {
             playtimeSinceLastEventTimestamp = 0L;
-            viewIdIndex++;
 
             if (state.isAd) {
                 sendEvent(AD_REQUEST);
@@ -339,6 +337,7 @@ public class NRVideoTracker extends NRTracker {
 
             stopHeartbeat();
 
+            viewIdIndex++;
             numberOfErrors = 0;
             playtimeSinceLastEventTimestamp = 0L;
             playtimeSinceLastEvent = 0L;
@@ -734,7 +733,13 @@ public class NRVideoTracker extends NRTracker {
      * @return Attribute.
      */
     public String getViewSession() {
-        return viewSessionId;
+        // If we are an Ad tracker, we use main tracker's viewSession
+        if (this.state.isAd && this.linkedTracker instanceof NRVideoTracker) {
+            return ((NRVideoTracker)this.linkedTracker).getViewSession();
+        }
+        else {
+            return viewSessionId;
+        }
     }
 
     /**
@@ -743,7 +748,13 @@ public class NRVideoTracker extends NRTracker {
      * @return Attribute.
      */
     public String getViewId() {
-        return getViewSession() + "-" + viewIdIndex;
+        // If we are an Ad tracker, we use main tracker's viewId
+        if (this.state.isAd && this.linkedTracker instanceof NRVideoTracker) {
+            return ((NRVideoTracker)this.linkedTracker).getViewId();
+        }
+        else {
+            return getViewSession() + "-" + viewIdIndex;
+        }
     }
 
     /**
@@ -797,7 +808,7 @@ public class NRVideoTracker extends NRTracker {
     /**
      * Generate table of timeSince attributes.
      *
-     * Genberate all video related timeSince attributes.
+     * Generate all video related timeSince attributes.
      */
     @Override
     public void generateTimeSinceTable() {
