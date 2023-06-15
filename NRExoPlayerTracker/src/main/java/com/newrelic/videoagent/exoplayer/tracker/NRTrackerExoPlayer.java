@@ -403,7 +403,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
             if (getState().isRequested && !getState().isStarted) {
                 sendStart();
             }
-            else if (getState().isPaused) {
+            else if (getState().isPaused && !player.isPlayingAd()) {
                 sendResume();
             }
             else if (!getState().isRequested && !getState().isStarted) {
@@ -420,7 +420,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         else {
             NRLog.d("\tVideo Paused");
 
-            if (getState().isPlaying) {
+            if (getState().isPlaying && !player.isPlayingAd()) {
                 sendPause();
             }
         }
