@@ -197,17 +197,17 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         if (player == null) return null;
 
         if (getPlaylist() != null) {
-            NRLog.d("Current window index = " + player.getCurrentWindowIndex());
+            NRLog.d("Current window index = " + player.getCurrentMediaItemIndex());
             try {
-                Uri src = getPlaylist().get(player.getCurrentWindowIndex());
+                Uri src = getPlaylist().get(player.getCurrentMediaItemIndex());
                 return src.toString();
             }
             catch (Exception e) {
-                return "";
+                return null;
             }
         }
         else {
-            return "";
+            return null;
         }
     }
 
@@ -452,9 +452,9 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         NRLog.d("onTracksChanged analytics");
 
         // Next track in the playlist
-        if (player.getCurrentWindowIndex() != lastWindow) {
+        if (player.getCurrentMediaItemIndex() != lastWindow) {
             NRLog.d("Next video in the playlist starts");
-            lastWindow = player.getCurrentWindowIndex();
+            lastWindow = player.getCurrentMediaItemIndex();
             sendRequest();
         }
     }
