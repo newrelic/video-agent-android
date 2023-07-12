@@ -2,15 +2,15 @@ package com.newrelic.videoagent.exoplayer.tracker;
 
 import android.net.Uri;
 
-import com.google.android.exoplayer2.ExoPlayer;
-import com.google.android.exoplayer2.PlaybackException;
-import com.google.android.exoplayer2.Player;
-import com.google.android.exoplayer2.SimpleExoPlayer;
-import com.google.android.exoplayer2.TracksInfo;
-import com.google.android.exoplayer2.analytics.AnalyticsListener;
-import com.google.android.exoplayer2.source.LoadEventInfo;
-import com.google.android.exoplayer2.source.MediaLoadData;
-import com.google.android.exoplayer2.video.VideoSize;
+import androidx.media3.common.PlaybackException;
+import androidx.media3.common.Player;
+import androidx.media3.common.Tracks;
+import androidx.media3.common.VideoSize;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.analytics.AnalyticsListener;
+import androidx.media3.exoplayer.source.LoadEventInfo;
+import androidx.media3.exoplayer.source.MediaLoadData;
+
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.exoplayer.BuildConfig;
@@ -448,7 +448,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     }
 
     @Override
-    public void onTracksInfoChanged(EventTime eventTime, TracksInfo tracksInfo) {
+    public void onTracksChanged(EventTime eventTime, Tracks tracksInfo) {
         NRLog.d("onTracksChanged analytics");
 
         // Next track in the playlist
