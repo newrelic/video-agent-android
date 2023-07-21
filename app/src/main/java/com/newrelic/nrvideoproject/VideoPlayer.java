@@ -1,11 +1,12 @@
 package com.newrelic.nrvideoproject;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.media3.common.MediaItem;
+import androidx.media3.exoplayer.SimpleExoPlayer;
+import androidx.media3.ui.PlayerView;
+
 import android.os.Bundle;
 import android.util.Log;
-import com.google.android.exoplayer2.MediaItem;
-import com.google.android.exoplayer2.SimpleExoPlayer;
-import com.google.android.exoplayer2.ui.PlayerView;
 import com.newrelic.videoagent.core.NewRelicVideoAgent;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer;
