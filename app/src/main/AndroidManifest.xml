@@ -13,7 +13,7 @@
             android:label="@string/title_activity_video_player_ads"
             android:theme="@style/Theme.NRVideoProject.NoActionBar"></activity>
         <activity android:name=".VideoPlayer" />
-        <activity android:name=".MainActivity">
+        <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
