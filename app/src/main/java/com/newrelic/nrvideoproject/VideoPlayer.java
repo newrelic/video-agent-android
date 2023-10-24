@@ -2,7 +2,7 @@ package com.newrelic.nrvideoproject;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.media3.common.MediaItem;
-import androidx.media3.exoplayer.SimpleExoPlayer;
+import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.ui.PlayerView;
 
 import android.os.Bundle;
@@ -16,7 +16,7 @@ import java.util.Map;
 
 public class VideoPlayer extends AppCompatActivity {
 
-    private SimpleExoPlayer player;
+    private ExoPlayer player;
     private Integer trackerId;
 
     @Override
@@ -55,7 +55,7 @@ public class VideoPlayer extends AppCompatActivity {
     }
 
     private void playVideo(String videoUrl) {
-        player = new SimpleExoPlayer.Builder(this).build();
+        player = new ExoPlayer.Builder(this).build();
 
         NRTrackerExoPlayer tracker = new NRTrackerExoPlayer();
 
