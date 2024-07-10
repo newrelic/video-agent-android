@@ -61,6 +61,10 @@ public class VideoPlayer extends AppCompatActivity {
 
         tracker.setAttribute("customAttr", 12345, "CUSTOM_ACTION");
 
+        tracker.setAttribute("contentTitle", "This is my test title", "CONTENT_START");
+        tracker.setAttribute("contentIsLive", true, "CONTENT_START");
+        tracker.setAttribute("myCustomAttr", "any value", "CONTENT_START");
+
         trackerId = NewRelicVideoAgent.getInstance().start(tracker);
 
         Map<String, Object> attr = new HashMap<>();
