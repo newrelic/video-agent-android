@@ -156,7 +156,13 @@ public class NRVideoTracker extends NRTracker {
      */
     @Override
     public Map<String, Object> getAttributes(String action, Map<String, Object> attributes) {
-        Map<String, Object> attr = super.getAttributes(action, attributes);
+        Map<String, Object> attr;
+
+        if (attributes != null) {
+            attr = attributes;
+        } else {
+            attr = new HashMap<>();
+        }
 
         if (action.endsWith("_BUFFER_START") || action.endsWith("_BUFFER_END")) {
             attr.put("bufferType", getBufferType());
@@ -226,6 +232,8 @@ public class NRVideoTracker extends NRTracker {
             attr.put("contentId", getVideoId());
             attr.put("contentIsLive", getIsLive());
         }
+
+        attr = super.getAttributes(action, attr);
 
         return attr;
     }

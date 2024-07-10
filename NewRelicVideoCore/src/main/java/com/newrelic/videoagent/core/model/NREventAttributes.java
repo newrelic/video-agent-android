@@ -49,16 +49,16 @@ public class NREventAttributes {
     public Map<String, Object> generateAttributes(String action, Map<String, Object> attributes) {
         Map<String, Object> attr = new HashMap<>();
 
+        if (attributes != null) {
+            attr.putAll(attributes);
+        }
+
         for (Map.Entry<String, Map<String, Object>> pair : attributeBuckets.entrySet()) {
             String filter = pair.getKey();
             if (checkFilter(filter, action)) {
                 Map<String, Object> bucket = pair.getValue();
                 attr.putAll(bucket);
             }
-        }
-
-        if (attributes != null) {
-            attr.putAll(attributes);
         }
 
         return attr;
