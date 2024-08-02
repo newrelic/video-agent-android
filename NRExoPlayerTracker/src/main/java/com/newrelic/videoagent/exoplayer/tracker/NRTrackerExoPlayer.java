@@ -29,12 +29,12 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
 
     protected ExoPlayer player;
 
-    private long bitrateEstimate;
-    private int lastHeight;
-    private int lastWidth;
-    private List<Uri> playlist;
-    private int lastWindow;
-    private String renditionChangeShift;
+    protected long bitrateEstimate;
+    protected int lastHeight;
+    protected int lastWidth;
+    protected List<Uri> playlist;
+    protected int lastWindow;
+    protected String renditionChangeShift;
 
     /**
      * Init a new ExoPlayer tracker.
@@ -255,7 +255,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      *
      * @return Attribute.
      */
-    private ExoPlayer getPlayer() {
+    public ExoPlayer getPlayer() {
         return player;
     }
 
