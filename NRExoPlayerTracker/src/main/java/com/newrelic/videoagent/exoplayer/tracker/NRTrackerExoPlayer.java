@@ -2,6 +2,8 @@ package com.newrelic.videoagent.exoplayer.tracker;
 
 import android.net.Uri;
 
+import androidx.media3.common.MediaLibraryInfo;
+import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.Tracks;
@@ -91,28 +93,28 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     /**
      * Get player name.
      *
-     * @return Attribute.
+     * @return Player name from Media3 library.
      */
     public String getPlayerName() {
-        return "ExoPlayer2";
+        return MediaLibraryInfo.TAG;
     }
 
     /**
      * Get player version.
      *
-     * @return Attribute.
+     * @return Player version from Media3 library.
      */
     public String getPlayerVersion() {
-        return "2.x";
+        return MediaLibraryInfo.VERSION;
     }
 
     /**
      * Get tracker name.
      *
-     * @return Atribute.
+     * @return The simple class name of this tracker.
      */
     public String getTrackerName() {
-        return "ExoPlayer2Tracker";
+        return this.getClass().getSimpleName();
     }
 
     /**
