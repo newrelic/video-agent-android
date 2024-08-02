@@ -252,6 +252,24 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         return (getPlayer().getVolume() == 0);
     }
 
+
+    /**
+     * Get the title from the currently played media
+     *
+     * @return String of the current title
+     */
+    public String getTitle() {
+        String contentTitle = "Unknown";
+        if (player != null && player.getCurrentMediaItem() != null && player.getCurrentMediaItem().mediaMetadata.title != null) {
+            MediaMetadata mm = player.getCurrentMediaItem().mediaMetadata;
+            contentTitle = mm.title.toString();
+            if (mm.subtitle != null) {
+                contentTitle += ": " + mm.subtitle; // Usually the episode title is available in subtitle
+            }
+        }
+        return contentTitle;
+    }
+
     /**
      * Get player instance.
      *
