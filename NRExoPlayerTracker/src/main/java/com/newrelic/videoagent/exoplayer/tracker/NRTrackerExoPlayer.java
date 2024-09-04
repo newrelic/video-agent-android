@@ -2,6 +2,8 @@ package com.newrelic.videoagent.exoplayer.tracker;
 
 import android.net.Uri;
 
+import androidx.media3.common.MediaLibraryInfo;
+import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.Tracks;
@@ -29,12 +31,12 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
 
     protected ExoPlayer player;
 
-    private long bitrateEstimate;
-    private int lastHeight;
-    private int lastWidth;
-    private List<Uri> playlist;
-    private int lastWindow;
-    private String renditionChangeShift;
+    protected long bitrateEstimate;
+    protected int lastHeight;
+    protected int lastWidth;
+    protected List<Uri> playlist;
+    protected int lastWindow;
+    protected String renditionChangeShift;
 
     /**
      * Init a new ExoPlayer tracker.
@@ -91,25 +93,25 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     /**
      * Get player name.
      *
-     * @return Attribute.
+     * @return Player name from Media3 library.
      */
     public String getPlayerName() {
-        return "ExoPlayer2";
+        return MediaLibraryInfo.TAG;
     }
 
     /**
      * Get player version.
      *
-     * @return Attribute.
+     * @return Player version from Media3 library.
      */
     public String getPlayerVersion() {
-        return "2.x";
+        return MediaLibraryInfo.VERSION;
     }
 
     /**
      * Get tracker name.
      *
-     * @return Atribute.
+     * @return The simple class name of this tracker.
      */
     public String getTrackerName() {
         return "ExoPlayer2Tracker";
@@ -250,12 +252,30 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         return (getPlayer().getVolume() == 0);
     }
 
+
+    /**
+     * Get the title from the currently played media
+     *
+     * @return String of the current title
+     */
+    public String getTitle() {
+        String contentTitle = "Unknown";
+        if (player != null && player.getCurrentMediaItem() != null && player.getCurrentMediaItem().mediaMetadata.title != null) {
+            MediaMetadata mm = player.getCurrentMediaItem().mediaMetadata;
+            contentTitle = mm.title.toString();
+            if (mm.subtitle != null) {
+                contentTitle += ": " + mm.subtitle; // Usually the episode title is available in subtitle
+            }
+        }
+        return contentTitle;
+    }
+
     /**
      * Get player instance.
      *
      * @return Attribute.
      */
-    private ExoPlayer getPlayer() {
+    public ExoPlayer getPlayer() {
         return player;
     }
 
