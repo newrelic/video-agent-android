@@ -114,7 +114,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      * @return The simple class name of this tracker.
      */
     public String getTrackerName() {
-        return this.getClass().getSimpleName();
+        return "ExoPlayer2Tracker";
     }
 
     /**
