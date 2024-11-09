@@ -133,15 +133,6 @@ public class NRTracker {
     }
 
     /**
-     * Send event of type VideoCustomAction.
-     *
-     * @param action Action name.
-     */
-    public void sendEvent(String action) {
-        sendEvent(action, null);
-    }
-
-    /**
      * Sends the given eventType and action wrapped in attributes.
      * @param eventType EventType for this telemetry.
      * @param action Action name.
@@ -191,7 +182,7 @@ public class NRTracker {
      * @param action Action name.
      */
     public void sendVideoEvent(String action) {
-        sendEvent(NR_VIDEO_EVENT, action, null);
+        sendVideoEvent(action, null);
     }
 
     /**
@@ -200,7 +191,7 @@ public class NRTracker {
      * @param action Action name.
      */
     public void sendVideoAdEvent(String action) {
-        sendEvent(NR_VIDEO_AD_EVENT, action, null);
+        sendVideoAdEvent(action, null);
     }
 
     /**
