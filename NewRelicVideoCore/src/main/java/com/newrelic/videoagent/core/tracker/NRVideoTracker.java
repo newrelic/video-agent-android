@@ -428,13 +428,6 @@ public class NRVideoTracker extends NRTracker {
     }
 
     /**
-     * Send error event.
-     */
-    public void sendError() {
-        sendError((String) null);
-    }
-
-    /**
      * Send request event.
      *
      * @param error Exception.

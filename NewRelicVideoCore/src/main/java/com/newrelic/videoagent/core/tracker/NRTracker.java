@@ -148,11 +148,10 @@ public class NRTracker {
 
         NRLog.d("SEND EVENT " + action + " , attr = " + attributes);
 
-        attributes.put("coreVersion", getCoreVersion());
         attributes.put("agentSession", getAgentSession());
         attributes.put("instrumentation.provider", "newrelic");
         attributes.put("instrumentation.name", getInstrumentationName());
-        attributes.put("instrumentation.version", getTrackerVersion());
+        attributes.put("instrumentation.version", getCoreVersion());
 
         // Remove null and empty values
         while (attributes.values().remove(null));
@@ -239,7 +238,7 @@ public class NRTracker {
      * @return Core version.
      */
     public String getInstrumentationName() {
-        return "andriod";
+        return "Mobile/Android";
     }
 
     /**
@@ -249,13 +248,5 @@ public class NRTracker {
      */
     public String getAgentSession() {
         return NewRelicVideoAgent.getInstance().getSessionId();
-    }
-    /**
-     * Get the tracker version.
-     *
-     * @return Attribute.
-     */
-    public String getTrackerVersion() {
-        return null;
     }
 }
