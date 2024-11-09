@@ -85,7 +85,7 @@ public class NRVideoTracker extends NRTracker {
      * @param player Player instance.
      */
     public void setPlayer(Object player) {
-        sendEvent(PLAYER_READY);
+        sendVideoEvent(PLAYER_READY);
         state.goPlayerReady();
     }
 
@@ -174,11 +174,10 @@ public class NRVideoTracker extends NRTracker {
         attr.put("playerVersion", getPlayerVersion());
         attr.put("viewSession", getViewSession());
         attr.put("viewId", getViewId());
-        attr.put("isAd", state.isAd);
         attr.put("numberOfAds", numberOfAds);
         attr.put("numberOfVideos", numberOfVideos);
         attr.put("numberOfErrors", numberOfErrors);
-        attr.put("playtimeSinceLastEvent", playtimeSinceLastEvent);
+        attr.put("elapsedTime", playtimeSinceLastEvent);
         attr.put("totalPlaytime", totalPlaytime);
 
         if (state.isAd) {
@@ -248,7 +247,11 @@ public class NRVideoTracker extends NRTracker {
      */
     @Override
     public void sendEvent(String action, Map<String, Object> attributes) {
+        generatePlayElapsedTime();
+        super.sendEvent(action, attributes);
+    }
 
+    public void generatePlayElapsedTime() {
         if (playtimeSinceLastEventTimestamp > 0) {
             playtimeSinceLastEvent = System.currentTimeMillis() - playtimeSinceLastEventTimestamp;
             totalPlaytime += playtimeSinceLastEvent;
@@ -256,8 +259,6 @@ public class NRVideoTracker extends NRTracker {
         } else {
             playtimeSinceLastEvent = 0L;
         }
-
-        super.sendEvent(action, attributes);
     }
 
     /**
@@ -268,9 +269,9 @@ public class NRVideoTracker extends NRTracker {
             playtimeSinceLastEventTimestamp = 0L;
 
             if (state.isAd) {
-                sendEvent(AD_REQUEST);
+                sendVideoAdEvent(AD_REQUEST);
             } else {
-                sendEvent(CONTENT_REQUEST);
+                sendVideoEvent(CONTENT_REQUEST);
             }
         }
     }
@@ -286,13 +287,13 @@ public class NRVideoTracker extends NRTracker {
                 if (linkedTracker instanceof NRVideoTracker) {
                     ((NRVideoTracker) linkedTracker).setNumberOfAds(numberOfAds);
                 }
-                sendEvent(AD_START);
+                sendVideoAdEvent(AD_START);
             } else {
                 if (linkedTracker instanceof NRVideoTracker) {
                     totalAdPlaytime = ((NRVideoTracker)linkedTracker).getTotalAdPlaytime();
                 }
                 numberOfVideos++;
-                sendEvent(CONTENT_START);
+                sendVideoEvent(CONTENT_START);
             }
             playtimeSinceLastEventTimestamp = System.currentTimeMillis();
         }
@@ -304,9 +305,9 @@ public class NRVideoTracker extends NRTracker {
     public void sendPause() {
         if (state.goPause()) {
             if (state.isAd) {
-                sendEvent(AD_PAUSE);
+                sendVideoAdEvent(AD_PAUSE);
             } else {
-                sendEvent(CONTENT_PAUSE);
+                sendVideoEvent(CONTENT_PAUSE);
             }
             playtimeSinceLastEventTimestamp = 0L;
         }
@@ -318,9 +319,9 @@ public class NRVideoTracker extends NRTracker {
     public void sendResume() {
         if (state.goResume()) {
             if (state.isAd) {
-                sendEvent(AD_RESUME);
+                sendVideoAdEvent(AD_RESUME);
             } else {
-                sendEvent(CONTENT_RESUME);
+                sendVideoEvent(CONTENT_RESUME);
             }
             if (!state.isBuffering && !state.isSeeking) {
                 playtimeSinceLastEventTimestamp = System.currentTimeMillis();
@@ -334,13 +335,13 @@ public class NRVideoTracker extends NRTracker {
     public void sendEnd() {
         if (state.goEnd()) {
             if (state.isAd) {
-                sendEvent(AD_END);
+                sendVideoAdEvent(AD_END);
                 if (linkedTracker instanceof NRVideoTracker) {
                     ((NRVideoTracker) linkedTracker).adHappened();
                 }
                 totalAdPlaytime = totalAdPlaytime + totalPlaytime;
             } else {
-                sendEvent(CONTENT_END);
+                sendVideoEvent(CONTENT_END);
             }
 
             stopHeartbeat();
@@ -359,9 +360,9 @@ public class NRVideoTracker extends NRTracker {
     public void sendSeekStart() {
         if (state.goSeekStart()) {
             if (state.isAd) {
-                sendEvent(AD_SEEK_START);
+                sendVideoAdEvent(AD_SEEK_START);
             } else {
-                sendEvent(CONTENT_SEEK_START);
+                sendVideoEvent(CONTENT_SEEK_START);
             }
             playtimeSinceLastEventTimestamp = 0L;
         }
@@ -373,9 +374,9 @@ public class NRVideoTracker extends NRTracker {
     public void sendSeekEnd() {
         if (state.goSeekEnd()) {
             if (state.isAd) {
-                sendEvent(AD_SEEK_END);
+                sendVideoAdEvent(AD_SEEK_END);
             } else {
-                sendEvent(CONTENT_SEEK_END);
+                sendVideoEvent(CONTENT_SEEK_END);
             }
             if (!state.isBuffering && !state.isPaused) {
                 playtimeSinceLastEventTimestamp = System.currentTimeMillis();
@@ -390,9 +391,9 @@ public class NRVideoTracker extends NRTracker {
         if (state.goBufferStart()) {
             bufferType = calculateBufferType();
             if (state.isAd) {
-                sendEvent(AD_BUFFER_START);
+                sendVideoAdEvent(AD_BUFFER_START);
             } else {
-                sendEvent(CONTENT_BUFFER_START);
+                sendVideoEvent(CONTENT_BUFFER_START);
             }
             playtimeSinceLastEventTimestamp = 0L;
         }
@@ -407,9 +408,9 @@ public class NRVideoTracker extends NRTracker {
                 bufferType = calculateBufferType();
             }
             if (state.isAd) {
-                sendEvent(AD_BUFFER_END);
+                sendVideoAdEvent(AD_BUFFER_END);
             } else {
-                sendEvent(CONTENT_BUFFER_END);
+                sendVideoEvent(CONTENT_BUFFER_END);
             }
             if (!state.isSeeking && !state.isPaused) {
                 playtimeSinceLastEventTimestamp = System.currentTimeMillis();
@@ -423,9 +424,9 @@ public class NRVideoTracker extends NRTracker {
      */
     public void sendHeartbeat() {
         if (state.isAd) {
-            sendEvent(AD_HEARTBEAT);
+            sendVideoAdEvent(AD_HEARTBEAT);
         } else {
-            sendEvent(CONTENT_HEARTBEAT);
+            sendVideoEvent(CONTENT_HEARTBEAT);
         }
     }
 
@@ -434,9 +435,9 @@ public class NRVideoTracker extends NRTracker {
      */
     public void sendRenditionChange() {
         if (state.isAd) {
-            sendEvent(AD_RENDITION_CHANGE);
+            sendVideoAdEvent(AD_RENDITION_CHANGE);
         } else {
-            sendEvent(CONTENT_RENDITION_CHANGE);
+            sendVideoEvent(CONTENT_RENDITION_CHANGE);
         }
     }
 
@@ -480,14 +481,13 @@ public class NRVideoTracker extends NRTracker {
         }
         numberOfErrors++;
         Map<String, Object> errAttr = new HashMap<>();
-        errAttr.put("errorMessage", errorMessage);
-
+        errAttr.put("errorName", errorMessage);
+        generatePlayElapsedTime();
+        String actionName = CONTENT_ERROR;
         if (state.isAd) {
-            sendEvent(AD_ERROR, errAttr);
+            actionName = AD_ERROR;
         }
-        else {
-            sendEvent(CONTENT_ERROR, errAttr);
-        }
+        sendVideoErrorEvent(actionName, errAttr);
     }
 
     /**
@@ -497,7 +497,7 @@ public class NRVideoTracker extends NRTracker {
         if (state.isAd && state.goAdBreakStart()) {
             adBreakIdIndex++;
             totalAdPlaytime = 0L;
-            sendEvent(AD_BREAK_START);
+            sendVideoAdEvent(AD_BREAK_START);
         }
     }
 
@@ -506,7 +506,7 @@ public class NRVideoTracker extends NRTracker {
      */
     public void sendAdBreakEnd() {
         if (state.isAd && state.goAdBreakEnd()) {
-            sendEvent(AD_BREAK_END);
+            sendVideoAdEvent(AD_BREAK_END);
         }
     }
 
@@ -515,7 +515,7 @@ public class NRVideoTracker extends NRTracker {
      */
     public void sendAdQuartile() {
         if (state.isAd) {
-            sendEvent(AD_QUARTILE);
+            sendVideoAdEvent(AD_QUARTILE);
         }
     }
 
@@ -524,7 +524,7 @@ public class NRVideoTracker extends NRTracker {
      */
     public void sendAdClick() {
         if (state.isAd) {
-            sendEvent(AD_CLICK);
+            sendVideoAdEvent(AD_CLICK);
         }
     }
 
@@ -537,14 +537,6 @@ public class NRVideoTracker extends NRTracker {
         return state.isAd;
     }
 
-    /**
-     * Get the tracker version.
-     *
-     * @return Attribute.
-     */
-    public String getTrackerVersion() {
-        return null;
-    }
 
     /**
      * Get the tracker name.
