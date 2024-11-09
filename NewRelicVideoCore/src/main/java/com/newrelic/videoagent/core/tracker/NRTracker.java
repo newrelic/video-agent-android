@@ -36,7 +36,7 @@ public class NRTracker {
      * Tracker is ready.
      */
     public void trackerReady() {
-        sendEvent(TRACKER_READY);
+        sendVideoEvent(TRACKER_READY);
     }
 
     /**
@@ -133,7 +133,7 @@ public class NRTracker {
     }
 
     /**
-     * Send event.
+     * Send event of type VideoCustomAction.
      *
      * @param action Action name.
      */
@@ -176,7 +176,7 @@ public class NRTracker {
     }
 
     /**
-     * Send event with attributes.
+     * Send event of type VideoCustomAction with attributes.
      *
      * @param action Action name.
      * @param attributes Action attributes.
