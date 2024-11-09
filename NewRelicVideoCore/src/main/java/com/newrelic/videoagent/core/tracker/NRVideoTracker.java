@@ -237,20 +237,6 @@ public class NRVideoTracker extends NRTracker {
         return attr;
     }
 
-    /**
-     * Send event with attributes.
-     *
-     * Generate playtimeSinceLastEvent and totalPlaytime attributes. Then call `super.sendEvent(...)`.
-     *
-     * @param action Action name.
-     * @param attributes Action attributes.
-     */
-    @Override
-    public void sendEvent(String action, Map<String, Object> attributes) {
-        generatePlayElapsedTime();
-        super.sendEvent(action, attributes);
-    }
-
     public void generatePlayElapsedTime() {
         if (playtimeSinceLastEventTimestamp > 0) {
             playtimeSinceLastEvent = System.currentTimeMillis() - playtimeSinceLastEventTimestamp;
