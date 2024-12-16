@@ -516,6 +516,14 @@ public class NRVideoTracker extends NRTracker {
         return state.isAd;
     }
 
+    /**
+     * Get the tracker version.
+     *
+     * @return Attribute.
+     */
+    public String getTrackerVersion() {
+        return null;
+    }
 
     /**
      * Get the tracker name.
