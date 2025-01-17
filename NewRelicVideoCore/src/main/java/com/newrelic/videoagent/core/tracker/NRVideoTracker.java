@@ -180,6 +180,7 @@ public class NRVideoTracker extends NRTracker {
         attr.put("numberOfErrors", numberOfErrors);
         attr.put("playtimeSinceLastEvent", playtimeSinceLastEvent);
         attr.put("totalPlaytime", totalPlaytime);
+        attr.put("src", "Andriod");
 
         if (state.isAd) {
             attr.put("adTitle", getTitle());
