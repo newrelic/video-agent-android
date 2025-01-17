@@ -179,6 +179,7 @@ public class NRVideoTracker extends NRTracker {
         attr.put("numberOfErrors", numberOfErrors);
         attr.put("elapsedTime", playtimeSinceLastEvent);
         attr.put("totalPlaytime", totalPlaytime);
+        attr.put("src", "Andriod");
 
         if (state.isAd) {
             attr.put("adTitle", getTitle());
@@ -290,6 +291,7 @@ public class NRVideoTracker extends NRTracker {
      */
     public void sendPause() {
         if (state.goPause()) {
+            generatePlayElapsedTime();
             if (state.isAd) {
                 sendVideoAdEvent(AD_PAUSE);
             } else {
