@@ -170,6 +170,7 @@ public class NRVideoTracker extends NRTracker {
 
         attr.put("trackerName", getTrackerName());
         attr.put("trackerVersion", getTrackerVersion());
+        attr.put("src", getTrackerSrc());
         attr.put("playerName", getPlayerName());
         attr.put("playerVersion", getPlayerVersion());
         attr.put("viewSession", getViewSession());
@@ -180,7 +181,6 @@ public class NRVideoTracker extends NRTracker {
         attr.put("numberOfErrors", numberOfErrors);
         attr.put("playtimeSinceLastEvent", playtimeSinceLastEvent);
         attr.put("totalPlaytime", totalPlaytime);
-        attr.put("src", "Andriod");
 
         if (state.isAd) {
             attr.put("adTitle", getTitle());
@@ -544,6 +544,15 @@ public class NRVideoTracker extends NRTracker {
      * @return Attribute.
      */
     public String getTrackerVersion() {
+        return null;
+    }
+
+    /**
+     * Get the tracker src.
+     *
+     * @return Attribute.
+     */
+    public String getTrackerSrc() {
         return null;
     }
 
