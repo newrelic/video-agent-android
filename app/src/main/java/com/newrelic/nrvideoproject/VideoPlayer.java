@@ -64,6 +64,8 @@ public class VideoPlayer extends AppCompatActivity {
         tracker.setAttribute("contentTitle", "This is my test title", "CONTENT_START");
         tracker.setAttribute("contentIsLive", true, "CONTENT_START");
         tracker.setAttribute("myCustomAttr", "any value", "CONTENT_START");
+        // Uncomment below to set userId
+        tracker.setUserId("myUserId");
 
         trackerId = NewRelicVideoAgent.getInstance().start(tracker);
 

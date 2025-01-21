@@ -36,7 +36,16 @@ public class NRTracker {
      * Tracker is ready.
      */
     public void trackerReady() {
-        sendEvent(TRACKER_READY);
+        sendVideoEvent(TRACKER_READY);
+    }
+
+    /**
+     * Set userId.
+     *
+     * @param userId User Id.
+     */
+    public void setUserId(String userId) {
+        eventAttributes.setUserId(userId);
     }
 
     /**
@@ -71,8 +80,6 @@ public class NRTracker {
      */
     public Map<String, Object> getAttributes(String action, Map<String, Object> attributes) {
         attributes = eventAttributes.generateAttributes(action, attributes);
-        attributes.put("coreVersion", getCoreVersion());
-        attributes.put("agentSession", getAgentSession());
         return attributes;
     }
 
@@ -135,21 +142,12 @@ public class NRTracker {
     }
 
     /**
-     * Send event.
-     *
+     * Sends the given eventType and action wrapped in attributes.
+     * @param eventType EventType for this telemetry.
      * @param action Action name.
+     * @param attributes Event Type attributes for this action.
      */
-    public void sendEvent(String action) {
-        sendEvent(action, null);
-    }
-
-    /**
-     * Send event with attributes.
-     *
-     * @param action Action name.
-     * @param attributes Action attributes.
-     */
-    public void sendEvent(String action, Map<String, Object> attributes) {
+    public void sendEvent(String eventType, String action, Map<String, Object> attributes) {
         if (attributes == null) {
             attributes = new HashMap<>();
         }
@@ -159,17 +157,79 @@ public class NRTracker {
 
         NRLog.d("SEND EVENT " + action + " , attr = " + attributes);
 
+        attributes.put("agentSession", getAgentSession());
+        attributes.put("instrumentation.provider", "newrelic");
+        attributes.put("instrumentation.name", getInstrumentationName());
+        attributes.put("instrumentation.version", getCoreVersion());
+
         // Remove null and empty values
         while (attributes.values().remove(null));
         while (attributes.values().remove(""));
 
         if (preSend(action, attributes)) {
             attributes.put("actionName", action);
-
-            if (!NewRelic.recordCustomEvent(NR_VIDEO_EVENT, attributes)) {
+            if (!NewRelic.recordCustomEvent(eventType, attributes)) {
                 NRLog.e("⚠️ Failed to recordCustomEvent. Maybe the NewRelicAgent is not initialized or the attribute list contains invalid/empty values. ⚠️");
             }
         }
+    }
+
+    /**
+     * Send event of type VideoCustomAction with attributes.
+     *
+     * @param action Action name.
+     * @param attributes Action attributes.
+     */
+    public void sendEvent(String action, Map<String, Object> attributes) {
+        sendEvent(NR_VIDEO_CUSTOM_EVENT, action, attributes);
+    }
+
+    /**
+     * Send event with attributes.
+     *
+     * @param action Action name.
+     */
+    public void sendVideoEvent(String action) {
+        sendVideoEvent(action, null);
+    }
+
+    /**
+     * Send event with attributes.
+     *
+     * @param action Action name.
+     */
+    public void sendVideoAdEvent(String action) {
+        sendVideoAdEvent(action, null);
+    }
+
+    /**
+     * Send event with attributes.
+     *
+     * @param action Action name.
+     * @param attributes Event attributes.
+     */
+    public void sendVideoEvent(String action, Map<String, Object> attributes) {
+        sendEvent(NR_VIDEO_EVENT, action, attributes);
+    }
+
+    /**
+     * Send event with attributes.
+     *
+     * @param action Action name.
+     * @param attributes Event attributes.
+     */
+    public void sendVideoAdEvent(String action, Map<String, Object> attributes) {
+        sendEvent(NR_VIDEO_AD_EVENT, action, attributes);
+    }
+
+    /**
+     * Send event with attributes.
+     *
+     * @param action Action name.
+     * @param attributes Event attributes.
+     */
+    public void sendVideoErrorEvent(String action, Map<String, Object> attributes) {
+        sendEvent(NR_VIDEO_ERROR_EVENT, action, attributes);
     }
 
     /**
@@ -179,6 +239,15 @@ public class NRTracker {
      */
     public String getCoreVersion() {
         return NRVIDEO_CORE_VERSION;
+    }
+
+    /**
+     * Get the core version.
+     *
+     * @return Core version.
+     */
+    public String getInstrumentationName() {
+        return "Mobile/Android";
     }
 
     /**
