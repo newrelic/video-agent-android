@@ -60,7 +60,7 @@ public class NRTimeSince {
             return System.currentTimeMillis() - timestamp;
         }
         else {
-            return 0L;
+            return null;
         }
     }
 

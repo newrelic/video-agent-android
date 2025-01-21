@@ -15,8 +15,6 @@ public class NRDef {
 
     public static final String SRC = "ANDROID";
 
-    public static final String SRC = "ANDROID";
-
     public static final String TRACKER_READY = "TRACKER_READY";
     public static final String PLAYER_READY = "PLAYER_READY";
 
