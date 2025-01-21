@@ -8,7 +8,10 @@ public class NRDef {
 
     public static final String NRVIDEO_CORE_VERSION = VERSION_NAME;
 
-    public static final String NR_VIDEO_EVENT = "MobileVideo";
+    public static final String NR_VIDEO_EVENT = "VideoAction";
+    public static final String NR_VIDEO_AD_EVENT = "VideoAdAction";
+    public static final String NR_VIDEO_ERROR_EVENT = "VideoErrorAction";
+    public static final String NR_VIDEO_CUSTOM_EVENT = "VideoCustomAction";
 
     public static final String SRC = "ANDROID";
 

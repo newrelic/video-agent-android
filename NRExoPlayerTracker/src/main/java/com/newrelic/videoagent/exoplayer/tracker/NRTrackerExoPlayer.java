@@ -364,11 +364,12 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         Map<String, Object> attr = new HashMap<>();
         attr.put("lostFrames", count);
         attr.put("lostFramesDuration", elapsed);
+        generatePlayElapsedTime();
         if (getState().isAd) {
-            sendEvent("AD_DROPPED_FRAMES", attr);
+            sendVideoAdEvent("AD_DROPPED_FRAMES", attr);
         }
         else {
-            sendEvent("CONTENT_DROPPED_FRAMES", attr);
+            sendVideoEvent("CONTENT_DROPPED_FRAMES", attr);
         }
     }
 
