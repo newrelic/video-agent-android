@@ -159,7 +159,7 @@ public class NRVideoTracker extends NRTracker {
         Map<String, Object> attr;
 
         if (attributes != null) {
-            attr = attributes;
+            attr = new HashMap<>(attributes);
         } else {
             attr = new HashMap<>();
         }
