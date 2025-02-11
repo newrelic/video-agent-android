@@ -16,6 +16,7 @@ import androidx.media3.exoplayer.source.MediaLoadData;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.exoplayer.BuildConfig;
+import static com.newrelic.videoagent.core.NRDef.*;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -124,6 +125,15 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      */
     public String getTrackerVersion() {
         return BuildConfig.VERSION_NAME;
+    }
+
+    /**
+     * Get tracker src.
+     *
+     * @return Attribute.
+     */
+    public String getTrackerSrc() {
+        return SRC;
     }
 
     /**
