@@ -3,6 +3,7 @@ package com.newrelic.videoagent.core.tracker;
 import android.os.Handler;
 import com.newrelic.videoagent.core.model.NRTimeSince;
 import com.newrelic.videoagent.core.model.NRTrackerState;
+import com.newrelic.videoagent.core.model.NRChrono;
 import com.newrelic.videoagent.core.utils.NRLog;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -38,6 +39,8 @@ public class NRVideoTracker extends NRTracker {
     private Long playtimeSinceLastEvent;
     private String bufferType;
     private NRTimeSince lastAdTimeSince;
+    private Integer acc;
+    private NRChrono chrono;
 
     /**
      * Create a new NRVideoTracker.
@@ -67,6 +70,8 @@ public class NRVideoTracker extends NRTracker {
                 }
             }
         };
+        acc = 0;
+        chrono = new NRChrono();
     }
 
     /**
@@ -281,6 +286,7 @@ public class NRVideoTracker extends NRTracker {
     public void sendStart() {
         if (state.goStart()) {
             startHeartbeat();
+            chrono.start();
             if (state.isAd) {
                 numberOfAds++;
                 if (linkedTracker instanceof NRVideoTracker) {
@@ -303,6 +309,9 @@ public class NRVideoTracker extends NRTracker {
      */
     public void sendPause() {
         if (state.goPause()) {
+            if(!state.isBuffering){
+                acc += chrono.getDeltaTime();
+            }
             if (state.isAd) {
                 sendEvent(AD_PAUSE);
             } else {
@@ -317,6 +326,9 @@ public class NRVideoTracker extends NRTracker {
      */
     public void sendResume() {
         if (state.goResume()) {
+            if(!state.isBuffering){
+                chrono.start();
+            }
             if (state.isAd) {
                 sendEvent(AD_RESUME);
             } else {
@@ -388,6 +400,9 @@ public class NRVideoTracker extends NRTracker {
      */
     public void sendBufferStart() {
         if (state.goBufferStart()) {
+            if(state.isPlaying){
+                acc += chrono.getDeltaTime();
+            }
             bufferType = calculateBufferType();
             if (state.isAd) {
                 sendEvent(AD_BUFFER_START);
@@ -403,6 +418,9 @@ public class NRVideoTracker extends NRTracker {
      */
     public void sendBufferEnd() {
         if (state.goBufferEnd()) {
+            if(state.isPlaying){
+                chrono.start();
+            }
             if (bufferType == null) {
                 bufferType = calculateBufferType();
             }
@@ -422,6 +440,15 @@ public class NRVideoTracker extends NRTracker {
      * Send heartbeat event.
      */
     public void sendHeartbeat() {
+        private Integer _elpasedTime = 0;
+        if(acc > 0){
+            _elpasedTime += acc;
+            acc = 0;
+        }
+        if(state.isPlaying){
+            _elpasedTime += chrono.getDeltaTime();
+        }
+        chrono.start();
         if (state.isAd) {
             sendEvent(AD_HEARTBEAT);
         } else {
