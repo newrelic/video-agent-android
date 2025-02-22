@@ -1,5 +1,0 @@
-include ':app'
-rootProject.name = "CoreTest"
-
-include ':NewRelicVideoCore'
-project(':NewRelicVideoCore').projectDir = new File('../NewRelicVideoCore/')
