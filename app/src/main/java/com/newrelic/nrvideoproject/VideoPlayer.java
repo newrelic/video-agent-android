@@ -4,14 +4,15 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.media3.common.MediaItem;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.ui.PlayerView;
-
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import com.newrelic.videoagent.core.NewRelicVideoAgent;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer;
-
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class VideoPlayer extends AppCompatActivity {
@@ -28,19 +29,19 @@ public class VideoPlayer extends AppCompatActivity {
 
         if (video.equals("Tears")) {
             Log.v("VideoPlayer", "Play Tears");
-            playVideo("http://www.bok.net/dash/tears_of_steel/cleartext/stream.mpd");
+            playVideo("https://turtle-tube.appspot.com/t/t2/dash.mpd");
         }
         else if (video.equals("Playhouse")) {
             Log.v("VideoPlayer", "Play Playhouse");
-            playVideo("https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd");
+            playVideo("https://turtle-tube.appspot.com/t/t2/dash.mpd");
         }
         else if (video.equals("Kite")) {
             Log.v("VideoPlayer", "Play Kite");
-            playVideo("https://demos.transloadit.com/dashtest/my_playlist.mpd");
+            playVideo("https://turtle-tube.appspot.com/t/t2/dash.mpd");
         }
         else if (video.equals("Live")) {
             Log.v("VideoPlayer", "Play Live");
-            playVideo("https://livesim.dashif.org/livesim/testpic_2s/Manifest.mpd");
+            playVideo("https://turtle-tube.appspot.com/t/t2/dash.mpd");
         }
         else {
             Log.v("VideoPlayer","Unknown video");
@@ -79,6 +80,11 @@ public class VideoPlayer extends AppCompatActivity {
         playerView.setPlayer(player);
 
         tracker.setPlayer(player);
+
+        // Set the playlist URIs
+        List<Uri> uris = new ArrayList<>();
+        uris.add(Uri.parse(videoUrl));
+        tracker.setSrc(uris);
 
         player.setMediaItem(MediaItem.fromUri(videoUrl));
         // Prepare the player.

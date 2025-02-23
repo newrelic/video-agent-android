@@ -2,15 +2,13 @@ plugins {
     id 'com.android.library'
     id 'maven-publish'
 }
-
 android {
     compileSdkVersion 33
-
     defaultConfig {
         minSdkVersion 16
         targetSdkVersion 33
-        versionCode 8
-        versionName "2.0.0"
+        versionCode 9
+        versionName "3.0.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
@@ -38,7 +36,6 @@ android {
 }
 
 dependencies {
-
     implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation 'com.google.android.material:material:1.1.0'
     implementation 'com.newrelic.agent.android:android-agent:7.0.0'
@@ -46,7 +43,6 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
 }
-
 afterEvaluate {
     publishing {
         publications {

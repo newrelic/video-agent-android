@@ -1,6 +1,8 @@
 package com.newrelic.videoagent.core.tracker;
 
 import android.os.Handler;
+
+import com.newrelic.videoagent.core.model.NRChrono;
 import com.newrelic.videoagent.core.model.NRTimeSince;
 import com.newrelic.videoagent.core.model.NRTrackerState;
 import com.newrelic.videoagent.core.utils.NRLog;
@@ -38,6 +40,8 @@ public class NRVideoTracker extends NRTracker {
     private Long playtimeSinceLastEvent;
     private String bufferType;
     private NRTimeSince lastAdTimeSince;
+    private Long acc;
+    private NRChrono chrono;
 
     /**
      * Create a new NRVideoTracker.
@@ -67,6 +71,8 @@ public class NRVideoTracker extends NRTracker {
                 }
             }
         };
+        acc = 0L;
+        chrono = new NRChrono();
     }
 
     /**
@@ -159,7 +165,7 @@ public class NRVideoTracker extends NRTracker {
         Map<String, Object> attr;
 
         if (attributes != null) {
-            attr = attributes;
+            attr = new HashMap<>(attributes);
         } else {
             attr = new HashMap<>();
         }
@@ -178,7 +184,7 @@ public class NRVideoTracker extends NRTracker {
         attr.put("numberOfAds", numberOfAds);
         attr.put("numberOfVideos", numberOfVideos);
         attr.put("numberOfErrors", numberOfErrors);
-        attr.put("elapsedTime", playtimeSinceLastEvent);
+//        attr.put("elapsedTime", playtimeSinceLastEvent);
         attr.put("totalPlaytime", totalPlaytime);
 
         if (state.isAd) {
@@ -232,9 +238,7 @@ public class NRVideoTracker extends NRTracker {
             attr.put("contentId", getVideoId());
             attr.put("contentIsLive", getIsLive());
         }
-
         attr = super.getAttributes(action, attr);
-
         return attr;
     }
 
@@ -269,7 +273,11 @@ public class NRVideoTracker extends NRTracker {
     public void sendStart() {
         if (state.goStart()) {
             startHeartbeat();
+            chrono.start();
             if (state.isAd) {
+                if(!state.isBuffering){
+                    acc += chrono.getDeltaTime();
+                }
                 numberOfAds++;
                 if (linkedTracker instanceof NRVideoTracker) {
                     ((NRVideoTracker) linkedTracker).setNumberOfAds(numberOfAds);
@@ -291,6 +299,9 @@ public class NRVideoTracker extends NRTracker {
      */
     public void sendPause() {
         if (state.goPause()) {
+            if(!state.isBuffering){
+                acc += chrono.getDeltaTime();
+            }
             if (state.isAd) {
                 sendVideoAdEvent(AD_PAUSE);
             } else {
@@ -305,6 +316,9 @@ public class NRVideoTracker extends NRTracker {
      */
     public void sendResume() {
         if (state.goResume()) {
+            if(!state.isBuffering){
+                chrono.start();
+            }
             if (state.isAd) {
                 sendVideoAdEvent(AD_RESUME);
             } else {
@@ -376,6 +390,9 @@ public class NRVideoTracker extends NRTracker {
      */
     public void sendBufferStart() {
         if (state.goBufferStart()) {
+            if(state.isPlaying){
+                acc += chrono.getDeltaTime();
+            }
             bufferType = calculateBufferType();
             if (state.isAd) {
                 sendVideoAdEvent(AD_BUFFER_START);
@@ -391,6 +408,9 @@ public class NRVideoTracker extends NRTracker {
      */
     public void sendBufferEnd() {
         if (state.goBufferEnd()) {
+            if(state.isPlaying){
+                chrono.start();
+            }
             if (bufferType == null) {
                 bufferType = calculateBufferType();
             }
@@ -410,11 +430,27 @@ public class NRVideoTracker extends NRTracker {
      * Send heartbeat event.
      */
     public void sendHeartbeat() {
+        Long _elpasedTime = 0L;
+        if(this.acc > 0){
+            _elpasedTime += this.acc;
+            this.acc = 0L;
+        }
+        if(state.isPlaying){
+            _elpasedTime += chrono.getDeltaTime();
+        }
+        chrono.start();
+
+        Long minimumElapsedTime =  30000L;
+        _elpasedTime = Math.min(minimumElapsedTime, _elpasedTime);
+
+        Map<String, Object> attributes = new HashMap<>();
+        attributes.put("elapsedTime", _elpasedTime);
         if (state.isAd) {
             sendVideoAdEvent(AD_HEARTBEAT);
         } else {
-            sendVideoEvent(CONTENT_HEARTBEAT);
+            sendVideoEvent(CONTENT_HEARTBEAT, attributes);
         }
+
     }
 
     /**
@@ -462,7 +498,7 @@ public class NRVideoTracker extends NRTracker {
         numberOfErrors++;
         Map<String, Object> errAttr = new HashMap<>();
         errAttr.put("errorName", errorMessage);
-        generatePlayElapsedTime();
+//        generatePlayElapsedTime();
         String actionName = CONTENT_ERROR;
         if (state.isAd) {
             actionName = AD_ERROR;
