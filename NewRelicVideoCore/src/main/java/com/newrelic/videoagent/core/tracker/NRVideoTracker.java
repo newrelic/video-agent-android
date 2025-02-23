@@ -71,7 +71,7 @@ public class NRVideoTracker extends NRTracker {
                 }
             }
         };
-        acc = 0;
+        acc = 0L;
         chrono = new NRChrono();
     }
 
@@ -433,7 +433,7 @@ public class NRVideoTracker extends NRTracker {
         Long _elpasedTime = 0L;
         if(this.acc > 0){
             _elpasedTime += this.acc;
-            this.acc = 0;
+            this.acc = 0L;
         }
         if(state.isPlaying){
             _elpasedTime += chrono.getDeltaTime();
