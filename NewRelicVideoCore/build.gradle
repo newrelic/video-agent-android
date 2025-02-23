@@ -10,7 +10,7 @@ android {
         minSdkVersion 16
         targetSdkVersion 33
         versionCode 9
-        versionName "1.0.6"
+        versionName "3.0.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
@@ -51,7 +51,7 @@ afterEvaluate {
     publishing {
         publications {
             release(MavenPublication) {
-                from components.release
+                from components.findByName('release')
                 groupId = 'com.github.newrelic'
                 artifactId = 'NewRelicVideoCore'
                 version = "${android.defaultConfig.versionName}"
