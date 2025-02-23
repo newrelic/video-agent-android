@@ -40,7 +40,7 @@ public class NRVideoTracker extends NRTracker {
     private Long playtimeSinceLastEvent;
     private String bufferType;
     private NRTimeSince lastAdTimeSince;
-    private long acc;
+    private Long acc;
     private NRChrono chrono;
 
     /**
