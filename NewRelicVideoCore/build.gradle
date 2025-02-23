@@ -2,10 +2,8 @@ plugins {
     id 'com.android.library'
     id 'maven-publish'
 }
-
 android {
     compileSdkVersion 33
-
     defaultConfig {
         minSdkVersion 16
         targetSdkVersion 33
@@ -38,7 +36,6 @@ android {
 }
 
 dependencies {
-
     implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation 'com.google.android.material:material:1.1.0'
     implementation 'com.newrelic.agent.android:android-agent:7.0.0'
@@ -46,12 +43,11 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
 }
-
 afterEvaluate {
     publishing {
         publications {
             release(MavenPublication) {
-                from components.findByName('release')
+                from components.release
                 groupId = 'com.github.newrelic'
                 artifactId = 'NewRelicVideoCore'
                 version = "${android.defaultConfig.versionName}"
