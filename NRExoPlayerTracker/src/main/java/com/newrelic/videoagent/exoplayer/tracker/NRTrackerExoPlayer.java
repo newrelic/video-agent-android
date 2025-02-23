@@ -16,6 +16,7 @@ import androidx.media3.exoplayer.source.MediaLoadData;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.exoplayer.BuildConfig;
+import static com.newrelic.videoagent.core.NRDef.*;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -124,6 +125,15 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      */
     public String getTrackerVersion() {
         return BuildConfig.VERSION_NAME;
+    }
+
+    /**
+     * Get tracker src.
+     *
+     * @return Attribute.
+     */
+    public String getTrackerSrc() {
+        return SRC;
     }
 
     /**
@@ -354,11 +364,12 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         Map<String, Object> attr = new HashMap<>();
         attr.put("lostFrames", count);
         attr.put("lostFramesDuration", elapsed);
+//        generatePlayElapsedTime();
         if (getState().isAd) {
-            sendEvent("AD_DROPPED_FRAMES", attr);
+            sendVideoAdEvent("AD_DROPPED_FRAMES", attr);
         }
         else {
-            sendEvent("CONTENT_DROPPED_FRAMES", attr);
+            sendVideoEvent("CONTENT_DROPPED_FRAMES", attr);
         }
     }
 
