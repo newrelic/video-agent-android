@@ -29,7 +29,7 @@ public class VideoPlayer extends AppCompatActivity {
 
         if (video.equals("Tears")) {
             Log.v("VideoPlayer", "Play Tears");
-            playVideo("http://www.bok.net/dash/tears_of_steel/cleartext/stream.mpd");
+            playVideo("https://turtle-tube.appspot.com/t/t2/dash.mpd");
         }
         else if (video.equals("Playhouse")) {
             Log.v("VideoPlayer", "Play Playhouse");
