@@ -336,9 +336,6 @@ public class NRVideoTracker extends NRTracker {
     public void sendEnd() {
         if (state.goEnd()) {
             if (state.isAd) {
-                if(!state.isBuffering){
-                    chrono.start();
-                }
                 sendVideoAdEvent(AD_END);
                 if (linkedTracker instanceof NRVideoTracker) {
                     ((NRVideoTracker) linkedTracker).adHappened();
