@@ -6,6 +6,7 @@ import com.google.ads.interactivemedia.v3.api.AdEvent;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.ima.BuildConfig;
+import static com.newrelic.videoagent.core.NRDef.*;
 
 public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdErrorListener, AdEvent.AdEventListener {
 
@@ -124,6 +125,15 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
      */
     public String getTrackerVersion() {
         return BuildConfig.VERSION_NAME;
+    }
+
+    /**
+     * Get tracker src.
+     *
+     * @return Attribute.
+     */
+    public String getTrackerSrc() {
+        return SRC;
     }
 
     /**
