@@ -1,7 +1,6 @@
 plugins {
     id 'com.android.library'
     id 'maven-publish'
-    id 'newrelic'
 }
 android {
     compileSdkVersion 33
@@ -32,9 +31,6 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
     namespace 'com.newrelic.videoagent.ima'
-    lint {
-        baseline = file("lint-baseline.xml")
-    }
 }
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.2.0'
@@ -44,13 +40,12 @@ dependencies {
     testImplementation 'junit:junit:4.+'
     androidTestImplementation 'androidx.test.ext:junit:1.1.2'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
-//    implementation 'com.newrelic.agent.android:android-agent:7.6.3'
 }
 afterEvaluate {
     publishing {
         publications {
             release(MavenPublication) {
-                from components.findByName('release')
+                from components.release
                 groupId = 'com.github.newrelic'
                 artifactId = 'NRIMATracker'
                 version = "${android.defaultConfig.versionName}"
