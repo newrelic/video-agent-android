@@ -146,7 +146,7 @@ public class NRTracker {
         attributes = getAttributes(action, attributes);
         timeSinceTable.applyAttributes(action, attributes);
 
-        NRLog.d("SEND EVENT " + eventType + " " + action + " , attr = " + attributes);
+        NRLog.d("SEND EVENT " + action + " , attr = " + attributes);
 
         attributes.put("agentSession", getAgentSession());
         attributes.put("instrumentation.provider", "newrelic");
