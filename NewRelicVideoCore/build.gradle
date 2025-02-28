@@ -1,6 +1,7 @@
 plugins {
     id 'com.android.library'
     id 'maven-publish'
+    id 'newrelic'
 }
 
 android {
@@ -10,12 +11,10 @@ android {
         minSdkVersion 16
         targetSdkVersion 33
         versionCode 9
-        versionName "1.0.6"
-
+        versionName "3.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
     }
-
     buildTypes {
         debug {
             minifyEnabled false
@@ -35,23 +34,26 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
     namespace 'com.newrelic.videoagent.core'
+    lint {
+        baseline = file("lint-baseline.xml")
+    }
 }
-
 dependencies {
 
     implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation 'com.google.android.material:material:1.1.0'
-    implementation 'com.newrelic.agent.android:android-agent:7.0.0'
+    implementation 'com.newrelic.agent.android:android-agent:7.6.2'
     testImplementation 'junit:junit:4.+'
     androidTestImplementation 'androidx.test.ext:junit:1.1.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
+//    implementation 'com.newrelic.agent.android:android-agent:7.6.3'
 }
 
 afterEvaluate {
     publishing {
         publications {
             release(MavenPublication) {
-                from components.release
+                from components.findByName('release')
                 groupId = 'com.github.newrelic'
                 artifactId = 'NewRelicVideoCore'
                 version = "${android.defaultConfig.versionName}"

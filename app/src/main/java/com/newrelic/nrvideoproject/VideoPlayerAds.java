@@ -89,6 +89,9 @@ public class VideoPlayerAds extends AppCompatActivity implements AdErrorEvent.Ad
         playerView.setPlayer(player);
         adsLoader.setPlayer(player);
 
+        // Set the user ID
+        NewRelicVideoAgent.getInstance().setUserId("your_user_id");
+
         // Pass the player to the content tracker
         tracker.setPlayer(player);
 

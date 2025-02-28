@@ -36,7 +36,11 @@ public class NRTracker {
      * Tracker is ready.
      */
     public void trackerReady() {
+<<<<<<< Updated upstream
         sendEvent(TRACKER_READY);
+=======
+        sendVideoEvent(TRACKER_READY);
+>>>>>>> Stashed changes
     }
 
     /**
@@ -157,7 +161,7 @@ public class NRTracker {
         attributes = getAttributes(action, attributes);
         timeSinceTable.applyAttributes(action, attributes);
 
-        NRLog.d("SEND EVENT " + action + " , attr = " + attributes);
+        NRLog.d("SEND EVENT " + eventType + " " + action + " , attr = " + attributes);
 
         // Remove null and empty values
         while (attributes.values().remove(null));

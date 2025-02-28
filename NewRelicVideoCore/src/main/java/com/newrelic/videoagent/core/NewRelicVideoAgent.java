@@ -136,4 +136,23 @@ public class NewRelicVideoAgent {
             return null;
         }
     }
+
+    /**
+     * Set userId.
+     *
+     * @param userId User Id.
+     */
+    public void setUserId(String userId) {
+        for (Integer trackerId : trackerPairs.keySet()) {
+            NRTrackerPair pair = trackerPairs.get(trackerId);
+            if (pair.getFirst() != null) {
+                pair.getFirst().setAttribute("enduser.id", userId);
+            }
+            if (pair.getSecond() != null) {
+                pair.getSecond().setAttribute("enduser.id", userId);
+            }
+        }
+    }
+
+
 }

@@ -67,6 +67,9 @@ public class VideoPlayer extends AppCompatActivity {
 
         trackerId = NewRelicVideoAgent.getInstance().start(tracker);
 
+        // Set the user ID
+        NewRelicVideoAgent.getInstance().setUserId("your_user_id");
+
         Map<String, Object> attr = new HashMap<>();
         attr.put("myAttrStr", "Hello");
         attr.put("myAttrInt", 101);
@@ -77,6 +80,11 @@ public class VideoPlayer extends AppCompatActivity {
         playerView.setPlayer(player);
 
         tracker.setPlayer(player);
+
+        // Set the playlist URIs
+        List<Uri> uris = new ArrayList<>();
+        uris.add(Uri.parse(videoUrl));
+        tracker.setSrc(uris);
 
         player.setMediaItem(MediaItem.fromUri(videoUrl));
         // Prepare the player.
