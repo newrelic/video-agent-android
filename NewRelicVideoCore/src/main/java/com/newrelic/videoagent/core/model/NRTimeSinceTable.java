@@ -50,6 +50,7 @@ public class NRTimeSinceTable {
                 attributes.put(ts.getAttribute(), ts.timeSince());
             }
             if (ts.isAction(action)) {
+                // attributes.put("elapsedTime", ts.timeSince());
                 ts.now();
             }
         }
