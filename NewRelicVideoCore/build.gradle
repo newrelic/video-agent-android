@@ -44,7 +44,7 @@ afterEvaluate {
     publishing {
         publications {
             release(MavenPublication) {
-                from components.findByName('release')
+                from components.release
                 groupId = 'com.github.newrelic'
                 artifactId = 'NewRelicVideoCore'
                 version = "${android.defaultConfig.versionName}"

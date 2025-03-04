@@ -45,7 +45,7 @@ afterEvaluate {
     publishing {
         publications {
             release(MavenPublication) {
-                from components.findByName('release')
+                from components.release
                 groupId = 'com.github.newrelic'
                 artifactId = 'NRExoPlayerTracker'
                 version = "${android.defaultConfig.versionName}"
