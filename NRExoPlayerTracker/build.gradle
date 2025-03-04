@@ -2,19 +2,16 @@ plugins {
     id 'com.android.library'
     id 'maven-publish'
 }
-
 android {
     compileSdkVersion 33
-
     defaultConfig {
         minSdkVersion 16
         targetSdkVersion 33
         versionCode 6
-        versionName "3.0.0"
+        versionName "3.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
     }
-
     buildTypes {
         debug {
             minifyEnabled false
@@ -35,9 +32,7 @@ android {
     }
     namespace 'com.newrelic.videoagent.exoplayer'
 }
-
 dependencies {
-
     implementation 'androidx.appcompat:appcompat:1.2.0'
     implementation 'com.google.android.material:material:1.2.1'
     implementation project(path: ':NewRelicVideoCore')
@@ -46,7 +41,6 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.2'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
 }
-
 afterEvaluate {
     publishing {
         publications {

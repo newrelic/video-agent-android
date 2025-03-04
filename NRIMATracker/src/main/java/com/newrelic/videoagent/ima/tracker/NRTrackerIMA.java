@@ -50,6 +50,7 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
                 sendStart();
                 break;
             case COMPLETED:
+            case SKIPPED:
                 sendEnd();
                 quartile = null;
                 break;

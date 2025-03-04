@@ -40,15 +40,6 @@ public class NRTracker {
     }
 
     /**
-     * Set userId.
-     *
-     * @param userId User Id.
-     */
-    public void setUserId(String userId) {
-        eventAttributes.setUserId(userId);
-    }
-
-    /**
      * Set custom attribute for all events.
      *
      * @param key Attribute name.
