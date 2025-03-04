@@ -2,6 +2,7 @@ package com.newrelic.videoagent.core.tracker;
 
 import android.os.Handler;
 
+import androidx.media3.exoplayer.ExoPlayer;
 import com.newrelic.videoagent.core.model.NRChrono;
 import com.newrelic.videoagent.core.model.NRTimeSince;
 import com.newrelic.videoagent.core.model.NRTrackerState;
@@ -41,7 +42,10 @@ public class NRVideoTracker extends NRTracker {
     private String bufferType;
     private NRTimeSince lastAdTimeSince;
     private Long acc;
+    private Long adAcc;
     private NRChrono chrono;
+    private NRChrono adChrono;
+    private ExoPlayer currentPlayer;
 
     /**
      * Create a new NRVideoTracker.
@@ -67,12 +71,15 @@ public class NRVideoTracker extends NRTracker {
             public void run() {
                 if (isHeartbeatRunning) {
                     sendHeartbeat();
-                    heartbeatHandler.postDelayed(heartbeatRunnable, heartbeatTimeInterval * 1000);
+                    long heartbeatInterval = state.isAd ? 2000 : heartbeatTimeInterval*1000;
+                    heartbeatHandler.postDelayed(heartbeatRunnable,  heartbeatInterval);
                 }
             }
         };
         acc = 0L;
+        adAcc = 0L;
         chrono = new NRChrono();
+        adChrono = new NRChrono();
     }
 
     /**
@@ -91,6 +98,7 @@ public class NRVideoTracker extends NRTracker {
      * @param player Player instance.
      */
     public void setPlayer(Object player) {
+        currentPlayer = (ExoPlayer) player;
         sendVideoEvent(PLAYER_READY);
         state.goPlayerReady();
     }
@@ -102,7 +110,8 @@ public class NRVideoTracker extends NRTracker {
         NRLog.d("START HEARTBEAT");
         if (heartbeatTimeInterval == 0) return;
         isHeartbeatRunning = true;
-        heartbeatHandler.postDelayed(heartbeatRunnable, heartbeatTimeInterval * 1000);
+        long heartbeatInterval = state.isAd ? 2000 : heartbeatTimeInterval*1000;
+        heartbeatHandler.postDelayed(heartbeatRunnable, heartbeatInterval);
     }
 
     /**
@@ -121,7 +130,7 @@ public class NRVideoTracker extends NRTracker {
      */
     public void setHeartbeatTime(int seconds) {
         if (seconds >= 1) {
-            heartbeatTimeInterval = seconds;
+            heartbeatTimeInterval = state.isAd ? 2 : seconds;
             if (isHeartbeatRunning) {
                 stopHeartbeat();
                 startHeartbeat();
@@ -273,11 +282,11 @@ public class NRVideoTracker extends NRTracker {
     public void sendStart() {
         if (state.goStart()) {
             startHeartbeat();
-            chrono.start();
             if (state.isAd) {
-                if(!state.isBuffering){
-                    acc += chrono.getDeltaTime();
-                }
+               adChrono.start();
+               if(state.isStarted){
+                   acc += chrono.getDeltaTime ();
+               }
                 numberOfAds++;
                 if (linkedTracker instanceof NRVideoTracker) {
                     ((NRVideoTracker) linkedTracker).setNumberOfAds(numberOfAds);
@@ -287,6 +296,7 @@ public class NRVideoTracker extends NRTracker {
                 if (linkedTracker instanceof NRVideoTracker) {
                     totalAdPlaytime = ((NRVideoTracker)linkedTracker).getTotalAdPlaytime();
                 }
+                chrono.start();
                 numberOfVideos++;
                 sendVideoEvent(CONTENT_START);
             }
@@ -336,6 +346,8 @@ public class NRVideoTracker extends NRTracker {
     public void sendEnd() {
         if (state.goEnd()) {
             if (state.isAd) {
+                adAcc = 0L;
+                chrono.start();
                 sendVideoAdEvent(AD_END);
                 if (linkedTracker instanceof NRVideoTracker) {
                     ((NRVideoTracker) linkedTracker).adHappened();
@@ -430,25 +442,27 @@ public class NRVideoTracker extends NRTracker {
      * Send heartbeat event.
      */
     public void sendHeartbeat() {
-        Long _elpasedTime = 0L;
-        if(this.acc > 0){
-            _elpasedTime += this.acc;
-            this.acc = 0L;
-        }
-        if(state.isPlaying){
-            _elpasedTime += chrono.getDeltaTime();
-        }
-        chrono.start();
 
-        Long minimumElapsedTime =  30000L;
-        _elpasedTime = Math.min(minimumElapsedTime, _elpasedTime);
-
-        Map<String, Object> attributes = new HashMap<>();
-        attributes.put("elapsedTime", _elpasedTime);
         if (state.isAd) {
-            sendVideoAdEvent(AD_HEARTBEAT);
+            adAcc += adChrono.getDeltaTime();
+            long heartbeatInterval = 2000;
+            adAcc = (Math.abs(adAcc - heartbeatInterval) <= 5 ? heartbeatInterval  : adAcc);
+            Map<String, Object> eventData = new HashMap<>();
+            eventData.put("elapsedTime", adAcc);
+            sendVideoAdEvent(AD_HEARTBEAT,eventData);
+            adChrono.start();
+            adAcc = 0L;
         } else {
-            sendVideoEvent(CONTENT_HEARTBEAT, attributes);
+            if(state.isPlaying && !currentPlayer.isPlayingAd ()){
+                acc += chrono.getDeltaTime();
+            }
+            long heartbeatInterval =  heartbeatTimeInterval*1000;
+            acc = (Math.abs(acc - heartbeatInterval) <= 5 ? heartbeatInterval : acc);
+            Map<String, Object> eventData = new HashMap<>();
+            eventData.put("elapsedTime", acc);
+            sendVideoEvent(CONTENT_HEARTBEAT, eventData);
+            chrono.start();
+            acc = 0L;
         }
 
     }
