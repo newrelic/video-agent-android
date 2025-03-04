@@ -9,10 +9,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.NRVideoProject">
         <activity
-            android:name=".VideoPlayerAds"
-            android:label="@string/title_activity_video_player_ads"
-            android:theme="@style/Theme.NRVideoProject.NoActionBar"
-            android:exported="false"></activity>
+                android:name=".VideoPlayerAds"
+                android:label="@string/title_activity_video_player_ads"
+                android:theme="@style/Theme.NRVideoProject.NoActionBar"
+                android:exported="false"/>
         <activity android:name=".VideoPlayer" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>

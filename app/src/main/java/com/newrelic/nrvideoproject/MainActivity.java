@@ -54,7 +54,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         });
 
         //WARNING: DEFINE THE APP TOKEN HERE
-        NewRelic.withApplicationToken("APP TOKEN").start(this.getApplication());
+//        NewRelic.withApplicationToken("APP TOKEN").start(this.getApplication());
 
         NRLog.enable();
 
