@@ -386,7 +386,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     }
 
     private void logOnPlayerStateChanged(boolean playWhenReady, int playbackState) {
-
+        NRLog.d("Accumulator " + state.acc+ " " + state.adAcc);
         NRLog.d("onPlayerStateChanged, payback state = " + playbackState + " {");
 
         if (playbackState == Player.STATE_READY) {
