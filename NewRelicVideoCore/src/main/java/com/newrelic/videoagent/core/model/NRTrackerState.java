@@ -1,5 +1,7 @@
 package com.newrelic.videoagent.core.model;
 
+import androidx.media3.exoplayer.ExoPlayer;
+
 /**
  * Holds the state of a tracker.
  */
@@ -40,6 +42,8 @@ public class NRTrackerState {
      * In an ad break.
      */
     public boolean isAdBreak;
+    public NRChrono chrono;
+    public Long acc;
 
     /**
      * Create a new tracker state instance.
@@ -61,6 +65,8 @@ public class NRTrackerState {
         isBuffering = false;
         isAd = false;
         isAdBreak = false;
+        chrono = new NRChrono();
+        acc = 0L;
     }
 
     /**
