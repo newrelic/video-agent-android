@@ -277,10 +277,10 @@ public class NRVideoTracker extends NRTracker {
             state.chrono.start();
             if (state.isAd) {
                 numberOfAds++;
+                ((NRVideoTracker) linkedTracker).sendPause ();
                 if (linkedTracker instanceof NRVideoTracker) {
                     ((NRVideoTracker) linkedTracker).setNumberOfAds(numberOfAds);
                 }
-                sendVideoEvent(CONTENT_PAUSE);
                 sendVideoAdEvent(AD_START);
             } else {
                 if (linkedTracker instanceof NRVideoTracker) {
@@ -336,7 +336,7 @@ public class NRVideoTracker extends NRTracker {
         if (state.goEnd()) {
             if (state.isAd) {
                 sendVideoAdEvent(AD_END);
-                sendVideoEvent(CONTENT_RESUME);
+                ((NRVideoTracker) linkedTracker).sendResume();
                 if (linkedTracker instanceof NRVideoTracker) {
                     ((NRVideoTracker) linkedTracker).adHappened();
                 }
@@ -431,22 +431,16 @@ public class NRVideoTracker extends NRTracker {
      */
     public void sendHeartbeat() {
         long heartbeatInterval = state.isAd ?  2000 : heartbeatTimeInterval*1000;
+        if(state.isPlaying){
+            state.acc += state.chrono.getDeltaTime();
+        }
+        state.acc = (Math.abs(state.acc - heartbeatInterval) <= 5 ? heartbeatInterval : state.acc);
+        Map<String, Object> eventData = new HashMap<>();
+        eventData.put("elapsedTime", state.acc);
         if (state.isAd) {
-            if(cPlayer.isPlayingAd ()){
-                state.acc += state.chrono.getDeltaTime();
-            }
-            state.acc = (Math.abs(state.acc - heartbeatInterval) <= 5 ? heartbeatInterval : state.acc);
-            Map<String, Object> eventData = new HashMap<>();
-            eventData.put("elapsedTime", state.acc);
             sendVideoAdEvent(AD_HEARTBEAT,eventData);
 
         } else {
-            if(cPlayer.isPlaying()){
-                state.acc += state.chrono.getDeltaTime();
-            }
-            state.acc = (Math.abs(state.acc - heartbeatInterval) <= 5 ? heartbeatInterval : state.acc);
-            Map<String, Object> eventData = new HashMap<>();
-            eventData.put("elapsedTime", state.acc);
             sendVideoEvent(CONTENT_HEARTBEAT, eventData);
         }
         state.chrono.start();
