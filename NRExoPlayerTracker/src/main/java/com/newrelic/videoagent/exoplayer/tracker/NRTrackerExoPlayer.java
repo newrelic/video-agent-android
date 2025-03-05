@@ -42,7 +42,8 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     /**
      * Init a new ExoPlayer tracker.
      */
-    public NRTrackerExoPlayer() {}
+    public NRTrackerExoPlayer() {
+    }
 
     /**
      * Init a new ExoPlayer tracker.
@@ -68,7 +69,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     /**
      * Generate ExoPlayer attributes.
      *
-     * @param action Action being generated.
+     * @param action     Action being generated.
      * @param attributes Specific attributes sent along the action.
      * @return
      */
@@ -79,8 +80,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         // Implement getter for "playhead"
         if (getState().isAd) {
             attr.put("adPlayrate", getPlayrate());
-        }
-        else {
+        } else {
             attr.put("contentPlayrate", getPlayrate());
         }
 
@@ -175,7 +175,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         if (player == null) return null;
         else if (getPlayer().getVideoFormat() == null) return null;
 
-        return (long)getPlayer().getVideoFormat().height;
+        return (long) getPlayer().getVideoFormat().height;
     }
 
     /**
@@ -213,12 +213,10 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
             try {
                 Uri src = getPlaylist().get(player.getCurrentMediaItemIndex());
                 return src.toString();
-            }
-            catch (Exception e) {
+            }catch(Exception e) {
                 return null;
             }
-        }
-        else {
+        } else {
             return null;
         }
     }
@@ -244,7 +242,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
 
         if (getPlayer().getVideoFormat() != null) {
             if (getPlayer().getVideoFormat().frameRate > 0) {
-                return (double)getPlayer().getVideoFormat().frameRate;
+                return (double) getPlayer().getVideoFormat().frameRate;
             }
         }
 
@@ -386,7 +384,6 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     }
 
     private void logOnPlayerStateChanged(boolean playWhenReady, int playbackState) {
-        NRLog.d("Accumulator " + state.acc+ " " + state.adAcc);
         NRLog.d("onPlayerStateChanged, payback state = " + playbackState + " {");
 
         if (playbackState == Player.STATE_READY) {
@@ -403,8 +400,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
             if (getState().isRequested && !getState().isStarted) {
                 sendStart();
             }
-        }
-        else if (playbackState == Player.STATE_ENDED) {
+        } else if (playbackState == Player.STATE_ENDED) {
             NRLog.d("\tVideo Ended Playing");
             if (getState().isStarted) {
                 if (getState().isBuffering) {
@@ -415,8 +411,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
                 }
                 sendEnd();
             }
-        }
-        else if (playbackState == Player.STATE_BUFFERING) {
+        } else if (playbackState == Player.STATE_BUFFERING) {
             NRLog.d("\tVideo Is Buffering");
 
             if (!getState().isRequested) {
@@ -433,22 +428,18 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
 
             if (getState().isRequested && !getState().isStarted) {
                 sendStart();
-            }
-            else if (getState().isPaused && !player.isPlayingAd()) {
+            } else if (getState().isPaused && !player.isPlayingAd()) {
                 sendResume();
-            }
-            else if (!getState().isRequested && !getState().isStarted) {
+            } else if (!getState().isRequested && !getState().isStarted) {
                 NRLog.d("LAST CHANCE TO SEND REQUEST START. isPlayingAd = " + player.isPlayingAd());
                 if (!player.isPlayingAd()) {
                     sendRequest();
                     sendStart();
                 }
             }
-        }
-        else if (playWhenReady) {
+        } else if (playWhenReady) {
             NRLog.d("\tVideo Not Playing");
-        }
-        else {
+        } else {
             NRLog.d("\tVideo Paused");
 
             if (getState().isPlaying && !player.isPlayingAd()) {
@@ -526,8 +517,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
             if (lastMul < currMul) {
                 renditionChangeShift = "up";
                 sendRenditionChange();
-            }
-            else if (lastMul > currMul) {
+            } else if (lastMul > currMul) {
                 renditionChangeShift = "down";
                 sendRenditionChange();
             }
