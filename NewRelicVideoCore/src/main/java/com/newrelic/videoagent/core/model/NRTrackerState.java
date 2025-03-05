@@ -48,6 +48,11 @@ public class NRTrackerState {
         reset();
     }
 
+    public Long acc;
+    public Long adAcc;
+    public NRChrono chrono;
+    public NRChrono adChrono;
+
     /**
      * Reset all states.
      */
@@ -102,6 +107,12 @@ public class NRTrackerState {
         if (isRequested && !isStarted) {
             isStarted = true;
             isPlaying = true;
+            if(isAd){
+                adChrono.start();
+                acc += chrono.getDeltaTime ();
+            }else {
+                chrono.start();
+            }
             return true;
         }
         else {
@@ -122,6 +133,10 @@ public class NRTrackerState {
             isPaused = false;
             isSeeking = false;
             isBuffering = false;
+            if(isAd){
+                //acc += adAcc; or use adChrono.getDeltaTime();
+                chrono.start();
+            }
             return true;
         }
         else {
@@ -138,6 +153,14 @@ public class NRTrackerState {
         if (isStarted && !isPaused) {
             isPaused = true;
             isPlaying = false;
+            if(!isBuffering){
+                if(isAd){
+                    adAcc += adChrono.getDeltaTime ();
+                }else{
+                    acc += chrono.getDeltaTime ();
+                }
+            }
+
             return true;
         }
         else {
@@ -154,6 +177,13 @@ public class NRTrackerState {
         if (isStarted && isPaused) {
             isPaused = false;
             isPlaying = true;
+            if(!isBuffering){
+                if(isAd){
+                    adChrono.start();
+                }else{
+                    chrono.start();
+                }
+            }
             return true;
         }
         else {
@@ -168,6 +198,13 @@ public class NRTrackerState {
      */
     public boolean goBufferStart() {
         if (isRequested && !isBuffering) {
+            if(!isPlaying){
+                if(isAd){
+                    adAcc += adChrono.getDeltaTime ();
+                }else{
+                    acc += chrono.getDeltaTime ();
+                }
+            }
             isBuffering = true;
             isPlaying = false;
             return true;
@@ -186,6 +223,13 @@ public class NRTrackerState {
         if (isRequested && isBuffering) {
             isBuffering = false;
             isPlaying = true;
+            if(isPlaying){
+                if(isAd){
+                   adChrono.start();
+                }else{
+                    chrono.start();
+                }
+            }
             return true;
         } else {
             return false;
