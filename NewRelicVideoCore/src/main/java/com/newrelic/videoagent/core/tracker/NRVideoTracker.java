@@ -489,7 +489,7 @@ public class NRVideoTracker extends NRTracker {
         }
         numberOfErrors++;
         Map<String, Object> errAttr = new HashMap<>();
-        errAttr.put("errorName", errorMessage);
+        errAttr.put("errorMessage", errorMessage);
 //        generatePlayElapsedTime();
         String actionName = CONTENT_ERROR;
         if (state.isAd) {
