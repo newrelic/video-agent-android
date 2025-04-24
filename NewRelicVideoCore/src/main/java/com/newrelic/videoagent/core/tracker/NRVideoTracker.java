@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Random;
 
 import static com.newrelic.videoagent.core.NRDef.*;
+import com.newrelic.videoagent.core.exception.ErrorExceptionHandler;
 
 /**
  * `NRVideoTracker` defines the basic behaviour of a video tracker.
@@ -462,20 +463,8 @@ public class NRVideoTracker extends NRTracker {
      * @param error Exception.
      */
     public void sendError(Exception error) {
-        String msg;
-        if (error != null) {
-            if (error.getMessage() != null) {
-                msg = error.getMessage();
-            }
-            else {
-                msg = error.toString();
-            }
-        }
-        else {
-            msg = "<Unknown error>";
-        }
-
-        sendError(msg);
+        ErrorExceptionHandler exceptionHandler = new ErrorExceptionHandler(error);
+        sendError(exceptionHandler.getErrorCode(), exceptionHandler.getErrorMessage());
     }
 
     /**
@@ -483,13 +472,16 @@ public class NRVideoTracker extends NRTracker {
      *
      * @param errorMessage Error message.
      */
-    public void sendError(String errorMessage) {
+    public void sendError(int errorCode, String errorMessage) {
         if (errorMessage == null) {
             errorMessage = "<Unknown error>";
         }
         numberOfErrors++;
         Map<String, Object> errAttr = new HashMap<>();
         errAttr.put("errorMessage", errorMessage);
+        if (errorCode != -1){
+            errAttr.put("errorCode", errorCode);
+        }
 //        generatePlayElapsedTime();
         String actionName = CONTENT_ERROR;
         if (state.isAd) {
