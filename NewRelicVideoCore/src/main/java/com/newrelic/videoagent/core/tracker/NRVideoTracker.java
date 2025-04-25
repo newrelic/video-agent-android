@@ -479,9 +479,7 @@ public class NRVideoTracker extends NRTracker {
         numberOfErrors++;
         Map<String, Object> errAttr = new HashMap<>();
         errAttr.put("errorMessage", errorMessage);
-        if (errorCode != -1){
-            errAttr.put("errorCode", errorCode);
-        }
+        errAttr.put("errorCode", errorCode);
 //        generatePlayElapsedTime();
         String actionName = CONTENT_ERROR;
         if (state.isAd) {
