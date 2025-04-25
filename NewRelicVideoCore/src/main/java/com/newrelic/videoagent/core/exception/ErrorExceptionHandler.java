@@ -7,12 +7,14 @@ import androidx.media3.exoplayer.source.ads.AdsMediaSource.AdLoadException;
 
 public class ErrorExceptionHandler {
 
+    private final static int DEFAULT_ERROR_CODE = -9999; // default error code for unhandled exceptions
+
     private int errorCode;
     private String errorMessage;
 
 
     public ErrorExceptionHandler(Exception error) {
-        this.errorCode = -1; // Default error code
+        this.errorCode = DEFAULT_ERROR_CODE; 
         this.errorMessage = error.getMessage();
 
         if (error instanceof InvalidResponseCodeException) {
