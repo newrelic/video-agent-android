@@ -49,13 +49,13 @@ dependencies {
     ...
 
     // Add this to install the NewRelicVideoCore (required)
-    implementation 'com.github.newrelic.video-agent-android:NewRelicVideoCore:master-SNAPSHOT'
+    implementation 'com.github.newrelic.video-agent-android:NewRelicVideoCore:v3.0.2'
     
     // Add this to install the ExoPlayer tracker
-    implementation 'com.github.newrelic.video-agent-android:NRExoPlayerTracker:master-SNAPSHOT'
+    implementation 'com.github.newrelic.video-agent-android:NRExoPlayerTracker:v3.0.2'
     
     // Add this to install the Google IMA library tracker
-    implementation 'com.github.newrelic.video-agent-android:NRIMATracker:master-SNAPSHOT'
+    implementation 'com.github.newrelic.video-agent-android:NRIMATracker:v3.0.2'
 }
 ```
 
