@@ -7,7 +7,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Switch;
 
-import com.newrelic.agent.android.NewRelic;
+//import com.newrelic.agent.android.NewRelic;
 import com.newrelic.videoagent.core.utils.NRLog;
 
 import java.util.HashMap;
