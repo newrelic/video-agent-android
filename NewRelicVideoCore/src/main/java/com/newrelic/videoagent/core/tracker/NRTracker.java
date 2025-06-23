@@ -1,10 +1,11 @@
 package com.newrelic.videoagent.core.tracker;
 
-import com.newrelic.agent.android.NewRelic;
+
 import com.newrelic.videoagent.core.NewRelicVideoAgent;
 import com.newrelic.videoagent.core.model.NREventAttributes;
 import com.newrelic.videoagent.core.model.NRTimeSince;
 import com.newrelic.videoagent.core.model.NRTimeSinceTable;
+import com.newrelic.videoagent.core.telemetry.analytics.VideoAnalyticsController;
 import com.newrelic.videoagent.core.utils.NRLog;
 
 import java.util.HashMap;
@@ -46,32 +47,37 @@ public class NRTracker {
      * @param value Attribute value.
      */
     public void setAttribute(String key, Object value) {
-        setAttribute(key, value, null);
+        // Direct call to VideoAnalyticsController to set global attributes
+        VideoAnalyticsController.getInstance().setAttribute(key, value);
     }
 
     /**
      * Set custom attribute for selected events.
      *
-     * WARNING: if the same attribute is defined for multiple action filters that could potentially match the same action, the behaviour is undefined. The user is responsable for designing filters that are sufficiently selective.
+     * WARNING: if the same attribute is defined for multiple action filters that could potentially match the same action, the behaviour is undefined. The user is responsible for designing filters that are sufficiently selective.
      *
      * @param key Attribute name.
      * @param value Attribute value.
      * @param action Action filter, a regexp.
      */
     public void setAttribute(String key, Object value, String action) {
+        // This method in NREventAttributes is for generating attributes based on action filters,
+        // it doesn't directly set global attributes on VideoAnalyticsController.
+        // It's used within getAttributes().
         eventAttributes.setAttribute(key, value, action);
     }
 
     /**
-     * Generate attributes for a given action.
+     * Generate list of attributes for a given action.
      *
      * @param action Action being generated.
      * @param attributes Specific attributes sent along the action.
      * @return Map of attributes.
      */
     public Map<String, Object> getAttributes(String action, Map<String, Object> attributes) {
-        attributes = eventAttributes.generateAttributes(action, attributes);
-        return attributes;
+        // This method still uses the local eventAttributes (NREventAttributes instance)
+        // to generate action-specific attributes.
+        return eventAttributes.generateAttributes(action, attributes);
     }
 
     /**
@@ -134,6 +140,7 @@ public class NRTracker {
 
     /**
      * Sends the given eventType and action wrapped in attributes.
+     * This method now delegates to the standalone VideoAnalyticsController.
      * @param eventType EventType for this telemetry.
      * @param action Action name.
      * @param attributes Event Type attributes for this action.
@@ -143,24 +150,36 @@ public class NRTracker {
             attributes = new HashMap<>();
         }
 
+        // Generate action-specific attributes
         attributes = getAttributes(action, attributes);
+        // Apply time-since attributes
         timeSinceTable.applyAttributes(action, attributes);
 
-        NRLog.d("SEND EVENT " + action + " , attr = " + attributes);
+        NRLog.d("SEND EVENT " + action + " , attr = " + attributes); // Updated log call
 
+        // Add common instrumentation attributes. These should ideally be consistent
+        // with what's expected by the New Relic ingest for video.
         attributes.put("agentSession", getAgentSession());
-        attributes.put("instrumentation.provider", "newrelic");
+        attributes.put("instrumentation.provider", "newrelic"); // Consistent with NewRelic Mobile agent
         attributes.put("instrumentation.name", getInstrumentationName());
         attributes.put("instrumentation.version", getCoreVersion());
 
-        // Remove null and empty values
-        while (attributes.values().remove(null));
-        while (attributes.values().remove(""));
+        // Remove null and empty values (defensive programming for JSON serialization)
+        // Note: Map.values().remove() removes first occurrence. Better to create new map.
+        Map<String, Object> finalAttributes = new HashMap<>();
+        for (Map.Entry<String, Object> entry : attributes.entrySet()) {
+            if (entry.getValue() != null && !(entry.getValue() instanceof String && ((String) entry.getValue()).isEmpty())) {
+                finalAttributes.put(entry.getKey(), entry.getValue());
+            }
+        }
 
-        if (preSend(action, attributes)) {
-            attributes.put("actionName", action);
-            if (!NewRelic.recordCustomEvent(eventType, attributes)) {
-                NRLog.e("⚠️ Failed to recordCustomEvent. Maybe the NewRelicAgent is not initialized or the attribute list contains invalid/empty values. ⚠️");
+
+        if (preSend(action, finalAttributes)) {
+            finalAttributes.put("actionName", action); // Ensure actionName is present
+
+            // MODIFIED: Delegate to the standalone VideoAnalyticsController
+            if (!VideoAnalyticsController.getInstance().recordCustomEvent(eventType, finalAttributes)) {
+                NRLog.e("⚠️ Failed to recordCustomEvent via VideoAnalyticsController. Check initialization or attribute validity. ⚠️"); // Updated log call
             }
         }
     }
@@ -233,9 +252,9 @@ public class NRTracker {
     }
 
     /**
-     * Get the core version.
+     * Get the instrumentation name.
      *
-     * @return Core version.
+     * @return Instrumentation name.
      */
     public String getInstrumentationName() {
         return "Mobile/Android";
@@ -247,6 +266,7 @@ public class NRTracker {
      * @return Agent session ID.
      */
     public String getAgentSession() {
+        // This is now retrieved from the standalone NewRelicVideoAgent
         return NewRelicVideoAgent.getInstance().getSessionId();
     }
 }

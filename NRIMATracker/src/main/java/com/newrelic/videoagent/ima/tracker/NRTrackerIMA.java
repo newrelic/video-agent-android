@@ -21,18 +21,25 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
 
     @Override
     public void onAdError(AdErrorEvent adErrorEvent) {
-        if (adErrorEvent == null) return;
+        if (adErrorEvent == null) {
+            NRLog.d("NRTrackerIMA: onAdError received a null AdErrorEvent."); // Updated log call
+            return;
+        }
 
-        NRLog.d("AdErrorEvent = " + adErrorEvent);
+        NRLog.d("NRTrackerIMA: AdErrorEvent = " + adErrorEvent.getError().getMessage()); // Updated log call
+        // Assuming sendError(Exception) in NRVideoTracker extracts relevant error info
         sendError(adErrorEvent.getError());
     }
 
     @Override
     public void onAdEvent(AdEvent adEvent) {
-        if (adEvent == null) return;
+        if (adEvent == null) {
+            NRLog.d("NRTrackerIMA: onAdEvent received a null AdEvent."); // Updated log call
+            return;
+        }
 
         if (adEvent.getType() != AdEvent.AdEventType.AD_PROGRESS) {
-            NRLog.d("AdEvent = " + adEvent);
+            NRLog.d("NRTrackerIMA: AdEvent = " + adEvent.getType().name()); // Updated log call
         }
 
         fillAdAttributes(adEvent.getAd());
@@ -46,17 +53,17 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
                 break;
             case STARTED:
                 quartile = 0L;
-                sendRequest();
-                sendStart();
+                sendRequest(); // Ad request
+                sendStart();   // Ad start
                 break;
             case COMPLETED:
             case SKIPPED:
-                sendEnd();
-                quartile = null;
+                sendEnd();     // Ad end
+                quartile = null; // Reset quartile
                 break;
             case TAPPED:
             case CLICKED:
-                sendAdClick();
+                sendAdClick(); // Ad click
                 break;
             case FIRST_QUARTILE:
                 quartile = 1L;
@@ -71,41 +78,59 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
                 sendAdQuartile();
                 break;
             case PAUSED:
-                sendPause();
+                sendPause();   // Ad pause
                 break;
             case RESUMED:
-                sendResume();
+                sendResume();  // Ad resume
+                break;
+            default:
+                NRLog.d("NRTrackerIMA: Unhandled AdEventType: " + adEvent.getType().name()); // Added default case for unhandled types
                 break;
         }
     }
 
+    /**
+     * Fills ad-specific attributes from the IMA Ad object.
+     * @param ad The IMA Ad object.
+     */
     private void fillAdAttributes(Ad ad) {
-        if (ad == null) return;
-
-        switch (ad.getAdPodInfo().getPodIndex()) {
-            case 0:
-                adPosition = "pre";
-            break;
-            case -1:
-                adPosition = "post";
-            break;
-            default:
-                adPosition = "mid";
-            break;
+        if (ad == null) {
+            NRLog.d("NRTrackerIMA: fillAdAttributes received a null Ad object."); // Updated log call
+            return;
         }
+
+        if (ad.getAdPodInfo() != null) {
+            switch (ad.getAdPodInfo().getPodIndex()) {
+                case 0:
+                    adPosition = "pre";
+                    break;
+                case -1:
+                    adPosition = "post";
+                    break;
+                default:
+                    adPosition = "mid";
+                    break;
+            }
+        } else {
+            adPosition = null; // Clear if no pod info
+        }
+
         creativeId = ad.getCreativeId();
         title = ad.getTitle();
         bitrate = (long)ad.getVastMediaBitrate();
         renditionHeight = (long)ad.getVastMediaHeight();
         renditionWidth = (long)ad.getVastMediaWidth();
         duration = (long)ad.getDuration();
+
+        NRLog.d("NRTrackerIMA: Filled ad attributes for title: " + title); // Updated log call
     }
 
     /**
      * Get player name.
      *
-     * @return Attribute.
+     * @return "IMA".
      */
+    @Override // Override method from NRVideoTracker
     public String getPlayerName() {
         return "IMA";
     }
@@ -113,8 +138,9 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     /**
      * Get tracker name.
      *
-     * @return Atribute.
+     * @return "IMATracker".
      */
+    @Override // Override method from NRVideoTracker
     public String getTrackerName() {
         return "IMATracker";
     }
@@ -122,8 +148,9 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     /**
      * Get tracker version.
      *
-     * @return Attribute.
+     * @return The version defined in BuildConfig.
      */
+    @Override // Override method from NRVideoTracker
     public String getTrackerVersion() {
         return BuildConfig.VERSION_NAME;
     }
@@ -131,16 +158,17 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     /**
      * Get tracker src.
      *
-     * @return Attribute.
+     * @return The source string for this tracker (e.g., SRC constant).
      */
+    @Override // Override method from NRVideoTracker
     public String getTrackerSrc() {
-        return SRC;
+        return SRC; // This constant should be defined in NRDef
     }
 
     /**
      * Get Ad Position.
      *
-     * @return Attribute.
+     * @return "pre", "mid", "post", or null.
      */
     @Override
     public String getAdPosition() {
@@ -148,9 +176,9 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     }
 
     /**
-     * Get Ad Creative ID
+     * Get Ad Creative ID.
      *
-     * @return Attribute.
+     * @return Creative ID string, or null.
      */
     @Override
     public String getAdCreativeId() {
@@ -160,7 +188,7 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     /**
      * Get Ad Quartile.
      *
-     * @return Attribute.
+     * @return Quartile number (1, 2, 3), or null.
      */
     @Override
     public Long getAdQuartile() {
@@ -168,9 +196,9 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     }
 
     /**
-     * Get title.
+     * Get ad title.
      *
-     * @return Attribute.
+     * @return Ad title string, or null.
      */
     @Override
     public String getTitle() {
@@ -178,9 +206,9 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     }
 
     /**
-     * Get bitrate.
+     * Get ad bitrate.
      *
-     * @return Attribute.
+     * @return Bitrate in bits per second, or null.
      */
     @Override
     public Long getBitrate() {
@@ -188,9 +216,9 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     }
 
     /**
-     * Get rendition height.
+     * Get ad rendition height.
      *
-     * @return Attribute.
+     * @return Rendition height in pixels, or null.
      */
     @Override
     public Long getRenditionHeight() {
@@ -198,9 +226,9 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     }
 
     /**
-     * Get rendition width.
+     * Get ad rendition width.
      *
-     * @return Attribute.
+     * @return Rendition width in pixels, or null.
      */
     @Override
     public Long getRenditionWidth() {
@@ -208,9 +236,9 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     }
 
     /**
-     * Get duration.
+     * Get ad duration.
      *
-     * @return Attribute.
+     * @return Duration in milliseconds, or null.
      */
     @Override
     public Long getDuration() {

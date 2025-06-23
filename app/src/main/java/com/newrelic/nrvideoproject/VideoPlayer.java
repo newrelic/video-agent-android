@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.util.Log;
 import com.newrelic.videoagent.core.NewRelicVideoAgent;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
+import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,31 +29,46 @@ public class VideoPlayer extends AppCompatActivity {
         String video = getIntent().getStringExtra("video");
 
         if (video.equals("Tears")) {
-            Log.v("VideoPlayer", "Play Tears");
+            NRLog.d("VideoPlayer: Play Tears"); // Updated log call
             playVideo("https://turtle-tube.appspot.com/t/t2/dash.mpd");
         }
         else if (video.equals("Playhouse")) {
-            Log.v("VideoPlayer", "Play Playhouse");
+            NRLog.d("VideoPlayer: Play Playhouse"); // Updated log call
             playVideo("https://turtle-tube.appspot.com/t/t2/dash.mpd");
         }
         else if (video.equals("Kite")) {
-            Log.v("VideoPlayer", "Play Kite");
+            NRLog.d("VideoPlayer: Play Kite"); // Updated log call
             playVideo("https://turtle-tube.appspot.com/t/t2/dash.mpd");
         }
         else if (video.equals("Live")) {
-            Log.v("VideoPlayer", "Play Live");
+            NRLog.d("VideoPlayer: Play Live"); // Updated log call
             playVideo("https://turtle-tube.appspot.com/t/t2/dash.mpd");
         }
         else {
-            Log.v("VideoPlayer","Unknown video");
+            NRLog.d("VideoPlayer: Unknown video selected"); // Updated log call
         }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        ((NRVideoTracker)NewRelicVideoAgent.getInstance().getContentTracker(trackerId)).sendEnd();
-        NewRelicVideoAgent.getInstance().releaseTracker(trackerId);
+        // Ensure the tracker is correctly cast before calling sendEnd, and then release it.
+        // It's assumed that NRVideoTracker's dispose and sendEnd methods are updated to use
+        // the standalone VideoAnalyticsController and VideoHarvest for data flushing.
+        if (trackerId != null) {
+            NRVideoTracker videoTracker = (NRVideoTracker) NewRelicVideoAgent.getInstance().getContentTracker(trackerId);
+            if (videoTracker != null) {
+                videoTracker.sendEnd(); // Trigger final event before release
+            }
+            NewRelicVideoAgent.getInstance().releaseTracker(trackerId);
+            NRLog.d("VideoPlayer: Tracker with ID " + trackerId + " released on onDestroy."); // Updated log call
+        }
+
+        // Optionally, trigger an immediate harvest if you want to ensure data is sent on exit.
+        // This might be crucial for ensuring all events from a short session are captured.
+        // VideoHarvest.harvestNow(true); // Blocking call, might delay app exit slightly.
+        // Or non-blocking:
+        // VideoHarvest.harvestNow();
     }
 
     private void playVideo(String videoUrl) {
@@ -60,6 +76,8 @@ public class VideoPlayer extends AppCompatActivity {
 
         NRTrackerExoPlayer tracker = new NRTrackerExoPlayer();
 
+        // These setAttribute calls should internally route to VideoAnalyticsController
+        // via the NRVideoTracker base class.
         tracker.setAttribute("customAttr", 12345, "CUSTOM_ACTION");
 
         tracker.setAttribute("contentTitle", "This is my test title", "CONTENT_START");
@@ -68,12 +86,15 @@ public class VideoPlayer extends AppCompatActivity {
 
         trackerId = NewRelicVideoAgent.getInstance().start(tracker);
 
-        // Set the user ID
+        // Set the user ID through the standalone agent.
         NewRelicVideoAgent.getInstance().setUserId("your_user_id");
 
         Map<String, Object> attr = new HashMap<>();
         attr.put("myAttrStr", "Hello");
         attr.put("myAttrInt", 101);
+
+        // These sendEvent calls should internally route to VideoAnalyticsController
+        // via the NRVideoTracker base class.
         tracker.sendEvent("CUSTOM_ACTION", attr);
         tracker.sendEvent("CUSTOM_ACTION_2", attr);
 
@@ -91,5 +112,7 @@ public class VideoPlayer extends AppCompatActivity {
         // Prepare the player.
         player.setPlayWhenReady(true);
         player.prepare();
+
+        NRLog.d("VideoPlayer: Started playing video from: " + videoUrl); // Updated log call
     }
 }
