@@ -10,7 +10,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.concurrent.TimeUnit;
 
-public class VideoHarvestConnection {private static final int MAX_RETRIES = 3;
+public class VideoHarvestConnection {
+    private static final int MAX_RETRIES = 3;
+    private static final String TAG = "VideoHarvestConnection";
     private static final long RETRY_DELAY_MS = TimeUnit.SECONDS.toMillis(5); // 5 seconds
 
     private VideoAgentConfiguration configuration;
@@ -20,7 +22,7 @@ public class VideoHarvestConnection {private static final int MAX_RETRIES = 3;
 
     public VideoHarvestConnection(VideoAgentConfiguration configuration) {
         this.configuration = configuration;
-        NRLog.d("VideoHarvestConnection initialized. Collector endpoint: " + COLLECTOR_ENDPOINT_URL); // Updated log call
+        NRLog.d("VideoHarvestConnection initialized. Collector endpoint: " + COLLECTOR_ENDPOINT_URL);
     }
 
     /**
@@ -31,10 +33,10 @@ public class VideoHarvestConnection {private static final int MAX_RETRIES = 3;
      */
     public boolean sendData(String payload) {
         if (payload == null || payload.isEmpty()) {
-            NRLog.d("Attempted to send empty payload."); // Updated log call
+            NRLog.d("Attempted to send empty payload.");
             return false;
         }
-        NRLog.d("Attempting to send payload of size: " + payload.length() + " bytes."); // Updated log call
+        NRLog.d("Attempting to send payload of size: " + payload.length() + " bytes.");
 
         for (int retryCount = 0; retryCount < MAX_RETRIES; retryCount++) {
             HttpURLConnection conn = null;
@@ -63,10 +65,11 @@ public class VideoHarvestConnection {private static final int MAX_RETRIES = 3;
                 }
 
                 int responseCode = conn.getResponseCode();
-                NRLog.d("HTTP Response Code: " + responseCode); // Updated log call
+                NRLog.d("HTTP Response Code: " + responseCode);
 
                 if (responseCode >= 200 && responseCode < 300) {
-                    NRLog.d("Payload successfully sent to New Relic collector."); // Updated log call
+                    // NEW: Log successful data transmission
+                    NRLog.d("Successfully sent data to New Relic Mobile Collector! Response Code: " + responseCode);
                     // Read response if necessary (e.g., for data tokens or harvest configuration)
                     try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"))) {
                         StringBuilder response = new StringBuilder();
@@ -74,17 +77,17 @@ public class VideoHarvestConnection {private static final int MAX_RETRIES = 3;
                         while ((responseLine = br.readLine()) != null) {
                             response.append(responseLine.trim());
                         }
-                        NRLog.d("Server Response: " + response.toString()); // Updated log call
+                        NRLog.d("Server Response: " + response.toString());
                         // In a full implementation, you might parse this response for harvest settings.
                     }
                     return true; // Success
                 } else if (responseCode >= 500 || responseCode == 408 || responseCode == 429) {
                     // Server error, request timeout, or too many requests - retry
-                    NRLog.d("Server error or transient issue (" + responseCode + "). Retrying in " + RETRY_DELAY_MS + "ms."); // Updated log call
+                    NRLog.d("Server error or transient issue (" + responseCode + "). Retrying in " + RETRY_DELAY_MS + "ms.");
                     Thread.sleep(RETRY_DELAY_MS);
                 } else {
                     // Client error or unrecoverable server error - do not retry
-                    NRLog.e("Failed to send payload. HTTP Response Code: " + responseCode); // Updated log call
+                    NRLog.e("Failed to send payload. HTTP Response Code: " + responseCode);
                     return false;
                 }
 
@@ -97,7 +100,7 @@ public class VideoHarvestConnection {private static final int MAX_RETRIES = 3;
                         Thread.sleep(RETRY_DELAY_MS);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        NRLog.d("Retry delay interrupted."); // Updated log call
+                        NRLog.d("Retry delay interrupted.");
                         return false;
                     }
                 }
@@ -107,7 +110,7 @@ public class VideoHarvestConnection {private static final int MAX_RETRIES = 3;
                 }
             }
         }
-        NRLog.e("Failed to send payload after " + MAX_RETRIES + " retries."); // Updated log call
+        NRLog.e("Failed to send payload after " + MAX_RETRIES + " retries.");
         return false; // All retries failed
     }
 
@@ -117,6 +120,6 @@ public class VideoHarvestConnection {private static final int MAX_RETRIES = 3;
      */
     public void updateConfiguration(VideoAgentConfiguration newConfiguration) {
         this.configuration = newConfiguration;
-        NRLog.d("VideoHarvestConnection configuration updated (license key implicitly updated)."); // Updated log call
+        NRLog.d("VideoHarvestConnection configuration updated (license key implicitly updated).");
     }
 }
