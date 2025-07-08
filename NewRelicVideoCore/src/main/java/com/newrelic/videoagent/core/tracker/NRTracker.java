@@ -140,7 +140,7 @@ public class NRTracker {
      */
     public void sendEvent(String eventType, String action, Map<String, Object> attributes) {
         if (this instanceof NRVideoTracker) {
-            ((NRVideoTracker) this).generatePlayElapsedTime();
+            ((NRVideoTracker) this).updatePlaytime();
         }
 
         if (attributes == null) {

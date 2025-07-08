@@ -244,7 +244,7 @@ public class NRVideoTracker extends NRTracker {
         return attr;
     }
 
-    public void generatePlayElapsedTime() {
+    public void updatePlaytime() {
         if (playtimeSinceLastEventTimestamp > 0) {
             playtimeSinceLastEvent = System.currentTimeMillis() - playtimeSinceLastEventTimestamp;
             totalPlaytime += playtimeSinceLastEvent;
