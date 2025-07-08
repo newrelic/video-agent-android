@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.newrelic.videoagent.core.NRDef.*;
+import androidx.media3.common.C;
 
 /**
  * New Relic Video tracker for ExoPlayer.
@@ -38,6 +39,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     protected List<Uri> playlist;
     protected int lastWindow;
     protected String renditionChangeShift;
+    protected long actualBitrate;
 
     /**
      * Init a new ExoPlayer tracker.
@@ -143,6 +145,10 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      */
     public Long getBitrate() {
         return bitrateEstimate;
+    }
+
+    public Long getActualBitrate() {
+        return actualBitrate;
     }
 
     /**
@@ -324,6 +330,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         lastWindow = 0;
         lastWidth = 0;
         lastHeight = 0;
+        actualBitrate = 0;
     }
 
     /**
@@ -485,6 +492,16 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     public void onLoadError(EventTime eventTime, LoadEventInfo loadEventInfo, MediaLoadData mediaLoadData, IOException error, boolean wasCanceled) {
         NRLog.d("onLoadError analytics");
         sendError(error);
+    }
+
+    @Override
+    public void onLoadCompleted(EventTime eventTime, LoadEventInfo loadEventInfo, MediaLoadData mediaLoadData) {
+        if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA
+                && mediaLoadData.trackType == C.TRACK_TYPE_VIDEO
+                && loadEventInfo.loadDurationMs > 0) {
+            // Calculate the bitrate for this specific chunk in bits per second
+            this.actualBitrate = (loadEventInfo.bytesLoaded * 8 * 1000) / loadEventInfo.loadDurationMs;
+        }
     }
 
     @Override

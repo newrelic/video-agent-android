@@ -139,6 +139,10 @@ public class NRTracker {
      * @param attributes Event Type attributes for this action.
      */
     public void sendEvent(String eventType, String action, Map<String, Object> attributes) {
+        if (this instanceof NRVideoTracker) {
+            ((NRVideoTracker) this).generatePlayElapsedTime();
+        }
+
         if (attributes == null) {
             attributes = new HashMap<>();
         }
