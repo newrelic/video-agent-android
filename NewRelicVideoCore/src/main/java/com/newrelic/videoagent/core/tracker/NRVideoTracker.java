@@ -226,8 +226,8 @@ public class NRVideoTracker extends NRTracker {
             }
 
             attr.put("contentTitle", getTitle());
-            attr.put("contentBitrate", getBitrate());
-            attr.put("actualBitrate", getActualBitrate());
+//            attr.put("contentBitrate", getBitrate());
+            attr.put("contentBitrate", getActualBitrate());
             attr.put("contentRenditionBitrate", getRenditionBitrate());
             attr.put("contentRenditionWidth", getRenditionWidth());
             attr.put("contentRenditionHeight", getRenditionHeight());
