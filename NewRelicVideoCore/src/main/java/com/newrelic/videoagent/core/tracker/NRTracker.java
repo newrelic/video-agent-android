@@ -1,6 +1,8 @@
 package com.newrelic.videoagent.core.tracker;
 
 import com.newrelic.agent.android.NewRelic;
+
+import com.newrelic.videoagent.core.NRVideo;
 import com.newrelic.videoagent.core.NewRelicVideoAgent;
 import com.newrelic.videoagent.core.model.NREventAttributes;
 import com.newrelic.videoagent.core.model.NRTimeSince;
@@ -139,14 +141,6 @@ public class NRTracker {
      * @param attributes Event Type attributes for this action.
      */
     public void sendEvent(String eventType, String action, Map<String, Object> attributes) {
-        if (this instanceof NRVideoTracker) {
-            ((NRVideoTracker) this).updatePlaytime();
-        }
-
-        if (attributes == null) {
-            attributes = new HashMap<>();
-        }
-
         attributes = getAttributes(action, attributes);
         timeSinceTable.applyAttributes(action, attributes);
 
@@ -163,8 +157,11 @@ public class NRTracker {
 
         if (preSend(action, attributes)) {
             attributes.put("actionName", action);
-            if (!NewRelic.recordCustomEvent(eventType, attributes)) {
-                NRLog.e("⚠️ Failed to recordCustomEvent. Maybe the NewRelicAgent is not initialized or the attribute list contains invalid/empty values. ⚠️");
+            NRVideo videoAgent = getInjectedVideoAgent();
+            if (videoAgent != null) {
+                videoAgent.recordEvent(eventType, attributes);
+            } else {
+                NRLog.e("⚠️ Failed to recordEvent. NRVideo is not initialized. ⚠️");
             }
         }
     }
@@ -192,9 +189,10 @@ public class NRTracker {
      * Send event with attributes.
      *
      * @param action Action name.
+     * @param attributes Event attributes.
      */
-    public void sendVideoAdEvent(String action) {
-        sendVideoAdEvent(action, null);
+    public void sendVideoEvent(String action, Map<String, Object> attributes) {
+        sendEvent(NR_VIDEO_EVENT, action, attributes);
     }
 
     /**
@@ -203,8 +201,8 @@ public class NRTracker {
      * @param action Action name.
      * @param attributes Event attributes.
      */
-    public void sendVideoEvent(String action, Map<String, Object> attributes) {
-        sendEvent(NR_VIDEO_EVENT, action, attributes);
+    public void sendVideoAdEvent(String action) {
+        sendVideoAdEvent(action, null);
     }
 
     /**
@@ -252,5 +250,14 @@ public class NRTracker {
      */
     public String getAgentSession() {
         return NewRelicVideoAgent.getInstance().getSessionId();
+    }
+
+    // Dependency injection for NRVideo
+    private static NRVideo injectedVideoAgent;
+    public static void injectVideoAgent(NRVideo agent) {
+        injectedVideoAgent = agent;
+    }
+    public static NRVideo getInjectedVideoAgent() {
+        return injectedVideoAgent;
     }
 }

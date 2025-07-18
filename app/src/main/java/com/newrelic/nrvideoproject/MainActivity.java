@@ -75,7 +75,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     public void onClick(View v) {
         Intent intent = new Intent(this, getVideoActivity());
-        intent.putExtra("video", (String) v.getTag());
+        Object tag = v.getTag();
+        String videoTag = tag != null ? tag.toString() : "default";
+        intent.putExtra("video", videoTag);
         startActivity(intent);
     }
 
