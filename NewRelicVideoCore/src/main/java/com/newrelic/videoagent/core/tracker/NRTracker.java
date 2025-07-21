@@ -1,7 +1,5 @@
 package com.newrelic.videoagent.core.tracker;
 
-import com.newrelic.agent.android.NewRelic;
-
 import com.newrelic.videoagent.core.NRVideo;
 import com.newrelic.videoagent.core.NewRelicVideoAgent;
 import com.newrelic.videoagent.core.model.NREventAttributes;
@@ -9,7 +7,6 @@ import com.newrelic.videoagent.core.model.NRTimeSince;
 import com.newrelic.videoagent.core.model.NRTimeSinceTable;
 import com.newrelic.videoagent.core.utils.NRLog;
 
-import java.util.HashMap;
 import java.util.Map;
 import static com.newrelic.videoagent.core.NRDef.*;
 

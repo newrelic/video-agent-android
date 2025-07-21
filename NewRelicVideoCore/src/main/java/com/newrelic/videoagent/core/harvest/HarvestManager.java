@@ -1,233 +1,153 @@
 package com.newrelic.videoagent.core.harvest;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.HashMap;
+import com.newrelic.videoagent.core.NRVideoConfiguration;
 
+/**
+ * Clean HarvestManager implementation with simple overflow prevention
+ * - Dependency Injection instead of Singleton anti-pattern
+ * - Factory Pattern for component creation
+ * - Lazy scheduler initialization for better performance
+ * - Simple overflow detection triggers immediate harvest
+ * - Optimized for mobile/TV environments
+ */
 public class HarvestManager {
-    private static HarvestManager instance;
-    private final EventBuffer eventBuffer = new EventBuffer();
-    private final SizeEstimator sizeEstimator = new DefaultSizeEstimator();
-    private final ConcurrentLinkedQueue<Map<String, Object>> immediateHarvestQueue = new ConcurrentLinkedQueue<>();
-    private HarvestScheduler harvestScheduler;
-    private String appToken;
-    private int harvestCycleSeconds = 60; // Default cycle
-    private String endpointUrl;
 
-    private static final int MAX_BATCH_SIZE_BYTES = 1048576; // 1MB
+    private final EventBufferInterface eventBuffer;
+    private final SchedulerInterface scheduler;
+    private final HttpClientInterface httpClient;
+    private final DeadLetterHandler deadLetterHandler;
+    private volatile boolean schedulerStarted = false;
+    private final Object schedulerLock = new Object();
 
-    private HarvestManager() {}
+    public HarvestManager(HarvestComponentFactory factory) {
+        this.eventBuffer = factory.createEventBuffer();
+        this.httpClient = factory.createHttpClient();
+        this.deadLetterHandler = new DeadLetterHandler(factory.createDeadLetterQueue(), httpClient, factory.getConfiguration());
+        this.scheduler = factory.createScheduler(this::harvestRegular, this::harvestLive);
 
-    public static HarvestManager getInstance() {
-        if (instance == null) {
-            instance = new HarvestManager();
-        }
-        return instance;
+        // Set up overflow callback using interface method - no instanceof check needed!
+        eventBuffer.setOverflowCallback(this::harvestNow);
     }
 
-    public interface HarvestCallback {
-        void beforeHarvest(List<Map<String, Object>> events);
-        void afterHarvest(List<Map<String, Object>> events, boolean success, Exception error);
-    }
-
-    private HarvestCallback harvestCallback;
-    private String region = "US";
-    private String apiDomain;
-
-    public void setHarvestCallback(HarvestCallback callback) {
-        this.harvestCallback = callback;
-    }
-
-    public void setRegion(String region) {
-        this.region = region;
-        this.apiDomain = selectApiDomain(region);
-    }
-
-    private String selectApiDomain(String region) {
-        switch (region.toUpperCase()) {
-            case "EU":
-                return "https://eu-api.newrelic.com";
-            case "US":
-            default:
-                return "https://api.newrelic.com";
-        }
-    }
-
-    // Remove lifecycle registration from init
-    public void init(String licenseKey, String endpointUrl, int harvestCycleSeconds, String region) {
-        this.region = region;
-        this.apiDomain = selectApiDomain(region);
-        this.appToken = generateAppToken(licenseKey, region);
-        this.endpointUrl = endpointUrl;
-        this.harvestCycleSeconds = harvestCycleSeconds;
-        startScheduler(harvestCycleSeconds);
-    }
-
-    public void startScheduler(int harvestCycleSeconds) {
-        if (harvestScheduler == null) {
-            harvestScheduler = new HarvestScheduler(this::harvest, harvestCycleSeconds);
-            harvestScheduler.start();
-        }
-    }
-
-    public void shutdownScheduler() {
-        if (harvestScheduler != null) {
-            harvestScheduler.shutdown();
-            harvestScheduler = null;
-        }
-    }
-
-    private String generateAppToken(String licenseKey, String region) {
-        // Simulate token generation (replace with real logic if needed)
-        return Integer.toHexString((licenseKey + region).hashCode());
-    }
-
+    /**
+     * Records a custom event with lazy scheduler initialization
+     */
     public void recordCustomEvent(String eventType, Map<String, Object> attributes) {
-        List<Map<String, Object>> harvestBatch = new ArrayList<>();
-        // Before harvest callback
-        if (harvestCallback != null) {
-            harvestCallback.beforeHarvest(harvestBatch);
+        if (eventType != null && !eventType.trim().isEmpty()) {
+            Map<String, Object> event = new HashMap<>(attributes != null ? attributes : new HashMap<>());
+            event.put("eventType", eventType);
+            event.put("timestamp", System.currentTimeMillis());
+
+            eventBuffer.addEvent(event);
+
+            // LAZY LOADING: Start scheduler only when first event arrives
+            ensureSchedulerStarted();
         }
-        boolean harvestTriggered = eventBuffer.addEventOrHarvest(attributes, MAX_BATCH_SIZE_BYTES, sizeEstimator, harvestBatch);
-        if (harvestTriggered && !harvestBatch.isEmpty()) {
-            boolean success = false;
-            Exception error = null;
-            try {
-                sendBatch(harvestBatch);
-                success = true;
-            } catch (Exception e) {
-                error = e;
-            }
-            // After harvest callback
-            if (harvestCallback != null) {
-                harvestCallback.afterHarvest(harvestBatch, success, error);
-            }
-        }
-        // Immediate harvest if buffer size exceeds batch size (for non-full cases)
-        if (eventBuffer.getSize(sizeEstimator) >= MAX_BATCH_SIZE_BYTES) {
-            List<Map<String, Object>> batch = eventBuffer.pollBatch(MAX_BATCH_SIZE_BYTES, sizeEstimator);
-            if (!batch.isEmpty()) {
-                boolean success = false;
-                Exception error = null;
-                try {
-                    sendBatch(batch);
-                    success = true;
-                } catch (Exception e) {
-                    error = e;
-                }
-                if (harvestCallback != null) {
-                    harvestCallback.afterHarvest(batch, success, error);
+    }
+
+    /**
+     * Lazy initialization of scheduler - starts only when first event is recorded
+     * This saves resources if NRVideo is initialized but never used for tracking
+     */
+    private void ensureSchedulerStarted() {
+        if (!schedulerStarted) {
+            synchronized (schedulerLock) {
+                if (!schedulerStarted) {
+                    scheduler.start();
+                    schedulerStarted = true;
+                    // Optional debug logging
+                    System.out.println("[HarvestManager] Scheduler started lazily on first event");
                 }
             }
         }
     }
 
-    private int estimateEventSizeBytes(Object obj) {
-        if (obj == null) return 0;
-        if (obj instanceof String) return ((String) obj).getBytes().length;
-        if (obj instanceof Number) return 8;
-        if (obj instanceof Boolean) return 1;
-        if (obj instanceof Map) {
-            int size = 0;
-            Map<?, ?> map = (Map<?, ?>) obj;
-            for (Map.Entry<?, ?> entry : map.entrySet()) {
-                size += estimateEventSizeBytes(entry.getKey());
-                size += estimateEventSizeBytes(entry.getValue());
+    /**
+     * CRITICAL: Force immediate harvest of all pending events
+     * Called during app backgrounding/closing to prevent data loss
+     * Note: Scheduler shutdown is handled by lifecycle manager, not here
+     */
+    public void forceHarvestAll() {
+        try {
+            // Only harvest if scheduler was actually started (events exist)
+            if (schedulerStarted) {
+                // Harvest both regular and live events immediately
+                harvestRegular();
+                harvestLive();
+
+                // Also retry any failed events in dead letter queue
+                deadLetterHandler.retryFailedEvents();
             }
-            return size;
+        } catch (Exception e) {
+            System.err.println("[HarvestManager] Force harvest failed: " + e.getMessage());
         }
-        if (obj instanceof List) {
-            int size = 0;
-            for (Object item : (List<?>) obj) {
-                size += estimateEventSizeBytes(item);
+    }
+
+    /**
+     * Generic harvest method for both regular and live events
+     * @param batchSizeBytes Maximum batch size in bytes
+     * @param priorityFilter Priority level to filter ("normal", "high", etc.)
+     * @param harvestType HTTP endpoint type ("regular", "live")
+     * @param retryFailures Whether to retry failed events after harvest
+     */
+    private void harvest(int batchSizeBytes, String priorityFilter, String harvestType, boolean retryFailures) {
+        try {
+            SizeEstimator sizeEstimator = new DefaultSizeEstimator();
+            List<Map<String, Object>> events = eventBuffer.pollBatchByPriority(
+                batchSizeBytes,
+                sizeEstimator,
+                priorityFilter
+            );
+
+            if (!events.isEmpty()) {
+                boolean success = httpClient.sendEvents(events, harvestType);
+                if (!success) {
+                    deadLetterHandler.handleFailedEvents(events, harvestType);
+                }
             }
-            return size;
-        }
-        return 16; // Default for other types
-    }
 
-    private int getBufferSizeBytes() {
-        int size = 0;
-        for (Map<String, Object> event : immediateHarvestQueue) {
-            size += estimateEventSizeBytes(event);
-        }
-        return size;
-    }
+            // Retry failed events if requested (typically only for regular harvest)
+            if (retryFailures) {
+                deadLetterHandler.retryFailedEvents();
+            }
 
-    private void harvestImmediate() {
-        List<Map<String, Object>> eventsToSend = new ArrayList<>();
-        int batchSize = 0;
-        while (!immediateHarvestQueue.isEmpty() && batchSize < MAX_BATCH_SIZE_BYTES) {
-            Map<String, Object> event = immediateHarvestQueue.peek();
-            int eventSize = estimateEventSizeBytes(event);
-            if (batchSize + eventSize > MAX_BATCH_SIZE_BYTES) break;
-            eventsToSend.add(immediateHarvestQueue.poll());
-            batchSize += eventSize;
-        }
-        sendBatch(eventsToSend);
-    }
-
-    public void harvest() {
-        if (eventBuffer.isEmpty()) return;
-        List<Map<String, Object>> batch = eventBuffer.pollBatch(MAX_BATCH_SIZE_BYTES, sizeEstimator);
-        if (!batch.isEmpty()) {
-            sendBatch(batch);
+        } catch (Exception e) {
+            System.err.println("[HarvestManager] " + harvestType + " harvest failed: " + e.getMessage());
         }
     }
 
-    private void sendBatch(List<Map<String, Object>> eventsToSend) {
-        // Centralized API endpoint logic
-        String url = apiDomain + endpointUrl;
-        // TODO: Implement HTTP POST using appToken
-        System.out.println("Harvesting " + eventsToSend.size() + " events (" + getBatchSizeBytes(eventsToSend) + " bytes) to " + url + " with token " + appToken);
+    /**
+     * Regular harvest task - sends accumulated events with retry logic
+     */
+    private void harvestRegular() {
+        harvest(8192, "normal", "regular", true); // 8KB batch, normal priority, with retries
     }
 
-    private int getBatchSizeBytes(List<Map<String, Object>> batch) {
-        int size = 0;
-        for (Map<String, Object> event : batch) {
-            size += estimateEventSizeBytes(event);
-        }
-        return size;
+    /**
+     * Live harvest task - sends high-priority events immediately
+     */
+    private void harvestLive() {
+        harvest(4096, "high", "live", false); // 4KB batch, high priority, no retries
     }
 
-    public void shutdown() {
-        if (harvestScheduler != null) {
-            harvestScheduler.shutdown();
+    /**
+     * Simple overflow callback - harvest immediately when buffer is getting full
+     * This is called by the buffer when it detects potential overflow
+     */
+    private void harvestNow(String bufferType) {
+        try {
+            if ("live".equals(bufferType)) {
+                harvestLive();
+                System.out.println("[HarvestManager] Emergency live harvest completed");
+            } else {
+                harvestRegular();
+                System.out.println("[HarvestManager] Emergency regular harvest completed");
+            }
+        } catch (Exception e) {
+            System.err.println("[HarvestManager] Emergency harvest failed: " + e.getMessage());
         }
-    }
-
-    public static class Config {
-        public String licenseKey;
-        public String endpointUrl;
-        public int harvestCycleSeconds = 60;
-        public String region = "US";
-        public HarvestCallback harvestCallback;
-        public Config(String licenseKey, String endpointUrl) {
-            this.licenseKey = licenseKey;
-            this.endpointUrl = endpointUrl;
-        }
-        public Config setHarvestCycleSeconds(int seconds) {
-            this.harvestCycleSeconds = seconds;
-            return this;
-        }
-        public Config setRegion(String region) {
-            this.region = region;
-            return this;
-        }
-        public Config setHarvestCallback(HarvestCallback callback) {
-            this.harvestCallback = callback;
-            return this;
-        }
-    }
-
-    public void configure(Config config) {
-        this.region = config.region;
-        this.apiDomain = selectApiDomain(config.region);
-        this.appToken = generateAppToken(config.licenseKey, config.region);
-        this.endpointUrl = config.endpointUrl;
-        this.harvestCycleSeconds = config.harvestCycleSeconds;
-        this.harvestCallback = config.harvestCallback;
-        startScheduler(harvestCycleSeconds);
     }
 }
