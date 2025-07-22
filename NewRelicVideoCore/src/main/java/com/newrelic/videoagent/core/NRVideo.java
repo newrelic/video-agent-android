@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import android.content.Context;
+import androidx.media3.exoplayer.ExoPlayer;
 import com.newrelic.videoagent.core.harvest.HarvestManager;
 import com.newrelic.videoagent.core.harvest.HarvestComponentFactory;
 import com.newrelic.videoagent.core.storage.CrashSafeHarvestFactory;
@@ -18,69 +19,16 @@ public final class NRVideo {
     private final AtomicBoolean isActive = new AtomicBoolean(false);
     private final Context context;
     private final NRVideoConfiguration configuration;
-    private final boolean crashSafetyEnabled;
-    private final Object playerInstance; // ExoPlayer instance passed by user
-
+    private final ExoPlayer player;
     private volatile HarvestManager harvestManager;
     private volatile NewRelicVideoAgent videoAgent;
     private volatile Integer trackerId;
 
     // Private constructor for player-specific initialization
-    private NRVideo(Context context, NRVideoConfiguration config, boolean enableCrashSafety, Object playerInstance) {
+    private NRVideo(ExoPlayer player, Context context, NRVideoConfiguration config) {
         this.context = context;
         this.configuration = config;
-        this.crashSafetyEnabled = enableCrashSafety;
-        this.playerInstance = playerInstance;
-    }
-
-    // ===========================================
-    // PUBLIC API
-    // ===========================================
-
-    /**
-     * Quick start with automatic device detection (no player instance)
-     */
-    public static NRVideo quickStart(String applicationToken, Context context) {
-        NRVideoConfiguration config = NRVideoConfiguration.createOptimal(applicationToken, context);
-        return new NRVideo(context, config, true, null);
-    }
-
-    /**
-     * Start with ExoPlayer instance for video tracking
-     */
-    public static NRVideo withExoPlayer(String applicationToken, Context context, Object exoPlayerInstance) {
-        if (exoPlayerInstance == null) {
-            throw new IllegalArgumentException("ExoPlayer instance is required");
-        }
-
-        NRVideoConfiguration config = NRVideoConfiguration.forExoPlayer(applicationToken);
-        return new NRVideo(context, config, true, exoPlayerInstance);
-    }
-
-    /**
-     * Start with ExoPlayer instance and IMA ads support
-     */
-    public static NRVideo withExoPlayerAndAds(String applicationToken, Context context, Object exoPlayerInstance) {
-        if (exoPlayerInstance == null) {
-            throw new IllegalArgumentException("ExoPlayer instance is required");
-        }
-
-        NRVideoConfiguration config = NRVideoConfiguration.forExoPlayerWithAds(applicationToken);
-        return new NRVideo(context, config, true, exoPlayerInstance);
-    }
-
-    /**
-     * Start with custom configuration and player instance
-     */
-    public static NRVideo withCustomConfig(NRVideoConfiguration config, Context context, Object playerInstance) {
-        return new NRVideo(context, config, true, playerInstance);
-    }
-
-    /**
-     * Get current active instance
-     */
-    public static NRVideo getInstance() {
-        return instanceRef.get();
+        this.player = player;
     }
 
     /**
@@ -229,14 +177,10 @@ public final class NRVideo {
         }
     }
 
-    // ===========================================
-    // PRIVATE IMPLEMENTATION
-    // ===========================================
-
     private void initialize() {
         try {
             HarvestComponentFactory factory;
-            if (crashSafetyEnabled && context != null) {
+            if (configuration.isCrashSafety() && context != null) {
                 factory = new CrashSafeHarvestFactory(configuration, context);
             } else {
                 factory = new HarvestComponentFactory(configuration, context);
@@ -256,10 +200,10 @@ public final class NRVideo {
         try {
             switch (configuration.getPlayerType()) {
                 case EXOPLAYER:
-                    if (playerInstance != null) {
+                    if (player != null) {
                         // Create ExoPlayer tracker with player instance
                         Class<?> exoTrackerClass = Class.forName("com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer");
-                        return (NRTracker) exoTrackerClass.getConstructor(Object.class).newInstance(playerInstance);
+                        return (NRTracker) exoTrackerClass.getConstructor(Object.class).newInstance(player);
                     } else {
                         // Create basic video tracker if no player instance provided
                         return new com.newrelic.videoagent.core.tracker.NRVideoTracker();
@@ -267,9 +211,9 @@ public final class NRVideo {
 
                 case IMA:
                     // IMA is primarily for ads, but can also handle content
-                    if (playerInstance != null) {
+                    if (player != null) {
                         Class<?> imaTrackerClass = Class.forName("com.newrelic.videoagent.ima.tracker.NRTrackerIMA");
-                        return (NRTracker) imaTrackerClass.getConstructor(Object.class).newInstance(playerInstance);
+                        return (NRTracker) imaTrackerClass.getConstructor(Object.class).newInstance(player);
                     } else {
                         return new com.newrelic.videoagent.core.tracker.NRVideoTracker();
                     }
@@ -297,8 +241,8 @@ public final class NRVideo {
         try {
             // Always use IMA tracker for ads
             Class<?> imaTrackerClass = Class.forName("com.newrelic.videoagent.ima.tracker.NRTrackerIMA");
-            if (playerInstance != null) {
-                return (NRTracker) imaTrackerClass.getConstructor(Object.class).newInstance(playerInstance);
+            if (player != null) {
+                return (NRTracker) imaTrackerClass.getConstructor(Object.class).newInstance(player);
             } else {
                 return (NRTracker) imaTrackerClass.newInstance();
             }
@@ -319,12 +263,4 @@ public final class NRVideo {
         }
     }
 
-    private boolean isTVDevice() {
-        if (context == null) return false;
-        try {
-            return context.getPackageManager().hasSystemFeature("android.software.leanback");
-        } catch (Exception e) {
-            return false;
-        }
-    }
 }

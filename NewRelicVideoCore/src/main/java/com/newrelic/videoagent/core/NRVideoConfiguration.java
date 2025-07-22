@@ -1,53 +1,37 @@
 package com.newrelic.videoagent.core;
 
 import android.content.Context;
-import java.util.Locale;
+import android.content.pm.PackageManager;
 
 /**
  * Optimized configuration for New Relic Video Agent
  * Android Mobile & TV optimized with automatic device detection and player support
  */
 public final class NRVideoConfiguration {
-
-    // Core settings
     private final String applicationToken;
     private final String endpointUrl;
     private final String region;
-
-    // Video tracking settings
     private final boolean adTrackingEnabled;
-    private final boolean autoStartTracking;
-    private final PlayerType playerType;
-
-    // Harvest settings (size-optimized for mobile/TV)
     private final int harvestCycleSeconds;
     private final int liveHarvestCycleSeconds;
     private final int maxBatchSizeBytes;
     private final int maxDeadLetterSize;
     private final boolean memoryOptimized;
     private final boolean debugLoggingEnabled;
-
-    /**
-     * Supported player types
-     */
-    public enum PlayerType {
-        EXOPLAYER,  // ExoPlayer for video content
-        IMA         // IMA for ads (can be combined with ExoPlayer)
-    }
+    private final boolean enableCrashSafety;
 
     private NRVideoConfiguration(Builder builder) {
         this.applicationToken = builder.applicationToken;
-        this.endpointUrl = builder.endpointUrl;
-        this.region = builder.region;
+        this.region = identifyRegion();
+        this.endpointUrl = generateEndpointUrl();
         this.adTrackingEnabled = builder.adTrackingEnabled;
-        this.autoStartTracking = builder.autoStartTracking;
-        this.playerType = builder.playerType;
         this.harvestCycleSeconds = builder.harvestCycleSeconds;
         this.liveHarvestCycleSeconds = builder.liveHarvestCycleSeconds;
         this.maxBatchSizeBytes = builder.maxBatchSizeBytes;
         this.maxDeadLetterSize = builder.maxDeadLetterSize;
         this.memoryOptimized = builder.memoryOptimized;
         this.debugLoggingEnabled = builder.debugLoggingEnabled;
+        this.enableCrashSafety = builder.enableCrashSafety;
     }
 
     // Getters
@@ -55,14 +39,25 @@ public final class NRVideoConfiguration {
     public String getEndpointUrl() { return endpointUrl; }
     public String getRegion() { return region; }
     public boolean isAdTrackingEnabled() { return adTrackingEnabled; }
-    public boolean isAutoStartTracking() { return autoStartTracking; }
-    public PlayerType getPlayerType() { return playerType; }
     public int getHarvestCycleSeconds() { return harvestCycleSeconds; }
     public int getLiveHarvestCycleSeconds() { return liveHarvestCycleSeconds; }
     public int getMaxBatchSizeBytes() { return maxBatchSizeBytes; }
     public int getMaxDeadLetterSize() { return maxDeadLetterSize; }
     public boolean isMemoryOptimized() { return memoryOptimized; }
     public boolean isDebugLoggingEnabled() { return debugLoggingEnabled; }
+    public boolean isCrashSafety() {
+        return enableCrashSafety;
+    }
+
+    private String identifyRegion() {
+        return "US";
+    }
+    private String generateEndpointUrl() {
+        String domain = "EU".equalsIgnoreCase(region) ?
+                "mobile-collector.eu.newrelic.com" :
+                "mobile-collector.newrelic.com";
+        return "https://" + domain + "/mobile/v1/events";
+    }
 
     /**
      * Create optimal configuration with automatic device detection
@@ -84,37 +79,20 @@ public final class NRVideoConfiguration {
      */
     public static class Builder {
         private final String applicationToken;
-
-        // Default settings (will be overridden by auto-detection)
-        private String endpointUrl;
-        private String region = "US";
         private boolean adTrackingEnabled = false;  // Disabled by default, user must explicitly enable
-        private boolean autoStartTracking = true;
-        private PlayerType playerType = PlayerType.EXOPLAYER;  // Default to ExoPlayer
-        private int harvestCycleSeconds = 60;
-        private int liveHarvestCycleSeconds = 30;
-        private int maxBatchSizeBytes = 8192;
+        private int harvestCycleSeconds = 90;
+        private int liveHarvestCycleSeconds = 45;
+        private int maxBatchSizeBytes = 4096;
         private int maxDeadLetterSize = 500;
         private boolean memoryOptimized = true;
         private boolean debugLoggingEnabled = false;
+        private boolean enableCrashSafety = true; // Always enabled for crash safety
 
         public Builder(String applicationToken) {
             if (applicationToken == null || applicationToken.trim().isEmpty()) {
                 throw new IllegalArgumentException("Application token is required");
             }
             this.applicationToken = applicationToken;
-            this.endpointUrl = generateEndpointUrl(region);
-        }
-
-        public Builder region(String region) {
-            this.region = region;
-            this.endpointUrl = generateEndpointUrl(region);
-            return this;
-        }
-
-        public Builder endpointUrl(String endpointUrl) {
-            this.endpointUrl = endpointUrl;
-            return this;
         }
 
         public Builder enableAdTracking(boolean enabled) {
@@ -122,24 +100,14 @@ public final class NRVideoConfiguration {
             return this;
         }
 
-        public Builder playerType(PlayerType playerType) {
-            this.playerType = playerType;
-            return this;
-        }
-
-        public Builder autoStartTracking(boolean enabled) {
-            this.autoStartTracking = enabled;
-            return this;
-        }
-
         public Builder harvestCycle(int seconds) {
-            if (seconds < 5) throw new IllegalArgumentException("Harvest cycle must be at least 5 seconds");
+            if (seconds < 30) throw new IllegalArgumentException("Harvest cycle must be at least 30 seconds");
             this.harvestCycleSeconds = seconds;
             return this;
         }
 
         public Builder liveHarvestCycle(int seconds) {
-            if (seconds < 5) throw new IllegalArgumentException("Live harvest cycle must be at least 5 seconds");
+            if (seconds < 10) throw new IllegalArgumentException("Live harvest cycle must be at least 5 seconds");
             this.liveHarvestCycleSeconds = seconds;
             return this;
         }
@@ -161,8 +129,13 @@ public final class NRVideoConfiguration {
             return this;
         }
 
-        public Builder enableDebugLogging(boolean enabled) {
-            this.debugLoggingEnabled = enabled;
+        public Builder enableDebugLogging() {
+            this.debugLoggingEnabled = true;
+            return this;
+        }
+
+        public Builder disableCrashSafety() {
+            this.enableCrashSafety = false;
             return this;
         }
 
@@ -202,20 +175,7 @@ public final class NRVideoConfiguration {
                 }
             }
 
-            // Auto-detect region if not set
-            if ("US".equals(region)) {
-                region = detectRegion();
-                endpointUrl = generateEndpointUrl(region);
-            }
-
             return new NRVideoConfiguration(this);
-        }
-
-        private String generateEndpointUrl(String region) {
-            String domain = "EU".equalsIgnoreCase(region) ?
-                "mobile-collector.eu.newrelic.com" :
-                "mobile-collector.newrelic.com";
-            return "https://" + domain + "/mobile/v1/events";
         }
 
         /**
@@ -223,7 +183,7 @@ public final class NRVideoConfiguration {
          */
         private boolean detectTVDevice(Context context) {
             try {
-                android.content.pm.PackageManager pm = context.getPackageManager();
+                PackageManager pm = context.getPackageManager();
 
                 // Primary detection: Android TV Leanback UI
                 if (pm.hasSystemFeature("android.software.leanback")) {
@@ -246,22 +206,6 @@ public final class NRVideoConfiguration {
             }
         }
 
-        private String detectRegion() {
-            String country = Locale.getDefault().getCountry();
-            if (country.equalsIgnoreCase("US")) return "US";
-
-            // EU countries
-            String[] euCountries = {"GB", "FR", "DE", "IT", "ES", "NL", "BE", "SE",
-                                   "DK", "FI", "NO", "IE", "PT", "GR", "AT", "CH"};
-
-            for (String euCountry : euCountries) {
-                if (country.equalsIgnoreCase(euCountry)) {
-                    return "EU";
-                }
-            }
-
-            return "US"; // Default fallback
-        }
     }
 
     /**
@@ -269,26 +213,6 @@ public final class NRVideoConfiguration {
      */
     public static NRVideoConfiguration minimal(String applicationToken) {
         return new Builder(applicationToken).build();
-    }
-
-    /**
-     * ExoPlayer configuration (video content only)
-     */
-    public static NRVideoConfiguration forExoPlayer(String applicationToken) {
-        return new Builder(applicationToken)
-            .playerType(PlayerType.EXOPLAYER)
-            .enableAdTracking(false)
-            .build();
-    }
-
-    /**
-     * ExoPlayer with IMA ads configuration
-     */
-    public static NRVideoConfiguration forExoPlayerWithAds(String applicationToken) {
-        return new Builder(applicationToken)
-            .playerType(PlayerType.EXOPLAYER)
-            .enableAdTracking(true)
-            .build();
     }
 
     /**
