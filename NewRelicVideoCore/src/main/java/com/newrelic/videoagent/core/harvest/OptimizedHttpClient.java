@@ -400,43 +400,6 @@ public class OptimizedHttpClient implements HttpClientInterface {
         resetToPrimary();
     }
 
-    private String convertEventsToJson(List<Map<String, Object>> events) {
-        StringBuilder json = new StringBuilder();
-        json.append("[");
-
-        for (int i = 0; i < events.size(); i++) {
-            if (i > 0) json.append(",");
-            json.append(mapToJson(events.get(i)));
-        }
-
-        json.append("]");
-        return json.toString();
-    }
-
-    private String mapToJson(Map<String, Object> map) {
-        StringBuilder json = new StringBuilder();
-        json.append("{");
-
-        boolean first = true;
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            if (!first) json.append(",");
-            json.append("\"").append(escapeJsonString(entry.getKey())).append("\":");
-
-            Object value = entry.getValue();
-            if (value instanceof String) {
-                json.append("\"").append(escapeJsonString((String) value)).append("\"");
-            } else if (value instanceof Number || value instanceof Boolean) {
-                json.append(value);
-            } else {
-                json.append("\"").append(escapeJsonString(value != null ? value.toString() : "null")).append("\"");
-            }
-            first = false;
-        }
-
-        json.append("}");
-        return json.toString();
-    }
-
     private String escapeJsonString(String str) {
         if (str == null) return "null";
         return str.replace("\\", "\\\\")

@@ -3,260 +3,230 @@ package com.newrelic.videoagent.core;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import android.app.Application;
+import android.content.Context;
 import com.newrelic.videoagent.core.harvest.HarvestManager;
 import com.newrelic.videoagent.core.harvest.HarvestComponentFactory;
-import com.newrelic.videoagent.core.lifecycle.NRVideoLifecycleObserver;
+import com.newrelic.videoagent.core.storage.CrashSafeHarvestFactory;
+import com.newrelic.videoagent.core.tracker.NRTracker;
 
 /**
- * Simplified New Relic Video Agent for mobile/TV environments
- * Uses builder pattern for flexible configuration
- * NOW WITH AUTOMATIC LIFECYCLE DETECTION - No manual integration required!
- *
- * Usage Examples:
- *
- * // Minimal setup with automatic lifecycle
- * NRVideo agent = NRVideo.start("your-token", player, application);
- *
- * // Custom configuration with automatic lifecycle
- * NRVideoConfiguration config = new NRVideoConfiguration.Builder("your-token")
- *     .liveHarvestCycle(5)
- *     .enableAdTracking(false)
- *     .build();
- * NRVideo agent = NRVideo.start(player, config, application);
+ * New Relic Video Agent - Android Mobile & TV Optimized
+ * Supports ExoPlayer and IMA with automatic device detection
  */
-public final class NRVideo implements NRVideoLifecycleObserver.LifecycleListener {
-
+public final class NRVideo {
     private static final AtomicReference<NRVideo> instanceRef = new AtomicReference<>();
     private final AtomicBoolean isActive = new AtomicBoolean(false);
-
-    // Core configuration
+    private final Context context;
     private final NRVideoConfiguration configuration;
-    private final Object videoPlayer;
-    private final Application application;
+    private final boolean crashSafetyEnabled;
+    private final Object playerInstance; // ExoPlayer instance passed by user
 
-    // Runtime state
     private volatile HarvestManager harvestManager;
     private volatile NewRelicVideoAgent videoAgent;
     private volatile Integer trackerId;
-    private volatile NRVideoLifecycleObserver lifecycleObserver;
 
-    private NRVideo(Object player, NRVideoConfiguration config, Application app) {
-        this.videoPlayer = player;
+    // Private constructor for player-specific initialization
+    private NRVideo(Context context, NRVideoConfiguration config, boolean enableCrashSafety, Object playerInstance) {
+        this.context = context;
         this.configuration = config;
-        this.application = app;
+        this.crashSafetyEnabled = enableCrashSafety;
+        this.playerInstance = playerInstance;
     }
 
     // ===========================================
-    // STATIC FACTORY METHODS WITH AUTOMATIC LIFECYCLE
+    // PUBLIC API
     // ===========================================
 
     /**
-     * Start video agent with minimal configuration and automatic lifecycle detection
+     * Quick start with automatic device detection (no player instance)
      */
-    public static NRVideo start(String token, Object player, Application application) {
-        NRVideoConfiguration config = NRVideoConfiguration.minimal(token);
-        return start(player, config, application);
+    public static NRVideo quickStart(String applicationToken, Context context) {
+        NRVideoConfiguration config = NRVideoConfiguration.createOptimal(applicationToken, context);
+        return new NRVideo(context, config, true, null);
     }
 
     /**
-     * Start video agent with custom configuration and automatic lifecycle detection (recommended)
+     * Start with ExoPlayer instance for video tracking
      */
-    public static NRVideo start(Object player, NRVideoConfiguration configuration, Application application) {
-        if (player == null) {
-            throw new IllegalArgumentException("Player is required");
-        }
-        if (configuration == null) {
-            throw new IllegalArgumentException("Configuration is required");
-        }
-        if (application == null) {
-            throw new IllegalArgumentException("Application context is required for automatic lifecycle detection");
+    public static NRVideo withExoPlayer(String applicationToken, Context context, Object exoPlayerInstance) {
+        if (exoPlayerInstance == null) {
+            throw new IllegalArgumentException("ExoPlayer instance is required");
         }
 
-        // Auto-cleanup previous instance
-        NRVideo current = instanceRef.get();
-        if (current != null && current.isActive.get()) {
-            current.stop();
+        NRVideoConfiguration config = NRVideoConfiguration.forExoPlayer(applicationToken);
+        return new NRVideo(context, config, true, exoPlayerInstance);
+    }
+
+    /**
+     * Start with ExoPlayer instance and IMA ads support
+     */
+    public static NRVideo withExoPlayerAndAds(String applicationToken, Context context, Object exoPlayerInstance) {
+        if (exoPlayerInstance == null) {
+            throw new IllegalArgumentException("ExoPlayer instance is required");
         }
 
-        NRVideo instance = new NRVideo(player, configuration, application);
-        instanceRef.set(instance);
+        NRVideoConfiguration config = NRVideoConfiguration.forExoPlayerWithAds(applicationToken);
+        return new NRVideo(context, config, true, exoPlayerInstance);
+    }
 
-        try {
-            instance.initialize();
-            instance.setupAutomaticLifecycle(); // NEW: Automatic lifecycle setup
+    /**
+     * Start with custom configuration and player instance
+     */
+    public static NRVideo withCustomConfig(NRVideoConfiguration config, Context context, Object playerInstance) {
+        return new NRVideo(context, config, true, playerInstance);
+    }
 
-            if (configuration.isAutoStartTracking()) {
-                instance.startTracking();
+    /**
+     * Get current active instance
+     */
+    public static NRVideo getInstance() {
+        return instanceRef.get();
+    }
+
+    /**
+     * Start the video agent
+     */
+    public NRVideo start() {
+        if (isActive.compareAndSet(false, true)) {
+            NRVideo current = instanceRef.getAndSet(this);
+            if (current != null && current.isActive.get()) {
+                current.stop();
             }
 
-            instance.isActive.set(true);
-
-            if (configuration.isDebugLoggingEnabled()) {
-                System.out.println("[NRVideo] Started with automatic lifecycle - Tracker: " + instance.trackerId +
-                    ", Region: " + configuration.getRegion());
-            }
-
-            return instance;
-
-        } catch (Exception e) {
-            System.err.println("[NRVideo] Startup failed: " + e.getMessage());
-            instance.cleanup();
-            throw new RuntimeException("NRVideo startup failed", e);
-        }
-    }
-
-    /**
-     * Start with live streaming optimized configuration
-     */
-    public static NRVideo startForLiveStreaming(String token, Object player, Application application) {
-        NRVideoConfiguration config = NRVideoConfiguration.forLiveStreaming(token);
-        return start(player, config, application);
-    }
-
-    /**
-     * Start with on-demand content optimized configuration
-     */
-    public static NRVideo startForOnDemandContent(String token, Object player, Application application) {
-        NRVideoConfiguration config = NRVideoConfiguration.forOnDemandContent(token);
-        return start(player, config, application);
-    }
-
-    // ===========================================
-    // BUILDER FOR ADVANCED CONFIGURATION
-    // ===========================================
-
-    /**
-     * Get a configuration builder for advanced customization
-     */
-    public static NRVideoConfiguration.Builder configure(String applicationToken) {
-        return new NRVideoConfiguration.Builder(applicationToken);
-    }
-
-    // ===========================================
-    // INSTANCE METHODS
-    // ===========================================
-
-    /**
-     * Start tracking manually (if autoStartTracking was disabled)
-     */
-    public void startTracking() {
-        if (!isActive.get()) {
-            throw new IllegalStateException("NRVideo agent not started");
-        }
-
-        if (trackerId != null) {
-            System.err.println("[NRVideo] Tracking already started");
-            return;
-        }
-
-        try {
-            startTrackingInternal();
-            if (configuration.isDebugLoggingEnabled()) {
-                System.out.println("[NRVideo] Tracking started - ID: " + trackerId);
-            }
-        } catch (Exception e) {
-            System.err.println("[NRVideo] Failed to start tracking: " + e.getMessage());
-            throw new RuntimeException("Failed to start tracking", e);
-        }
-    }
-
-    /**
-     * Stop and cleanup
-     */
-    public void stop() {
-        if (!isActive.get()) return;
-
-        try {
-            // CRITICAL: Harvest any remaining events before stopping
-            if (harvestManager != null) {
-                harvestManager.forceHarvestAll(); // Immediate harvest to prevent data loss
-            }
-
-            cleanup();
-            isActive.set(false);
-            if (configuration.isDebugLoggingEnabled()) {
-                System.out.println("[NRVideo] Stopped with immediate harvest");
-            }
-        } catch (Exception e) {
-            System.err.println("[NRVideo] Stop error: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Called automatically when app goes to background - implements LifecycleListener
-     */
-    @Override
-    public void onAppBackgrounded() {
-        if (isActive.get() && harvestManager != null) {
-            harvestManager.forceHarvestAll(); // Immediate harvest
-            if (configuration.isDebugLoggingEnabled()) {
-                System.out.println("[NRVideo] Auto-detected: App backgrounded - immediate harvest triggered");
-            }
-        }
-    }
-
-    /**
-     * Called automatically when app comes to foreground - implements LifecycleListener
-     */
-    @Override
-    public void onAppForegrounded() {
-        if (isActive.get() && configuration.isDebugLoggingEnabled()) {
-            System.out.println("[NRVideo] Auto-detected: App foregrounded - normal harvesting resumed");
-        }
-    }
-
-    /**
-     * NEW: Called automatically when app is terminating (crash, kill, force close)
-     * This is CRITICAL for preventing data loss in emergency scenarios
-     */
-    @Override
-    public void onAppTerminating() {
-        if (isActive.get() && harvestManager != null) {
             try {
-                // EMERGENCY HARVEST: Immediate, synchronous harvest to prevent data loss
-                harvestManager.forceHarvestAll();
+                initialize();
+                startTracking();
 
                 if (configuration.isDebugLoggingEnabled()) {
-                    System.out.println("[NRVideo] EMERGENCY: App terminating - immediate harvest completed");
+                    System.out.println("[NRVideo] Started - Device: " + (isTVDevice() ? "TV" : "Mobile") +
+                                     ", Player: " + configuration.getPlayerType() +
+                                     ", Ads: " + configuration.isAdTrackingEnabled());
                 }
             } catch (Exception e) {
-                // Don't let harvest failure prevent app termination
-                System.err.println("[NRVideo] Emergency harvest failed: " + e.getMessage());
+                isActive.set(false);
+                throw new RuntimeException("Failed to start NRVideo: " + e.getMessage(), e);
+            }
+        }
+        return this;
+    }
+
+    /**
+     * Stop the video agent
+     */
+    public void stop() {
+        if (isActive.compareAndSet(true, false)) {
+            try {
+                if (trackerId != null && videoAgent != null) {
+                    videoAgent.releaseTracker(trackerId);
+                    trackerId = null;
+                }
+
+                if (harvestManager != null) {
+                    harvestManager.forceHarvestAll();
+                }
+
+                instanceRef.compareAndSet(this, null);
+            } catch (Exception e) {
+                System.err.println("[NRVideo] Error during stop: " + e.getMessage());
             }
         }
     }
 
     /**
-     * Record custom event - used by trackers to send video events
+     * Start video tracking with appropriate tracker based on configuration
      */
-    public void recordEvent(String eventType, Map<String, Object> attributes) {
-        if (!isActive.get()) {
+    public Integer startTracking() {
+        ensureInitialized();
+
+        if (trackerId == null && videoAgent != null) {
+            NRTracker contentTracker = createContentTracker();
+            NRTracker adTracker = configuration.isAdTrackingEnabled() ? createAdTracker() : null;
+
+            // Pass both trackers to NewRelicVideoAgent
+            trackerId = videoAgent.start(contentTracker, adTracker);
+
             if (configuration.isDebugLoggingEnabled()) {
-                System.err.println("[NRVideo] Cannot record event - agent not active");
+                System.out.println("[NRVideo] Started tracking - ID: " + trackerId +
+                                 ", Content: " + (contentTracker != null ? contentTracker.getClass().getSimpleName() : "null") +
+                                 ", Ads: " + (adTracker != null ? adTracker.getClass().getSimpleName() : "disabled"));
             }
-            return;
         }
 
+        return trackerId;
+    }
+
+    /**
+     * Get content tracker for video events
+     */
+    public NRTracker getContentTracker() {
+        if (trackerId != null && videoAgent != null) {
+            return videoAgent.getContentTracker(trackerId);
+        }
+        return null;
+    }
+
+    /**
+     * Get ad tracker for ad events (only if ads are enabled)
+     */
+    public NRTracker getAdTracker() {
+        if (trackerId != null && videoAgent != null && configuration.isAdTrackingEnabled()) {
+            return videoAgent.getAdTracker(trackerId);
+        }
+        return null;
+    }
+
+    /**
+     * Record custom video event
+     */
+    public void recordCustomEvent(String eventType, Map<String, Object> attributes) {
+        ensureInitialized();
         if (harvestManager != null) {
             harvestManager.recordCustomEvent(eventType, attributes);
-        } else {
-            System.err.println("[NRVideo] Cannot record event - harvest manager not initialized");
         }
     }
 
     /**
-     * Get current configuration (read-only)
+     * Check if video agent is active
+     */
+    public boolean isActive() {
+        return isActive.get();
+    }
+
+    /**
+     * Get configuration
      */
     public NRVideoConfiguration getConfiguration() {
         return configuration;
     }
 
     /**
-     * Check if agent is currently active
+     * Get tracker ID
      */
-    public boolean isActive() {
-        return isActive.get();
+    public Integer getTrackerId() {
+        return trackerId;
+    }
+
+    // ===========================================
+    // APP LIFECYCLE (for crash safety)
+    // ===========================================
+
+    /**
+     * Call when app goes to background
+     */
+    public void onAppBackgrounded() {
+        if (harvestManager != null) {
+            harvestManager.forceHarvestAll();
+        }
+    }
+
+    /**
+     * Emergency shutdown for current instance
+     */
+    public static void emergencyShutdownCurrent() {
+        NRVideo current = instanceRef.get();
+        if (current != null && current.harvestManager != null) {
+            current.harvestManager.forceHarvestAll();
+        }
     }
 
     // ===========================================
@@ -264,88 +234,97 @@ public final class NRVideo implements NRVideoLifecycleObserver.LifecycleListener
     // ===========================================
 
     private void initialize() {
-        // Direct use of unified configuration - now with context for token management
-        HarvestComponentFactory factory = new HarvestComponentFactory(configuration, application);
-        harvestManager = new HarvestManager(factory);
-    }
-
-    private void startTrackingInternal() {
-        videoAgent = NewRelicVideoAgent.getInstance();
-
-        Object contentTracker = createTracker(videoPlayer);
-        if (contentTracker == null) {
-            throw new RuntimeException("Unsupported player: " + videoPlayer.getClass().getSimpleName());
-        }
-
-        Object adTracker = configuration.isAdTrackingEnabled() ? createAdTracker() : null;
-
-        trackerId = adTracker != null
-            ? videoAgent.start(
-                (com.newrelic.videoagent.core.tracker.NRTracker) contentTracker,
-                (com.newrelic.videoagent.core.tracker.NRTracker) adTracker)
-            : videoAgent.start((com.newrelic.videoagent.core.tracker.NRTracker) contentTracker);
-    }
-
-    private Object createTracker(Object player) {
-        String className = player.getClass().getName().toLowerCase();
-
-        if (className.contains("exoplayer") || className.contains("media3")) {
-            return createCachedTracker("com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer", player);
-        }
-
-        return null;
-    }
-
-    private Object createAdTracker() {
-        return createCachedTracker("com.newrelic.videoagent.ima.tracker.NRTrackerIMA", null);
-    }
-
-    private Object createCachedTracker(String className, Object player) {
         try {
-            Class<?> clazz = Class.forName(className);
-
-            Object tracker = clazz.getDeclaredConstructor().newInstance();
-
-            if (player != null) {
-                clazz.getMethod("setPlayer", Object.class).invoke(tracker, player);
+            HarvestComponentFactory factory;
+            if (crashSafetyEnabled && context != null) {
+                factory = new CrashSafeHarvestFactory(configuration, context);
+            } else {
+                factory = new HarvestComponentFactory(configuration, context);
             }
 
-            return tracker;
+            harvestManager = new HarvestManager(factory);
+            videoAgent = NewRelicVideoAgent.getInstance();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to initialize NRVideo components", e);
+        }
+    }
+
+    /**
+     * Create content tracker based on player type
+     */
+    private NRTracker createContentTracker() {
+        try {
+            switch (configuration.getPlayerType()) {
+                case EXOPLAYER:
+                    if (playerInstance != null) {
+                        // Create ExoPlayer tracker with player instance
+                        Class<?> exoTrackerClass = Class.forName("com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer");
+                        return (NRTracker) exoTrackerClass.getConstructor(Object.class).newInstance(playerInstance);
+                    } else {
+                        // Create basic video tracker if no player instance provided
+                        return new com.newrelic.videoagent.core.tracker.NRVideoTracker();
+                    }
+
+                case IMA:
+                    // IMA is primarily for ads, but can also handle content
+                    if (playerInstance != null) {
+                        Class<?> imaTrackerClass = Class.forName("com.newrelic.videoagent.ima.tracker.NRTrackerIMA");
+                        return (NRTracker) imaTrackerClass.getConstructor(Object.class).newInstance(playerInstance);
+                    } else {
+                        return new com.newrelic.videoagent.core.tracker.NRVideoTracker();
+                    }
+
+                default:
+                    return new com.newrelic.videoagent.core.tracker.NRVideoTracker();
+            }
         } catch (Exception e) {
             if (configuration.isDebugLoggingEnabled()) {
-                System.err.println("[NRVideo] Failed to create tracker: " + className + " - " + e.getMessage());
+                System.err.println("[NRVideo] Failed to create specific tracker, using default: " + e.getMessage());
             }
+            // Fallback to basic video tracker
+            return new com.newrelic.videoagent.core.tracker.NRVideoTracker();
+        }
+    }
+
+    /**
+     * Create ad tracker (IMA) if ads are enabled
+     */
+    private NRTracker createAdTracker() {
+        if (!configuration.isAdTrackingEnabled()) {
             return null;
         }
-    }
 
-    private void setupAutomaticLifecycle() {
-        if (application != null) {
-            lifecycleObserver = new NRVideoLifecycleObserver(this);
-            application.registerActivityLifecycleCallbacks(lifecycleObserver);
-
-            if (configuration.isDebugLoggingEnabled()) {
-                System.out.println("[NRVideo] Automatic lifecycle detection enabled");
+        try {
+            // Always use IMA tracker for ads
+            Class<?> imaTrackerClass = Class.forName("com.newrelic.videoagent.ima.tracker.NRTrackerIMA");
+            if (playerInstance != null) {
+                return (NRTracker) imaTrackerClass.getConstructor(Object.class).newInstance(playerInstance);
+            } else {
+                return (NRTracker) imaTrackerClass.newInstance();
             }
+        } catch (Exception e) {
+            if (configuration.isDebugLoggingEnabled()) {
+                System.err.println("[NRVideo] Failed to create IMA ad tracker: " + e.getMessage());
+            }
+            return null; // No ad tracking if IMA tracker can't be created
         }
     }
 
-    private void cleanup() {
-        // Unregister automatic lifecycle observer
-        if (application != null && lifecycleObserver != null) {
-            application.unregisterActivityLifecycleCallbacks(lifecycleObserver);
-            lifecycleObserver = null;
+    private void ensureInitialized() {
+        if (!isActive.get()) {
+            throw new IllegalStateException("NRVideo is not started. Call start() first.");
         }
-
-        if (videoAgent != null && trackerId != null) {
-            videoAgent.releaseTracker(trackerId);
+        if (harvestManager == null) {
+            throw new IllegalStateException("HarvestManager not initialized");
         }
+    }
 
-        // Note: Scheduler shutdown is now handled by lifecycle observer
-        // harvestManager only handles event harvesting, not lifecycle management
-
-        harvestManager = null;
-        videoAgent = null;
-        trackerId = null;
+    private boolean isTVDevice() {
+        if (context == null) return false;
+        try {
+            return context.getPackageManager().hasSystemFeature("android.software.leanback");
+        } catch (Exception e) {
+            return false;
+        }
     }
 }
