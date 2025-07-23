@@ -18,16 +18,18 @@ public class HarvestComponentFactory {
 
     /**
      * Creates an optimized event buffer based on configuration
+     * Uses isTV flag from configuration instead of detecting device
      */
     public EventBufferInterface createEventBuffer() {
-        return new PriorityEventBuffer();
+        return new PriorityEventBuffer(configuration.isTV());
     }
 
     /**
      * Creates a dead letter queue for failed events
+     * Uses isTV flag from configuration for consistency
      */
     public EventBufferInterface createDeadLetterQueue() {
-        return new PriorityEventBuffer();
+        return new PriorityEventBuffer(configuration.isTV());
     }
 
     /**

@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Locale;
+import android.util.Log;
 import com.newrelic.videoagent.core.storage.CrashSafeHarvestFactory;
 import com.newrelic.videoagent.core.storage.IntegratedDeadLetterHandler;
 import com.newrelic.videoagent.core.storage.CrashSafeEventBuffer;
@@ -19,24 +20,30 @@ import com.newrelic.videoagent.core.lifecycle.NRVideoLifecycleObserver;
  */
 public class HarvestManager implements EventBufferInterface.CapacityCallback, NRVideoLifecycleObserver.LifecycleListener {
 
+    private static final String TAG = "NRVideo.HarvestManager";
+
     private final EventBufferInterface eventBuffer;
     private final SchedulerInterface scheduler;
     private final HttpClientInterface httpClient;
     private final IntegratedDeadLetterHandler deadLetterHandler;
-    private final CrashSafeHarvestFactory factory;
+    private final CrashSafeHarvestFactory crashSafeFactory; // Renamed for clarity
+    private final HarvestComponentFactory baseFactory; // Always available
     private final NRVideoLifecycleObserver lifecycleObserver;
 
     public HarvestManager(HarvestComponentFactory factory) {
+        // Store the base factory so we always have access to configuration
+        this.baseFactory = factory;
+
         // Support both regular and crash-safe factories
         if (factory instanceof CrashSafeHarvestFactory) {
-            this.factory = (CrashSafeHarvestFactory) factory;
-            this.eventBuffer = this.factory.createEventBuffer();
-            this.httpClient = this.factory.createHttpClient();
+            this.crashSafeFactory = (CrashSafeHarvestFactory) factory;
+            this.eventBuffer = this.crashSafeFactory.createEventBuffer();
+            this.httpClient = this.crashSafeFactory.createHttpClient();
 
             // Create IntegratedDeadLetterHandler with proper crash-safe integration
             CrashSafeEventBuffer crashSafeBuffer = (CrashSafeEventBuffer) this.eventBuffer;
             this.deadLetterHandler = new IntegratedDeadLetterHandler(
-                this.factory.createDeadLetterQueue(),
+                this.crashSafeFactory.createDeadLetterQueue(),
                 crashSafeBuffer,
                 httpClient,
                 factory.getConfiguration(),
@@ -44,7 +51,7 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback, NR
             );
         } else {
             // Fallback to regular factory
-            this.factory = null;
+            this.crashSafeFactory = null;
             this.eventBuffer = factory.createEventBuffer();
             this.httpClient = factory.createHttpClient();
 
@@ -81,22 +88,22 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback, NR
     // Implement LifecycleListener interface
     @Override
     public void onAppBackgrounded() {
-        if (factory != null && factory.getConfiguration().isDebugLoggingEnabled()) {
-            System.out.println("[HarvestManager] App backgrounded - immediate harvest triggered");
+        if (baseFactory.getConfiguration().isDebugLoggingEnabled()) {
+            Log.d(TAG, "App backgrounded - immediate harvest triggered");
         }
     }
 
     @Override
     public void onAppForegrounded() {
-        if (factory != null && factory.getConfiguration().isDebugLoggingEnabled()) {
-            System.out.println("[HarvestManager] App foregrounded - normal operation resumed");
+        if (baseFactory.getConfiguration().isDebugLoggingEnabled()) {
+            Log.d(TAG, "App foregrounded - normal operation resumed");
         }
     }
 
     @Override
     public void onAppTerminating() {
-        if (factory != null && factory.getConfiguration().isDebugLoggingEnabled()) {
-            System.out.println("[HarvestManager] App terminating - emergency harvest completed");
+        if (baseFactory.getConfiguration().isDebugLoggingEnabled()) {
+            Log.d(TAG, "App terminating - emergency harvest completed");
         }
     }
 
@@ -118,8 +125,8 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback, NR
     public void onCapacityThresholdReached(double currentCapacity, String bufferType) {
         scheduler.start(bufferType);
 
-        if (factory != null && factory.getConfiguration().isDebugLoggingEnabled()) {
-            System.out.println("[HarvestManager] Capacity threshold reached for " + bufferType + ": " +
+        if (baseFactory.getConfiguration().isDebugLoggingEnabled()) {
+            Log.d(TAG, "Capacity threshold reached for " + bufferType + ": " +
                 String.format(Locale.US, "%.1f%%", currentCapacity * 100) +
                 " - Attempting to start scheduler.");
         }
@@ -152,8 +159,8 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback, NR
             }
 
             // Perform emergency backup if crash-safe factory available
-            if (factory != null) {
-                factory.performEmergencyBackup();
+            if (crashSafeFactory != null) {
+                crashSafeFactory.performEmergencyBackup();
             } else if (eventBuffer instanceof CrashSafeEventBuffer) {
                 // Emergency backup for crash-safe event buffer
                 ((CrashSafeEventBuffer) eventBuffer).emergencyBackup();
@@ -162,14 +169,49 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback, NR
             // Emergency backup for dead letter handler
             deadLetterHandler.emergencyBackup();
         } catch (Exception e) {
-            System.err.println("[HarvestManager] Force harvest failed: " + e.getMessage());
+            Log.e(TAG, "Force harvest failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Harvest regular events with optimized batch sizes from configuration
+     */
+    private void harvestRegular() {
+        // Use configuration-defined batch size - no more hardcoded values
+        int batchSizeBytes = baseFactory.getConfiguration().getRegularBatchSizeBytes();
+        harvest(batchSizeBytes, "ondemand", "regular", true);
+    }
+
+    /**
+     * Harvest live events with optimized batch sizes from configuration
+     */
+    private void harvestLive() {
+        // Use configuration-defined batch size - no more hardcoded values
+        int batchSizeBytes = baseFactory.getConfiguration().getLiveBatchSizeBytes();
+        harvest(batchSizeBytes, "live", "live", false);
+    }
+
+    /**
+     * Force immediate harvest with reduced batch sizes
+     * Updated to match OverflowCallback interface signature
+     */
+    private void harvestNow(String bufferType) {
+        if ("live".equals(bufferType)) {
+            harvestLive();
+        } else if ("ondemand".equals(bufferType)) {
+            harvestRegular();
+        } else {
+            // Harvest both if buffer type is unknown
+            harvestRegular();
+            harvestLive();
         }
     }
 
     /**
      * Generic harvest method for both regular and live events
-     * @param batchSizeBytes Maximum batch size in bytes
-     * @param priorityFilter Priority level to filter ("normal", "high", etc.)
+     * OPTIMIZED: Updated for 2KB events with device-specific batch sizes
+     * @param batchSizeBytes Maximum batch size in bytes (optimized for 2KB events)
+     * @param priorityFilter Priority level to filter ("ondemand", "live")
      * @param harvestType HTTP endpoint type ("regular", "live")
      * @param retryFailures Whether to retry failed events after harvest
      */
@@ -187,6 +229,12 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback, NR
                 if (!success) {
                     deadLetterHandler.handleFailedEvents(events, harvestType);
                 }
+
+                // Debug logging for optimization monitoring
+                if (baseFactory.getConfiguration().isDebugLoggingEnabled()) {
+                    Log.d(TAG, harvestType + " harvest: " +
+                        events.size() + " events, ~" + (events.size() * 2) + "KB");
+                }
             }
 
             // Retry failed events if requested (typically only for regular harvest)
@@ -195,37 +243,7 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback, NR
             }
 
         } catch (Exception e) {
-            System.err.println("[HarvestManager] " + harvestType + " harvest failed: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Regular harvest task - sends accumulated events with retry logic
-     */
-    private void harvestRegular() {
-        harvest(8192, "ondemand", "regular", true); // 8KB batch, normal priority, with retries
-    }
-
-    /**
-     * Live harvest task - sends high-priority events immediately
-     */
-    private void harvestLive() {
-        harvest(4096, "live", "live", false); // 4KB batch, high priority, no retries
-    }
-
-    /**
-     * Emergency harvest callback - harvest immediately when buffer is getting full
-     * This is called by the buffer when it detects potential overflow
-     */
-    private void harvestNow(String bufferType) {
-        try {
-            if ("live".equals(bufferType)) {
-                harvestLive();
-            } else {
-                harvestRegular();
-            }
-        } catch (Exception e) {
-            System.err.println("[HarvestManager] Emergency harvest failed: " + e.getMessage());
+            Log.e(TAG, harvestType + " harvest failed: " + e.getMessage(), e);
         }
     }
 
@@ -247,8 +265,8 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback, NR
      * Get recovery statistics (if using crash-safe factory)
      */
     public String getRecoveryStats() {
-        if (factory != null) {
-            return factory.getRecoveryStats();
+        if (crashSafeFactory != null) {
+            return crashSafeFactory.getRecoveryStats();
         }
         return "Regular harvest manager (no crash safety)";
     }
@@ -257,6 +275,6 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback, NR
      * Check if currently recovering from crash
      */
     public boolean isRecovering() {
-        return factory != null && factory.isRecovering();
+        return crashSafeFactory != null && crashSafeFactory.isRecovering();
     }
 }

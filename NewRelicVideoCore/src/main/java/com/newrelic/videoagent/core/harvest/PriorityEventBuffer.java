@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * Uses thread-safe ConcurrentLinkedQueue for better reliability
  * Simple overflow detection triggers immediate harvest
  * Deduplicates CONTIGUOUS events by actionName with O(1) atomic tracking
+ * OPTIMIZED: Reduced buffer sizes for 2KB events with dynamic device detection
  */
 public class PriorityEventBuffer implements EventBufferInterface {
     // Live streaming events need immediate processing (live TV, sports, news)
@@ -24,12 +25,33 @@ public class PriorityEventBuffer implements EventBufferInterface {
     private final AtomicReference<String> lastLiveActionName = new AtomicReference<>();
     private final AtomicReference<String> lastOndemandActionName = new AtomicReference<>();
 
-    private static final int MAX_LIVE_EVENTS = 1000;      // Smaller buffer for immediate processing
-    private static final int MAX_ONDEMAND_EVENTS = 3000;  // Larger buffer for batch processing
+    // OPTIMIZED for 2KB events - device-specific buffer sizes
+    private final int MAX_LIVE_EVENTS;
+    private final int MAX_ONDEMAND_EVENTS;
+    private final boolean isAndroidTVDevice;
 
     // Enhanced callback support
     private OverflowCallback overflowCallback;
     private CapacityCallback capacityCallback;
+
+    public PriorityEventBuffer() {
+        // Default constructor - assume mobile device
+        this(false);
+    }
+
+    public PriorityEventBuffer(boolean isTV) {
+        this.isAndroidTVDevice = isTV;
+
+        if (isAndroidTVDevice) {
+            // Android TV: More memory available, longer content sessions
+            this.MAX_LIVE_EVENTS = 300;      // 300 × 2KB = 600KB (live needs quick processing)
+            this.MAX_ONDEMAND_EVENTS = 700;  // 700 × 2KB = 1.4MB (can batch larger)
+        } else {
+            // Mobile: Memory-conscious, shorter sessions, frequent harvesting
+            this.MAX_LIVE_EVENTS = 150;      // 150 × 2KB = 300KB (conservative for mobile)
+            this.MAX_ONDEMAND_EVENTS = 350;  // 350 × 2KB = 700KB (balanced for mobile)
+        }
+    }
 
     /**
      * Set overflow callback for immediate harvest when buffer is getting full
@@ -154,15 +176,22 @@ public class PriorityEventBuffer implements EventBufferInterface {
         ConcurrentLinkedQueue<Map<String, Object>> targetQueue = "live".equals(priority) ? liveEvents : ondemandEvents;
 
         int currentSize = 0;
-        // Live events: smaller batches for faster processing
-        // On-demand events: larger batches for efficiency
-        int maxEvents = "live".equals(priority) ? 50 : 100;
+        // OPTIMIZED: Adjusted batch sizes for 2KB events and device capabilities
+        int maxEvents;
+        if ("live".equals(priority)) {
+            // Live events: Quick, small batches for low latency
+            maxEvents = isAndroidTVDevice ? 25 : 15;  // TV: 50KB batches, Mobile: 30KB batches
+        } else {
+            // On-demand events: Larger batches for efficiency
+            maxEvents = isAndroidTVDevice ? 50 : 30;  // TV: 100KB batches, Mobile: 60KB batches
+        }
 
         for (int i = 0; i < maxEvents && !targetQueue.isEmpty(); i++) {
             Map<String, Object> event = targetQueue.poll();
             if (event == null) break;
 
-            int eventSize = sizeEstimator != null ? sizeEstimator.estimate(event) : 100;
+            // Use actual 2KB size estimate if no estimator provided
+            int eventSize = sizeEstimator != null ? sizeEstimator.estimate(event) : 2048;
             if (currentSize + eventSize > maxSizeBytes && !batch.isEmpty()) {
                 // Put the event back and break
                 targetQueue.offer(event);

@@ -3,6 +3,7 @@ package com.newrelic.videoagent.core;
 import java.util.Map;
 import android.app.Application;
 import android.content.Context;
+import android.util.Log;
 import androidx.media3.exoplayer.ExoPlayer;
 import com.newrelic.videoagent.core.harvest.HarvestManager;
 import com.newrelic.videoagent.core.harvest.HarvestComponentFactory;
@@ -15,6 +16,8 @@ import com.newrelic.videoagent.core.tracker.NRVideoTracker;
  * Supports ExoPlayer and IMA with automatic device detection
  */
 public final class NRVideo {
+    private static final String TAG = "NRVideo";
+
     private volatile HarvestManager harvestManager;
     private Context applicationContext;
     private NRVideoConfiguration configuration;
@@ -85,10 +88,10 @@ public final class NRVideo {
             app.registerActivityLifecycleCallbacks(lifecycleObserver);
 
             if (configuration.isDebugLoggingEnabled()) {
-                System.out.println("[NRVideo] Lifecycle observer registered with application");
+                Log.d(TAG, "Lifecycle observer registered with application");
             }
         } else {
-            System.err.println("[NRVideo] Warning: Could not register lifecycle observer - context is not Application instance");
+            Log.w(TAG, "Warning: Could not register lifecycle observer - context is not Application instance");
         }
     }
 
@@ -99,7 +102,7 @@ public final class NRVideo {
             return (NRTracker) exoTrackerClass.newInstance();
         } catch (Exception e) {
             if (config.isDebugLoggingEnabled()) {
-                System.err.println("[NRVideo] Failed to create specific tracker, using default: " + e.getMessage());
+                Log.e(TAG, "Failed to create specific tracker, using default: " + e.getMessage());
             }
             // Fallback to basic video tracker
             throw new RuntimeException("Failed to create NRTrackerExoPlayer", e);
@@ -114,7 +117,7 @@ public final class NRVideo {
             return (NRTracker) imaTrackerClass.newInstance();
         } catch (Exception e) {
             if (config.isDebugLoggingEnabled()) {
-                System.err.println("[NRVideo] Failed to create IMA ad tracker: " + e.getMessage());
+                Log.e(TAG, "Failed to create IMA ad tracker: " + e.getMessage());
             }
             return null; // No ad tracking if IMA tracker can't be created
         }

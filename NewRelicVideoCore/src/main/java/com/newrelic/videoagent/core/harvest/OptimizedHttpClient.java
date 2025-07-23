@@ -2,6 +2,7 @@ package com.newrelic.videoagent.core.harvest;
 
 import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.auth.TokenManager;
+import android.util.Log;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -28,6 +29,8 @@ import java.util.zip.GZIPOutputStream;
  * - Connection reuse where possible
  */
 public class OptimizedHttpClient implements HttpClientInterface {
+
+    private static final String TAG = "NRVideo.HttpClient";
 
     private final NRVideoConfiguration configuration;
     private final TokenManager tokenManager;
@@ -94,7 +97,6 @@ public class OptimizedHttpClient implements HttpClientInterface {
 
     private boolean sendEventsWithRetry(List<Map<String, Object>> events) {
         final int maxRetryAttempts = 3;
-
         int attempt = 0;
 
         while (attempt < maxRetryAttempts) {
@@ -106,7 +108,7 @@ public class OptimizedHttpClient implements HttpClientInterface {
                 if (result) {
                     consecutiveFailures.set(0); // Reset on success
                     if (configuration.isDebugLoggingEnabled()) {
-                        System.out.println("[OptimizedHttpClient] Successfully sent " + events.size() + " events on attempt " + (attempt + 1));
+                        Log.d(TAG, "Successfully sent " + events.size() + " events on attempt " + (attempt + 1) + " to " + currentDomain);
                     }
                     return true;
                 }
@@ -116,7 +118,7 @@ public class OptimizedHttpClient implements HttpClientInterface {
             } catch (IOException e) {
                 markDomainFailed();
                 if (configuration.isDebugLoggingEnabled()) {
-                    System.err.println("[OptimizedHttpClient] Attempt " + (attempt + 1) + " failed: " + e.getMessage());
+                    Log.w(TAG, "Attempt " + (attempt + 1) + " failed: " + e.getMessage());
                 }
             }
 
@@ -125,7 +127,7 @@ public class OptimizedHttpClient implements HttpClientInterface {
                 try {
                     long delay = calculateRetryDelay(attempt);
                     if (configuration.isDebugLoggingEnabled()) {
-                        System.out.println("[OptimizedHttpClient] Retrying in " + delay + "ms (attempt " + (attempt + 1) + ")");
+                        Log.d(TAG, "Retrying in " + delay + "ms (attempt " + (attempt + 1) + "/" + maxRetryAttempts + ")");
                     }
                     Thread.sleep(delay);
                 } catch (InterruptedException e) {
@@ -137,7 +139,7 @@ public class OptimizedHttpClient implements HttpClientInterface {
 
         // All immediate retries failed - let HarvestManager handle application-level retries
         if (configuration.isDebugLoggingEnabled()) {
-            System.err.println("[OptimizedHttpClient] All " + maxRetryAttempts + " attempts failed for " + events.size() + " events. Will be queued for retry by HarvestManager.");
+            Log.w(TAG, "All " + maxRetryAttempts + " attempts failed for " + events.size() + " events. Queuing for retry by HarvestManager.");
         }
         return false;
     }
@@ -164,13 +166,13 @@ public class OptimizedHttpClient implements HttpClientInterface {
                 appToken = tokenManager.getAppToken();
                 if (appToken == null) {
                     if (configuration.isDebugLoggingEnabled()) {
-                        System.err.println("[OptimizedHttpClient] Failed to get app token");
+                        Log.e(TAG, "Failed to get app token");
                     }
                     return false;
                 }
             } catch (IOException e) {
                 if (configuration.isDebugLoggingEnabled()) {
-                    System.err.println("[OptimizedHttpClient] Token generation failed: " + e.getMessage());
+                    Log.e(TAG, "Token generation failed", e);
                 }
                 return false;
             }
@@ -210,11 +212,11 @@ public class OptimizedHttpClient implements HttpClientInterface {
                 try {
                     tokenManager.refreshToken();
                     if (configuration.isDebugLoggingEnabled()) {
-                        System.out.println("[OptimizedHttpClient] Token refreshed due to auth failure");
+                        Log.d(TAG, "Token refreshed due to auth failure (response: " + responseCode + ")");
                     }
                 } catch (IOException tokenRefreshError) {
                     if (configuration.isDebugLoggingEnabled()) {
-                        System.err.println("[OptimizedHttpClient] Token refresh failed: " + tokenRefreshError.getMessage());
+                        Log.w(TAG, "Token refresh failed", tokenRefreshError);
                     }
                 }
             }
@@ -355,13 +357,16 @@ public class OptimizedHttpClient implements HttpClientInterface {
                 usingBackupDomains = true;
                 currentBackupIndex.set(0);
                 if (configuration.isDebugLoggingEnabled()) {
-                    System.out.println("[OptimizedHttpClient] Switching to backup domains");
+                    Log.w(TAG, "Circuit breaker activated: switching to backup domains after " + failures + " failures");
                 }
             } else {
                 // Rotate to next backup domain
                 int currentIndex = currentBackupIndex.get();
                 int nextIndex = (currentIndex + 1) % BACKUP_DOMAINS.length;
                 currentBackupIndex.set(nextIndex);
+                if (configuration.isDebugLoggingEnabled()) {
+                    Log.d(TAG, "Rotating to next backup domain: " + BACKUP_DOMAINS[nextIndex]);
+                }
             }
         } else {
             if (!usingBackupDomains) {
@@ -369,6 +374,9 @@ public class OptimizedHttpClient implements HttpClientInterface {
                 int currentIndex = currentPrimaryIndex.get();
                 int nextIndex = (currentIndex + 1) % PRIMARY_DOMAINS.length;
                 currentPrimaryIndex.set(nextIndex);
+                if (configuration.isDebugLoggingEnabled()) {
+                    Log.d(TAG, "Rotating to next primary domain: " + PRIMARY_DOMAINS[nextIndex]);
+                }
             }
         }
     }
@@ -385,7 +393,7 @@ public class OptimizedHttpClient implements HttpClientInterface {
         currentBackupIndex.set(0);
 
         if (configuration.isDebugLoggingEnabled()) {
-            System.out.println("[OptimizedHttpClient] Reset to primary domains");
+            Log.d(TAG, "Circuit breaker reset: returning to primary domains");
         }
     }
 
