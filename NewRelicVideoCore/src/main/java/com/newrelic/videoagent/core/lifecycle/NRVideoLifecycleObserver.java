@@ -9,6 +9,9 @@ import com.newrelic.videoagent.core.harvest.HarvestManager;
 import com.newrelic.videoagent.core.harvest.SchedulerInterface;
 import com.newrelic.videoagent.core.storage.VideoEventStorage;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
+
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -183,14 +186,14 @@ public class NRVideoLifecycleObserver implements Application.ActivityLifecycleCa
         try {
             if (videoEventStorage != null) {
                 // Create emergency crash event
-                java.util.Map<String, Object> emergencyEvent = new java.util.HashMap<>();
+                Map<String, Object> emergencyEvent = new java.util.HashMap<>();
                 emergencyEvent.put("eventType", "EMERGENCY_BACKUP");
                 emergencyEvent.put("reason", reason);
                 emergencyEvent.put("timestamp", System.currentTimeMillis());
                 emergencyEvent.put("deviceType", isAndroidTV ? "TV" : "Mobile");
                 emergencyEvent.put("activeActivities", activeActivities.get());
 
-                java.util.List<java.util.Map<String, Object>> events = new java.util.ArrayList<>();
+                List<Map<String, Object>> events = new java.util.ArrayList<>();
                 events.add(emergencyEvent);
 
                 videoEventStorage.backupFailedEvents(events);
