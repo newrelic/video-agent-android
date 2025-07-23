@@ -2,6 +2,8 @@ package com.newrelic.videoagent.core.storage;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.util.Log;
+import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.harvest.EventBufferInterface;
 import com.newrelic.videoagent.core.harvest.PriorityEventBuffer;
 import com.newrelic.videoagent.core.harvest.SizeEstimator;
@@ -24,6 +26,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class CrashSafeEventBuffer implements EventBufferInterface {
 
+    private static final String TAG = "NRVideo.CrashSafe";
+
     private final PriorityEventBuffer memoryBuffer;
     private final VideoEventStorage storage;
     private final SharedPreferences crashPrefs;
@@ -43,11 +47,13 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
     private volatile boolean isRecovering = false;
     private final AtomicInteger lastEventCount = new AtomicInteger(0);
 
-    public CrashSafeEventBuffer(Context context) {
+    public CrashSafeEventBuffer(Context context, NRVideoConfiguration configuration) {
         this.memoryBuffer = new PriorityEventBuffer();
         this.storage = VideoEventStorage.getInstance(context);
         this.crashPrefs = context.getSharedPreferences(CRASH_PREF_NAME, Context.MODE_PRIVATE);
-        this.isTVDevice = detectTVDevice(context);
+
+        // Use the already detected device type from configuration instead of duplicating detection logic
+        this.isTVDevice = configuration.isTV();
 
         // TV optimization: larger thresholds for better performance
         this.emergencyBackupThreshold = isTVDevice ? 200 : 100;
@@ -137,10 +143,10 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
 
             if (!liveEvents.isEmpty() || !ondemandEvents.isEmpty()) {
                 storage.backupEvents(liveEvents, ondemandEvents);
-                System.out.println("[CrashSafe] Emergency backup: " + (liveEvents.size() + ondemandEvents.size()) + " events saved");
+                Log.d(TAG, "Emergency backup: " + (liveEvents.size() + ondemandEvents.size()) + " events saved");
             }
         } catch (Exception e) {
-            System.err.println("[CrashSafe] Emergency backup failed: " + e.getMessage());
+            Log.e(TAG, "Emergency backup failed: " + e.getMessage(), e);
         }
     }
 
@@ -153,10 +159,10 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
                 storage.backupFailedEvents(failedEvents);
                 if (!isRecovering) {
                     isRecovering = true;
-                    System.out.println("[CrashSafe] Recovery mode enabled for " + failedEvents.size() + " failed events");
+                    Log.d(TAG, "Recovery mode enabled for " + failedEvents.size() + " failed events");
                 }
             } catch (Exception e) {
-                System.err.println("[CrashSafe] Failed to backup events: " + e.getMessage());
+                Log.e(TAG, "Failed to backup events: " + e.getMessage(), e);
             }
         }
     }
@@ -171,7 +177,7 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
             // Previous session didn't end cleanly - likely a crash
             if (storage.hasBackupData()) {
                 isRecovering = true;
-                System.out.println("[CrashSafe] Crash detected - recovery mode enabled");
+                Log.w(TAG, "Crash detected - recovery mode enabled");
             }
         }
     }
@@ -184,18 +190,18 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
             List<Map<String, Object>> recoveryEvents = storage.pollEvents(priority, recoveryBatchSize);
 
             if (!recoveryEvents.isEmpty()) {
-                System.out.println("[CrashSafe] Recovered " + recoveryEvents.size() + " events (" + priority + ")");
+                Log.d(TAG, "Recovered " + recoveryEvents.size() + " events (" + priority + ")");
 
                 // Check if recovery is complete
                 if (storage.isEmpty()) {
                     isRecovering = false;
-                    System.out.println("[CrashSafe] Recovery complete");
+                    Log.i(TAG, "Recovery complete");
                 }
             }
 
             return recoveryEvents;
         } catch (Exception e) {
-            System.err.println("[CrashSafe] Recovery polling failed: " + e.getMessage());
+            Log.e(TAG, "Recovery polling failed: " + e.getMessage(), e);
             return new ArrayList<>();
         }
     }
@@ -219,18 +225,6 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
      */
     private void updateCrashDetectionCounter() {
         crashPrefs.edit().putInt(KEY_LAST_EVENT_COUNT, lastEventCount.get()).apply();
-    }
-
-    /**
-     * Detect TV device for optimization
-     */
-    private boolean detectTVDevice(Context context) {
-        try {
-            return context.getPackageManager().hasSystemFeature("android.software.leanback") ||
-                   !context.getPackageManager().hasSystemFeature("android.hardware.touchscreen");
-        } catch (Exception e) {
-            return false;
-        }
     }
 
     // Helper methods

@@ -27,7 +27,7 @@ public class CrashSafeHarvestFactory extends HarvestComponentFactory {
     @Override
     public EventBufferInterface createEventBuffer() {
         if (crashSafeBuffer == null) {
-            crashSafeBuffer = new CrashSafeEventBuffer(context);
+            crashSafeBuffer = new CrashSafeEventBuffer(context, super.getConfiguration());
         }
         return crashSafeBuffer;
     }
