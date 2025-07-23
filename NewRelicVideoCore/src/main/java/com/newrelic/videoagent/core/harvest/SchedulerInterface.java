@@ -12,6 +12,12 @@ public interface SchedulerInterface {
     void start();
 
     /**
+     * Start a specific harvest task based on buffer type
+     * @param bufferType The type of buffer ("live" or "regular")
+     */
+    void start(String bufferType);
+
+    /**
      * Stop and shutdown the scheduled harvest tasks
      * Should perform immediate harvest before shutdown to prevent data loss
      */

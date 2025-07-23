@@ -8,37 +8,14 @@ The New Relic Video Agent provides crash-safe video analytics for Android Mobile
 ### 1. Add Dependency
 ```gradle
 dependencies {
-    implementation 'com.github.newrelic:video-agent-android:3.0.3'
+    implementation 'com.github.newrelic:video-agent-android:3.1.0' // Make sure to use the latest version
 }
 ```
 
-### 2. Initialize in Application Class
-```java
-public class MyApplication extends Application {
-    @Override
-    public void onCreate() {
-        super.onCreate();
-        
-        // Quick start for mobile apps
-        NRVideo.quickStart("YOUR_APPLICATION_TOKEN", this).start();
-        
-        // OR for TV apps with optimized settings
-        // NRVideo.quickStartTV("YOUR_APPLICATION_TOKEN", this).start();
-    }
-    
-    @Override
-    public void onTrimMemory(int level) {
-        super.onTrimMemory(level);
-        if (level >= TRIM_MEMORY_UI_HIDDEN) {
-            NRVideo.appBackgroundedCurrent(); // Emergency backup
-        }
-    }
-}
-```
-
-### 3. Video Player Integration
+### 2. Initialize in your Video Player Activity/Fragment
 ```java
 public class VideoPlayerActivity extends Activity {
+    private ExoPlayer player;
     private NRVideo nrVideo;
     private Integer trackerId;
     
@@ -46,24 +23,25 @@ public class VideoPlayerActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        // Get the active instance
-        nrVideo = NRVideo.getInstance();
+        // 1. Initialize your ExoPlayer
+        player = new ExoPlayer.Builder(this).build();
         
-        // Start video tracking
-        trackerId = nrVideo.startTracking();
+        // 2. Create a New Relic Video configuration
+        NRVideoConfiguration config = NRVideoConfiguration.forMobile("YOUR_APPLICATION_TOKEN");
         
-        // Get tracker for video events
-        NRVideoTracker tracker = nrVideo.getContentTracker();
-        if (tracker != null) {
-            tracker.sendStart(); // Video started
-        }
+        // 3. Set up the New Relic Video agent
+        nrVideo = new NRVideo();
+        trackerId = nrVideo.setUP(player, getApplicationContext(), config);
+        
+        // Now the agent will automatically track video events from the player.
     }
     
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (nrVideo != null) {
-            nrVideo.stopTracking();
+        // Clean up the player
+        if (player != null) {
+            player.release();
         }
     }
 }
@@ -96,20 +74,25 @@ NRVideoConfiguration config = NRVideoConfiguration.forTV("YOUR_TOKEN");
 ### Custom Configuration
 ```java
 NRVideoConfiguration config = new NRVideoConfiguration.Builder("YOUR_TOKEN")
-    .region("EU")                    // US or EU
     .harvestCycle(60)               // Regular harvest interval
     .liveHarvestCycle(30)           // Live content harvest interval
     .maxBatchSize(8192)             // 8KB batches
     .maxDeadLetterSize(500)         // Failed events queue size
-    .enableDebugLogging(true)       // Debug output
+    .enableDebugLogging()           // Debug output
     .memoryOptimized(true)          // Memory optimization
     .build();
 
-NRVideo nrVideo = new NRVideoSetup()
-    .withApplicationToken("YOUR_TOKEN")
-    .withCrashSafety(true)          // Enable crash-safe storage
-    .build(context)
-    .start();
+// Initialize with custom configuration
+nrVideo = new NRVideo();
+trackerId = nrVideo.setUP(player, getApplicationContext(), config);
+```
+
+### Auto-Optimized Configuration
+```java
+// Automatically detects device type and applies optimal settings
+NRVideoConfiguration config = NRVideoConfiguration.createOptimal("YOUR_TOKEN", getApplicationContext());
+nrVideo = new NRVideo();
+trackerId = nrVideo.setUP(player, getApplicationContext(), config);
 ```
 
 ## Event Types & Usage
@@ -130,7 +113,14 @@ attributes.put("videoTitle", "My Video");
 attributes.put("duration", 3600);
 attributes.put("quality", "1080p");
 
-nrVideo.recordCustomEvent("VIDEO_QUALITY_CHANGE", attributes);
+// Use the nrVideo instance to record custom events
+nrVideo.recordEvent("VIDEO_QUALITY_CHANGE", attributes);
+```
+
+### Setting User ID
+```java
+// Set user ID for all trackers
+nrVideo.setUserId("user123");
 ```
 
 ## Memory & Storage Size Analysis
@@ -258,15 +248,8 @@ boolean isTV = context.getPackageManager()
 ### Debug Logging
 ```java
 NRVideoConfiguration config = new NRVideoConfiguration.Builder("YOUR_TOKEN")
-    .enableDebugLogging(true)
+    .enableDebugLogging()
     .build();
-```
-
-### Recovery Statistics
-```java
-NRVideo nrVideo = NRVideo.getInstance();
-System.out.println("Usage stats: " + nrVideo.getUsageStats());
-System.out.println("Is recovering: " + nrVideo.isRecovering());
 ```
 
 ### Common Issues
@@ -276,7 +259,7 @@ System.out.println("Is recovering: " + nrVideo.isRecovering());
    - Verify crash safety is working (events should not accumulate)
 
 2. **Missing Events**
-   - Ensure app lifecycle callbacks are implemented
+   - Ensure you are calling `nrVideo.setUP()` with the correct player instance
    - Check network connectivity during video sessions
 
 3. **Database Growth**
@@ -286,19 +269,22 @@ System.out.println("Is recovering: " + nrVideo.isRecovering());
 ## Migration from Older Versions
 
 ### From Legacy Setup
-```java
-// OLD (deprecated)
-NRVideo video = new NRVideoSetup()
-    .withLicenseKey("token")
-    .build(); // No crash safety
+If you were using deprecated methods, the new setup is simpler.
 
-// NEW (recommended)  
-NRVideo video = NRVideo.quickStart("token", context).start();
+**OLD (deprecated):**
+```java
+// These methods don't exist in the current implementation
+NRVideo.quickStart("token", context).start();
+NRVideo nrVideo = NRVideo.getInstance();
+nrVideo.startTracking();
 ```
 
-### Gradual Rollout
-1. **Phase 1**: Deploy with crash safety disabled for testing
-2. **Phase 2**: Enable crash safety for subset of users
-3. **Phase 3**: Full rollout with crash safety enabled
+**NEW (recommended):**
+```java
+// In your video player Activity/Fragment
+NRVideoConfiguration config = NRVideoConfiguration.forMobile("YOUR_APPLICATION_TOKEN");
+NRVideo nrVideo = new NRVideo();
+nrVideo.setUP(player, getApplicationContext(), config);
+```
 
-The agent provides backward compatibility while offering modern crash-safe analytics optimized for both Android Mobile & TV platforms.
+The agent provides modern crash-safe analytics optimized for both Android Mobile & TV platforms.

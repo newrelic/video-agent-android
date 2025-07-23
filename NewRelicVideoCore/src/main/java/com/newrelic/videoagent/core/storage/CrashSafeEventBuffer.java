@@ -19,6 +19,7 @@ import java.util.Map;
  * - SQLite backup only on app kill/crash or retry exhaustion
  * - TV-optimized with larger buffers and background persistence
  * - Zero performance impact during normal operation
+ * - Enhanced capacity monitoring for scheduler startup
  */
 public class CrashSafeEventBuffer implements EventBufferInterface {
 
@@ -30,6 +31,7 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
     // TV vs Mobile optimization
     private final int emergencyBackupThreshold;
     private final int recoveryBatchSize;
+    private final int maxCapacity;
 
     // Crash detection
     private static final String CRASH_PREF_NAME = "nr_video_crash_detection";
@@ -49,6 +51,7 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
         // TV optimization: larger thresholds for better performance
         this.emergencyBackupThreshold = isTVDevice ? 200 : 100;
         this.recoveryBatchSize = isTVDevice ? 50 : 20;
+        this.maxCapacity = isTVDevice ? 2000 : 1000;
 
         // Check for crash recovery on startup
         checkCrashRecovery();
@@ -58,6 +61,21 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
     @Override
     public void setOverflowCallback(OverflowCallback callback) {
         memoryBuffer.setOverflowCallback(callback);
+    }
+
+    @Override
+    public void setCapacityCallback(CapacityCallback callback) {
+        memoryBuffer.setCapacityCallback(callback);
+    }
+
+    @Override
+    public int getMaxCapacity() {
+        return maxCapacity;
+    }
+
+    @Override
+    public boolean hasReachedCapacityThreshold(double threshold) {
+        return memoryBuffer.hasReachedCapacityThreshold(threshold);
     }
 
     @Override
@@ -74,14 +92,12 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
 
     @Override
     public List<Map<String, Object>> pollBatchByPriority(int maxSizeBytes, SizeEstimator sizeEstimator, String priority) {
-        List<Map<String, Object>> batch = new ArrayList<>();
-
         // Primary: get events from memory (normal operation)
-        batch.addAll(memoryBuffer.pollBatchByPriority(maxSizeBytes, sizeEstimator, priority));
+        List<Map<String, Object>> batch = new ArrayList<>(memoryBuffer.pollBatchByPriority(maxSizeBytes, sizeEstimator, priority));
 
         // Recovery: gradually mix in backup events if recovering from crash
         if (isRecovering && batch.size() < getOptimalBatchSize(priority)) {
-            batch.addAll(pollRecoveryEvents(maxSizeBytes - getBatchSize(batch, sizeEstimator), priority));
+            batch.addAll(pollRecoveryEvents(priority));
         }
 
         return batch;
@@ -162,7 +178,7 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
     /**
      * Poll recovery events in small batches
      */
-    private List<Map<String, Object>> pollRecoveryEvents(int maxSizeBytes, String priority) {
+    private List<Map<String, Object>> pollRecoveryEvents(String priority) {
         try {
             List<Map<String, Object>> recoveryEvents = storage.pollEvents(priority, recoveryBatchSize);
 
@@ -222,16 +238,6 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
         return isTVDevice ? baseSize * 2 : baseSize; // TV can handle larger batches
     }
 
-    private int getBatchSize(List<Map<String, Object>> batch, SizeEstimator sizeEstimator) {
-        if (sizeEstimator == null) return batch.size() * 100;
-
-        int totalSize = 0;
-        for (Map<String, Object> event : batch) {
-            totalSize += sizeEstimator.estimate(event);
-        }
-        return totalSize;
-    }
-
     /**
      * Get recovery statistics
      */
@@ -259,7 +265,7 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
 
         @Override
         public String toString() {
-            return String.format("Recovery{recovering=%s, backup=%d, memory=%d, tv=%s}",
+            return String.format(java.util.Locale.US, "Recovery{recovering=%s, backup=%d, memory=%d, tv=%s}",
                                isRecovering, backupEvents, memoryEvents, isTVDevice);
         }
     }

@@ -17,14 +17,15 @@ public class MultiTaskHarvestScheduler implements SchedulerInterface {
     private final Runnable liveHarvestTask;
     private final int regularIntervalMs;
     private final int liveIntervalMs;
-    private final AtomicBoolean isRunning = new AtomicBoolean(false);
+    private final AtomicBoolean isRegularRunning = new AtomicBoolean(false);
+    private final AtomicBoolean isLiveRunning = new AtomicBoolean(false);
     private final boolean isAndroidTVDevice;
 
     // Runnable wrappers for self-scheduling
     private final Runnable regularHarvestRunnable = new Runnable() {
         @Override
         public void run() {
-            if (isRunning.get() && regularHarvestTask != null) {
+            if (isRegularRunning.get() && regularHarvestTask != null) {
                 regularHarvestTask.run();
                 // Re-schedule next execution
                 backgroundHandler.postDelayed(this, regularIntervalMs);
@@ -35,7 +36,7 @@ public class MultiTaskHarvestScheduler implements SchedulerInterface {
     private final Runnable liveHarvestRunnable = new Runnable() {
         @Override
         public void run() {
-            if (isRunning.get() && liveHarvestTask != null) {
+            if (isLiveRunning.get() && liveHarvestTask != null) {
                 liveHarvestTask.run();
                 // Re-schedule next execution
                 backgroundHandler.postDelayed(this, liveIntervalMs);
@@ -203,18 +204,29 @@ public class MultiTaskHarvestScheduler implements SchedulerInterface {
 
     @Override
     public void start() {
-        if (isRunning.compareAndSet(false, true)) {
-            // Start regular harvest with short initial delay (Android-optimized)
-            backgroundHandler.postDelayed(regularHarvestRunnable, 5000); // 5 seconds
+        start("regular");
+        start("live");
+    }
 
-            // Start live harvest with even shorter delay
-            backgroundHandler.postDelayed(liveHarvestRunnable, 2000); // 2 seconds
+    @Override
+    public void start(String bufferType) {
+        if ("live".equals(bufferType)) {
+            if (isLiveRunning.compareAndSet(false, true)) {
+                backgroundHandler.postDelayed(liveHarvestRunnable, 2000); // 2 seconds
+            }
+        } else { // "regular" or "ondemand"
+            if (isRegularRunning.compareAndSet(false, true)) {
+                backgroundHandler.postDelayed(regularHarvestRunnable, 5000); // 5 seconds
+            }
         }
     }
 
     @Override
     public void shutdown() {
-        if (isRunning.compareAndSet(true, false)) {
+        boolean wasRegularRunning = isRegularRunning.getAndSet(false);
+        boolean wasLiveRunning = isLiveRunning.getAndSet(false);
+
+        if (wasRegularRunning || wasLiveRunning) {
             // CRITICAL: Harvest remaining events immediately before shutdown
             immediateHarvestAll();
 
@@ -265,8 +277,10 @@ public class MultiTaskHarvestScheduler implements SchedulerInterface {
             immediateHarvestAll();
 
             // Resume with longer intervals (TV-optimized for pause state)
-            if (isRunning.get()) {
+            if (isRegularRunning.get()) {
                 backgroundHandler.postDelayed(regularHarvestRunnable, regularIntervalMs * 2); // Double interval
+            }
+            if (isLiveRunning.get()) {
                 backgroundHandler.postDelayed(liveHarvestRunnable, liveIntervalMs * 2);       // Double interval
             }
         } else {
@@ -280,12 +294,14 @@ public class MultiTaskHarvestScheduler implements SchedulerInterface {
     @Override
     public void onAppForegrounded() {
         // Resume normal scheduling - works for both mobile and TV
-        if (isRunning.get()) {
-            backgroundHandler.removeCallbacks(regularHarvestRunnable); // Clear any existing scheduled tasks
-            backgroundHandler.removeCallbacks(liveHarvestRunnable);
+        backgroundHandler.removeCallbacks(regularHarvestRunnable); // Clear any existing scheduled tasks
+        backgroundHandler.removeCallbacks(liveHarvestRunnable);
 
-            // Resume with normal intervals
+        // Resume with normal intervals
+        if (isRegularRunning.get()) {
             backgroundHandler.postDelayed(regularHarvestRunnable, 1000); // Resume in 1 second
+        }
+        if (isLiveRunning.get()) {
             backgroundHandler.postDelayed(liveHarvestRunnable, 500);     // Resume in 0.5 seconds
         }
     }
@@ -297,6 +313,6 @@ public class MultiTaskHarvestScheduler implements SchedulerInterface {
 
     @Override
     public boolean isRunning() {
-        return isRunning.get();
+        return isRegularRunning.get() || isLiveRunning.get();
     }
 }

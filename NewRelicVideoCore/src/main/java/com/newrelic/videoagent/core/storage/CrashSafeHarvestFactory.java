@@ -50,7 +50,12 @@ public class CrashSafeHarvestFactory extends HarvestComponentFactory {
         if (integratedHandler == null && crashSafeBuffer != null) {
             EventBufferInterface deadLetterQueue = createDeadLetterQueue();
             integratedHandler = new IntegratedDeadLetterHandler(
-                deadLetterQueue, crashSafeBuffer, httpClient, getConfiguration());
+                deadLetterQueue,
+                crashSafeBuffer,
+                httpClient,
+                getConfiguration(),
+                context  // Added missing context parameter
+            );
         }
         return integratedHandler;
     }

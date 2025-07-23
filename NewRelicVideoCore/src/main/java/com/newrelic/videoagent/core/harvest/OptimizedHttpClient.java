@@ -7,6 +7,7 @@ import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.List;
@@ -30,7 +31,6 @@ public class OptimizedHttpClient implements HttpClientInterface {
 
     private final NRVideoConfiguration configuration;
     private final TokenManager tokenManager;
-    private DeadLetterHandler deadLetterHandler;
 
     // Domain resilience - integrated from ApiDomainSelector
     private static final String[] PRIMARY_DOMAINS = {
@@ -51,16 +51,16 @@ public class OptimizedHttpClient implements HttpClientInterface {
     private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
     private volatile boolean usingBackupDomains = false;
 
-    // Mobile/TV optimized timeouts and retry settings
+    // Mobile/TV optimized timeouts
     private int connectionTimeoutMs = 8000;
     private int readTimeoutMs = 12000;
-    private final int maxRetryAttempts = 3;
-    private final long baseRetryDelayMs = 1000;
-    private final long maxRetryDelayMs = 30000;
 
     // Circuit breaker settings
     private static final int MAX_CONSECUTIVE_FAILURES = 3;
     private static final long CIRCUIT_BREAKER_TIMEOUT = 300000; // 5 minutes
+
+    // UTF-8 charset constant for API 16+ compatibility
+    private static final String UTF_8 = "UTF-8";
 
     public OptimizedHttpClient(NRVideoConfiguration configuration, android.content.Context context) {
         this.configuration = configuration;
@@ -77,10 +77,6 @@ public class OptimizedHttpClient implements HttpClientInterface {
         System.setProperty("http.maxConnections", "5");
     }
 
-    public void setDeadLetterHandler(DeadLetterHandler deadLetterHandler) {
-        this.deadLetterHandler = deadLetterHandler;
-    }
-
     @Override
     public boolean sendEvents(List<Map<String, Object>> events, String endpointType) {
         if (events == null || events.isEmpty()) {
@@ -92,43 +88,46 @@ public class OptimizedHttpClient implements HttpClientInterface {
             resetToPrimary();
         }
 
-        // Attempt to send with domain failover
-        boolean success = sendEventsWithDomainFailover(events, endpointType);
-
-        if (!success && deadLetterHandler != null) {
-            deadLetterHandler.handleFailedEvents(events, endpointType);
-        }
-
-        return success;
+        // Attempt to send with domain failover and immediate retries
+        return sendEventsWithRetry(events, endpointType);
     }
 
-    private boolean sendEventsWithDomainFailover(List<Map<String, Object>> events, String endpointType) {
+    private boolean sendEventsWithRetry(List<Map<String, Object>> events, String endpointType) {
+        final int maxRetryAttempts = 3;
+
         int attempt = 0;
-        String currentDomain = null;
 
         while (attempt < maxRetryAttempts) {
             try {
-                currentDomain = selectOptimalDomain();
+                String currentDomain = selectOptimalDomain();
                 String endpoint = buildEndpointUrl(currentDomain);
 
                 boolean result = performHttpRequest(events, endpoint);
                 if (result) {
                     consecutiveFailures.set(0); // Reset on success
+                    if (configuration.isDebugLoggingEnabled()) {
+                        System.out.println("[OptimizedHttpClient] Successfully sent " + events.size() + " events on attempt " + (attempt + 1));
+                    }
                     return true;
                 }
 
-                markDomainFailed(currentDomain);
+                markDomainFailed();
 
             } catch (IOException e) {
-                if (currentDomain != null) {
-                    markDomainFailed(currentDomain);
+                markDomainFailed();
+                if (configuration.isDebugLoggingEnabled()) {
+                    System.err.println("[OptimizedHttpClient] Attempt " + (attempt + 1) + " failed: " + e.getMessage());
                 }
             }
 
             attempt++;
             if (attempt < maxRetryAttempts) {
                 try {
-                    Thread.sleep(calculateRetryDelay(attempt));
+                    long delay = calculateRetryDelay(attempt);
+                    if (configuration.isDebugLoggingEnabled()) {
+                        System.out.println("[OptimizedHttpClient] Retrying in " + delay + "ms (attempt " + (attempt + 1) + ")");
+                    }
+                    Thread.sleep(delay);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
@@ -136,6 +135,10 @@ public class OptimizedHttpClient implements HttpClientInterface {
             }
         }
 
+        // All immediate retries failed - let HarvestManager handle application-level retries
+        if (configuration.isDebugLoggingEnabled()) {
+            System.err.println("[OptimizedHttpClient] All " + maxRetryAttempts + " attempts failed for " + events.size() + " events. Will be queued for retry by HarvestManager.");
+        }
         return false;
     }
 
@@ -222,6 +225,7 @@ public class OptimizedHttpClient implements HttpClientInterface {
                     if (responseStream != null) {
                         // Optimized response draining with larger buffer
                         byte[] buffer = new byte[4096]; // Larger buffer for better performance
+                        //noinspection StatementWithEmptyBody
                         while (responseStream.read(buffer) != -1) {
                             // Discard response data to enable connection reuse
                         }
@@ -231,9 +235,8 @@ public class OptimizedHttpClient implements HttpClientInterface {
 
             return success;
 
-        } finally {
-            // Don't call disconnect() immediately to allow connection reuse
-            // The connection will be closed automatically after keep-alive timeout
+        } catch (Exception e) {
+            throw new IOException("Request failed: " + e.getMessage(), e);
         }
     }
 
@@ -242,63 +245,71 @@ public class OptimizedHttpClient implements HttpClientInterface {
      * This saves memory and is faster for large event batches
      */
     private void streamJsonToOutputStream(List<Map<String, Object>> events, OutputStream outputStream) throws IOException {
-        byte[] openBracket = "[".getBytes("UTF-8");
-        byte[] closeBracket = "]".getBytes("UTF-8");
-        byte[] comma = ",".getBytes("UTF-8");
+        try {
+            byte[] openBracket = "[".getBytes(UTF_8);
+            byte[] closeBracket = "]".getBytes(UTF_8);
+            byte[] comma = ",".getBytes(UTF_8);
 
-        outputStream.write(openBracket);
+            outputStream.write(openBracket);
 
-        for (int i = 0; i < events.size(); i++) {
-            if (i > 0) {
-                outputStream.write(comma);
+            for (int i = 0; i < events.size(); i++) {
+                if (i > 0) {
+                    outputStream.write(comma);
+                }
+                streamMapToOutputStream(events.get(i), outputStream);
             }
-            streamMapToOutputStream(events.get(i), outputStream);
-        }
 
-        outputStream.write(closeBracket);
+            outputStream.write(closeBracket);
+        } catch (UnsupportedEncodingException e) {
+            throw new IOException("UTF-8 encoding not supported", e);
+        }
     }
 
     /**
      * Stream individual map to OutputStream as JSON
      */
     private void streamMapToOutputStream(Map<String, Object> map, OutputStream outputStream) throws IOException {
-        byte[] openBrace = "{".getBytes("UTF-8");
-        byte[] closeBrace = "}".getBytes("UTF-8");
-        byte[] comma = ",".getBytes("UTF-8");
-        byte[] colon = ":".getBytes("UTF-8");
-        byte[] quote = "\"".getBytes("UTF-8");
+        try {
+            byte[] openBrace = "{".getBytes(UTF_8);
+            byte[] closeBrace = "}".getBytes(UTF_8);
+            byte[] comma = ",".getBytes(UTF_8);
+            byte[] colon = ":".getBytes(UTF_8);
+            byte[] quote = "\"".getBytes(UTF_8);
 
-        outputStream.write(openBrace);
+            outputStream.write(openBrace);
 
-        boolean first = true;
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            if (!first) {
-                outputStream.write(comma);
+            boolean first = true;
+            for (Map.Entry<String, Object> entry : map.entrySet()) {
+                if (!first) {
+                    outputStream.write(comma);
+                }
+
+                // Write key
+                outputStream.write(quote);
+                outputStream.write(escapeJsonString(entry.getKey()).getBytes(UTF_8));
+                outputStream.write(quote);
+                outputStream.write(colon);
+
+                // Write value
+                Object value = entry.getValue();
+                if (value instanceof String) {
+                    outputStream.write(quote);
+                    outputStream.write(escapeJsonString((String) value).getBytes(UTF_8));
+                    outputStream.write(quote);
+                } else if (value instanceof Number || value instanceof Boolean) {
+                    outputStream.write(value.toString().getBytes(UTF_8));
+                } else {
+                    outputStream.write(quote);
+                    outputStream.write(escapeJsonString(value != null ? value.toString() : "null").getBytes(UTF_8));
+                    outputStream.write(quote);
+                }
+                first = false;
             }
 
-            // Write key
-            outputStream.write(quote);
-            outputStream.write(escapeJsonString(entry.getKey()).getBytes("UTF-8"));
-            outputStream.write(quote);
-            outputStream.write(colon);
-
-            // Write value
-            Object value = entry.getValue();
-            if (value instanceof String) {
-                outputStream.write(quote);
-                outputStream.write(escapeJsonString((String) value).getBytes("UTF-8"));
-                outputStream.write(quote);
-            } else if (value instanceof Number || value instanceof Boolean) {
-                outputStream.write(value.toString().getBytes("UTF-8"));
-            } else {
-                outputStream.write(quote);
-                outputStream.write(escapeJsonString(value != null ? value.toString() : "null").getBytes("UTF-8"));
-                outputStream.write(quote);
-            }
-            first = false;
+            outputStream.write(closeBrace);
+        } catch (UnsupportedEncodingException e) {
+            throw new IOException("UTF-8 encoding not supported", e);
         }
-
-        outputStream.write(closeBrace);
     }
 
     private String selectOptimalDomain() {
@@ -335,7 +346,7 @@ public class OptimizedHttpClient implements HttpClientInterface {
         return "https://" + domain + "/mobile/v1/events";
     }
 
-    private void markDomainFailed(String failedDomain) {
+    private void markDomainFailed() {
         int failures = consecutiveFailures.incrementAndGet();
         lastFailureTime.set(System.currentTimeMillis());
 
@@ -379,6 +390,9 @@ public class OptimizedHttpClient implements HttpClientInterface {
     }
 
     private long calculateRetryDelay(int attempt) {
+        final long baseRetryDelayMs = 1000;
+        final long maxRetryDelayMs = 30000;
+
         long exponentialDelay = baseRetryDelayMs * (1L << attempt);
         double jitter = 0.1 + (Math.random() * 0.1);
         long delayWithJitter = (long) (exponentialDelay * (1 + jitter));

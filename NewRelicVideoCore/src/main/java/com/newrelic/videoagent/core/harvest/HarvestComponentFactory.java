@@ -62,4 +62,11 @@ public class HarvestComponentFactory {
     public NRVideoConfiguration getConfiguration() {
         return configuration;
     }
+
+    /**
+     * Gets the context for other components
+     */
+    public android.content.Context getContext() {
+        return context;
+    }
 }

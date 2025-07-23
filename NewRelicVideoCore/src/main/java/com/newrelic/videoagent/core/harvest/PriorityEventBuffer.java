@@ -27,8 +27,9 @@ public class PriorityEventBuffer implements EventBufferInterface {
     private static final int MAX_LIVE_EVENTS = 1000;      // Smaller buffer for immediate processing
     private static final int MAX_ONDEMAND_EVENTS = 3000;  // Larger buffer for batch processing
 
-    // Use interface callback instead of custom one
+    // Enhanced callback support
     private OverflowCallback overflowCallback;
+    private CapacityCallback capacityCallback;
 
     /**
      * Set overflow callback for immediate harvest when buffer is getting full
@@ -46,6 +47,7 @@ public class PriorityEventBuffer implements EventBufferInterface {
         // Check if this is a live streaming event
         boolean isLiveContent = isLiveStreamingEvent(event);
         boolean shouldTriggerHarvest = false;
+        boolean shouldTriggerCapacityCallback = false;
         String harvestType = null;
 
         // Get the target queue and last action tracker for this event
@@ -67,8 +69,16 @@ public class PriorityEventBuffer implements EventBufferInterface {
             lastActionTracker.set(actionName);
         }
 
-        // Check if we should trigger harvest AFTER the event is added
-        if (targetQueue.size() >= (maxCapacity * 0.9)) {
+        // Check capacity thresholds AFTER the event is added
+        double currentCapacity = (double) targetQueue.size() / maxCapacity;
+
+        // Check for 60% threshold (scheduler startup)
+        if (currentCapacity >= 0.6 && capacityCallback != null) {
+            shouldTriggerCapacityCallback = true;
+        }
+
+        // Check for 90% threshold (overflow prevention)
+        if (currentCapacity >= 0.9) {
             shouldTriggerHarvest = true;
             harvestType = isLiveContent ? "live" : "ondemand";
         }
@@ -76,16 +86,16 @@ public class PriorityEventBuffer implements EventBufferInterface {
         // Fallback: if we somehow still reach max capacity, remove oldest events
         while (liveEvents.size() > MAX_LIVE_EVENTS) {
             liveEvents.poll();
-            // Note: We don't update lastActionTracker here since we don't know what was removed
-            // This is acceptable since the tracker is for optimization, not correctness
         }
         while (ondemandEvents.size() > MAX_ONDEMAND_EVENTS) {
             ondemandEvents.poll();
-            // Note: We don't update lastActionTracker here since we don't know what was removed
         }
 
-        // IMPORTANT: Call harvest callback AFTER all queue operations are complete
-        // This prevents race condition between offer() and poll() operations
+        // IMPORTANT: Call callbacks AFTER all queue operations are complete
+        if (shouldTriggerCapacityCallback) {
+            capacityCallback.onCapacityThresholdReached(currentCapacity, isLiveContent ? "live" : "ondemand");
+        }
+
         if (shouldTriggerHarvest && overflowCallback != null) {
             overflowCallback.onBufferNearFull(harvestType);
         }
@@ -226,5 +236,22 @@ public class PriorityEventBuffer implements EventBufferInterface {
 
         // Default to on-demand if not explicitly marked as live
         return false;
+    }
+
+    @Override
+    public int getMaxCapacity() {
+        return MAX_LIVE_EVENTS + MAX_ONDEMAND_EVENTS;
+    }
+
+    @Override
+    public boolean hasReachedCapacityThreshold(double threshold) {
+        int totalEvents = liveEvents.size() + ondemandEvents.size();
+        double currentCapacity = (double) totalEvents / getMaxCapacity();
+        return currentCapacity >= threshold;
+    }
+
+    @Override
+    public void setCapacityCallback(CapacityCallback callback) {
+        this.capacityCallback = callback;
     }
 }

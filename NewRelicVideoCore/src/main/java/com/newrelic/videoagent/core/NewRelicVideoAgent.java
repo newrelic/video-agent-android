@@ -141,7 +141,9 @@ public class NewRelicVideoAgent {
      * Set userId.
      *
      * @param userId User Id.
+     * @deprecated Please use {@link NRVideo#setUserId(String)}
      */
+    @Deprecated
     public void setUserId(String userId) {
         for (Integer trackerId : trackerPairs.keySet()) {
             NRTrackerPair pair = trackerPairs.get(trackerId);
@@ -150,6 +152,101 @@ public class NewRelicVideoAgent {
             }
             if (pair.getSecond() != null) {
                 pair.getSecond().setAttribute("enduser.id", userId);
+            }
+        }
+    }
+
+    /**
+     * Sets an attribute for a specific tracker.
+     *
+     * @param trackerId The tracker ID.
+     * @param key The attribute key.
+     * @param value The attribute value.
+     * @param action The action name to associate with the attribute.
+     */
+    public void setAttribute(Integer trackerId, String key, Object value, String action) {
+        NRTracker contentTracker = getContentTracker(trackerId);
+        if (contentTracker != null) {
+            contentTracker.setAttribute(key, value, action);
+        }
+    }
+
+    /**
+     * Sets an ad attribute for a specific tracker.
+     *
+     * @param trackerId The tracker ID.
+     * @param key The attribute key.
+     * @param value The attribute value.
+     * @param action The action name to associate with the attribute.
+     */
+    public void setAdAttribute(Integer trackerId, String key, Object value, String action) {
+        NRTracker adTracker = getAdTracker(trackerId);
+        if (adTracker != null) {
+            adTracker.setAttribute(key, value, action);
+        }
+    }
+
+    /**
+     * Sets a global attribute.
+     *
+     * @param key The attribute key.
+     * @param value The attribute value.
+     * @param action The action name to associate with the attribute.
+     */
+    public void setGlobalAttribute(String key, Object value, String action) {
+        for (Integer trackerId : trackerPairs.keySet()) {
+            NRTrackerPair pair = trackerPairs.get(trackerId);
+            if (pair.getFirst() != null) {
+                pair.getFirst().setAttribute(key, value, action);
+            }
+            if (pair.getSecond() != null) {
+                pair.getSecond().setAttribute(key, value, action);
+            }
+        }
+    }
+
+    /**
+     * Sets an attribute for a specific tracker.
+     *
+     * @param trackerId The tracker ID.
+     * @param key The attribute key.
+     * @param value The attribute value.
+     */
+    public void setAttribute(Integer trackerId, String key, Object value) {
+        NRTracker contentTracker = getContentTracker(trackerId);
+        if (contentTracker != null) {
+            contentTracker.setAttribute(key, value);
+        }
+    }
+
+    /**
+     * Sets an ad attribute for a specific tracker.
+     *
+     * @param trackerId The tracker ID.
+     * @param key The attribute key.
+     * @param value The attribute value.
+     */
+    public void setAdAttribute(Integer trackerId, String key, Object value) {
+        NRTracker adTracker = getAdTracker(trackerId);
+        if (adTracker != null) {
+            adTracker.setAttribute(key, value);
+        }
+    }
+
+    /**
+     * Sets a global attribute.
+     *
+     * @param key The attribute key.
+     * @param value The attribute value.
+     */
+    public void setGlobalAttribute(String key, Object value) {
+        for (Integer trackerId : trackerPairs.keySet()) {
+            NRTrackerPair pair = trackerPairs.get(trackerId);
+            if (pair.getFirst() != null) {
+                pair.getFirst().setAttribute(key, value);
+            }
+            if (pair.getSecond() != null) {
+                pair.getSecond().setAttribute(key, value);
             }
         }
     }

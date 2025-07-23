@@ -19,6 +19,7 @@ public final class NRVideoConfiguration {
     private final boolean memoryOptimized;
     private final boolean debugLoggingEnabled;
     private final boolean enableCrashSafety;
+    private final boolean isTV;
 
     private NRVideoConfiguration(Builder builder) {
         this.applicationToken = builder.applicationToken;
@@ -32,6 +33,7 @@ public final class NRVideoConfiguration {
         this.memoryOptimized = builder.memoryOptimized;
         this.debugLoggingEnabled = builder.debugLoggingEnabled;
         this.enableCrashSafety = builder.enableCrashSafety;
+        this.isTV = builder.isTV;
     }
 
     // Getters
@@ -47,6 +49,16 @@ public final class NRVideoConfiguration {
     public boolean isDebugLoggingEnabled() { return debugLoggingEnabled; }
     public boolean isCrashSafety() {
         return enableCrashSafety;
+    }
+    public boolean isTV() { return isTV; }
+
+    /**
+     * Get dead letter retry interval in milliseconds
+     * Default retry interval for failed events
+     */
+    public long getDeadLetterRetryInterval() {
+        // Base retry interval - 60 seconds for video streaming scenarios
+        return 60000L;
     }
 
     private String identifyRegion() {
@@ -87,6 +99,7 @@ public final class NRVideoConfiguration {
         private boolean memoryOptimized = true;
         private boolean debugLoggingEnabled = false;
         private boolean enableCrashSafety = true; // Always enabled for crash safety
+        private boolean isTV = false;
 
         public Builder(String applicationToken) {
             if (applicationToken == null || applicationToken.trim().isEmpty()) {
@@ -139,6 +152,11 @@ public final class NRVideoConfiguration {
             return this;
         }
 
+        private Builder isTV(boolean isTV) {
+            this.isTV = isTV;
+            return this;
+        }
+
         public NRVideoConfiguration build() {
             return new NRVideoConfiguration(this);
         }
@@ -148,7 +166,7 @@ public final class NRVideoConfiguration {
          */
         public NRVideoConfiguration buildOptimal(Context context) {
             // Auto-detect device type and apply optimal settings
-            boolean isTV = detectTVDevice(context);
+            this.isTV = detectTVDevice(context);
 
             // Apply device-specific optimizations
             if (isTV) {
@@ -225,6 +243,7 @@ public final class NRVideoConfiguration {
             .maxBatchSize(16384)        // 16KB batches for TV
             .maxDeadLetterSize(1000)    // Larger dead letter queue for TV
             .memoryOptimized(false)     // TV has more memory available
+            .isTV(true)
             .build();
     }
 
@@ -238,6 +257,7 @@ public final class NRVideoConfiguration {
             .maxBatchSize(4096)         // Smaller 4KB batches
             .maxDeadLetterSize(200)     // Minimal dead letter queue
             .memoryOptimized(true)      // Aggressive memory optimization
+            .isTV(false)
             .build();
     }
 }

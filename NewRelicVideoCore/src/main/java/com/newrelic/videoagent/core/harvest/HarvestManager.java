@@ -3,25 +3,28 @@ package com.newrelic.videoagent.core.harvest;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
-import com.newrelic.videoagent.core.NRVideoConfiguration;
+import java.util.Locale;
 import com.newrelic.videoagent.core.storage.CrashSafeHarvestFactory;
 import com.newrelic.videoagent.core.storage.IntegratedDeadLetterHandler;
+import com.newrelic.videoagent.core.storage.CrashSafeEventBuffer;
+import com.newrelic.videoagent.core.lifecycle.NRVideoLifecycleObserver;
 
 /**
  * Enhanced HarvestManager with integrated crash-safe storage
  * - Seamless integration with crash detection and recovery
  * - TV-optimized performance with automatic app lifecycle handling
  * - Zero performance impact during normal operation
+ * - Proper 60% capacity threshold scheduler startup
+ * - Integrated lifecycle management
  */
-public class HarvestManager {
+public class HarvestManager implements EventBufferInterface.CapacityCallback, NRVideoLifecycleObserver.LifecycleListener {
 
     private final EventBufferInterface eventBuffer;
     private final SchedulerInterface scheduler;
     private final HttpClientInterface httpClient;
     private final IntegratedDeadLetterHandler deadLetterHandler;
     private final CrashSafeHarvestFactory factory;
-    private volatile boolean schedulerStarted = false;
-    private final Object schedulerLock = new Object();
+    private final NRVideoLifecycleObserver lifecycleObserver;
 
     public HarvestManager(HarvestComponentFactory factory) {
         // Support both regular and crash-safe factories
@@ -29,23 +32,97 @@ public class HarvestManager {
             this.factory = (CrashSafeHarvestFactory) factory;
             this.eventBuffer = this.factory.createEventBuffer();
             this.httpClient = this.factory.createHttpClient();
-            this.deadLetterHandler = this.factory.createIntegratedDeadLetterHandler(httpClient);
+
+            // Create IntegratedDeadLetterHandler with proper crash-safe integration
+            CrashSafeEventBuffer crashSafeBuffer = (CrashSafeEventBuffer) this.eventBuffer;
+            this.deadLetterHandler = new IntegratedDeadLetterHandler(
+                this.factory.createDeadLetterQueue(),
+                crashSafeBuffer,
+                httpClient,
+                factory.getConfiguration(),
+                factory.getContext()
+            );
         } else {
             // Fallback to regular factory
             this.factory = null;
             this.eventBuffer = factory.createEventBuffer();
             this.httpClient = factory.createHttpClient();
+
+            // Create IntegratedDeadLetterHandler without crash-safe buffer
             this.deadLetterHandler = new IntegratedDeadLetterHandler(
-                factory.createDeadLetterQueue(), null, httpClient, factory.getConfiguration());
+                factory.createDeadLetterQueue(),
+                null, // No crash-safe buffer for regular factory
+                httpClient,
+                factory.getConfiguration(),
+                factory.getContext()
+            );
         }
 
         this.scheduler = factory.createScheduler(this::harvestRegular, this::harvestLive);
 
-        // Set up overflow callback
-        eventBuffer.setOverflowCallback(this::harvestNow);
+        // Create and integrate lifecycle observer
+        this.lifecycleObserver = new NRVideoLifecycleObserver(this, factory.getContext(), factory.getConfiguration());
+        this.lifecycleObserver.setHarvestComponents(this, scheduler);
+
+        // Set up event buffer monitoring for 60% threshold scheduler startup
+        setupEventBufferMonitoring();
 
         // Register app lifecycle handler for crash safety
         registerLifecycleHandler();
+    }
+
+    /**
+     * Get the lifecycle observer for app registration
+     */
+    public NRVideoLifecycleObserver getLifecycleObserver() {
+        return lifecycleObserver;
+    }
+
+    // Implement LifecycleListener interface
+    @Override
+    public void onAppBackgrounded() {
+        if (factory != null && factory.getConfiguration().isDebugLoggingEnabled()) {
+            System.out.println("[HarvestManager] App backgrounded - immediate harvest triggered");
+        }
+    }
+
+    @Override
+    public void onAppForegrounded() {
+        if (factory != null && factory.getConfiguration().isDebugLoggingEnabled()) {
+            System.out.println("[HarvestManager] App foregrounded - normal operation resumed");
+        }
+    }
+
+    @Override
+    public void onAppTerminating() {
+        if (factory != null && factory.getConfiguration().isDebugLoggingEnabled()) {
+            System.out.println("[HarvestManager] App terminating - emergency harvest completed");
+        }
+    }
+
+    /**
+     * Set up event buffer monitoring for 60% capacity threshold
+     */
+    private void setupEventBufferMonitoring() {
+        // Set overflow callback for immediate harvest when buffer is getting full
+        eventBuffer.setOverflowCallback(this::harvestNow);
+
+        // Set capacity callback for 60% threshold scheduler startup
+        eventBuffer.setCapacityCallback(this);
+    }
+
+    /**
+     * Implements CapacityCallback - called when buffer reaches 60% capacity
+     */
+    @Override
+    public void onCapacityThresholdReached(double currentCapacity, String bufferType) {
+        scheduler.start(bufferType);
+
+        if (factory != null && factory.getConfiguration().isDebugLoggingEnabled()) {
+            System.out.println("[HarvestManager] Capacity threshold reached for " + bufferType + ": " +
+                String.format(Locale.US, "%.1f%%", currentCapacity * 100) +
+                " - Attempting to start scheduler.");
+        }
     }
 
     /**
@@ -57,8 +134,8 @@ public class HarvestManager {
             event.put("eventType", eventType);
             event.put("timestamp", System.currentTimeMillis());
 
+            // Add to event buffer - this will trigger capacity monitoring
             eventBuffer.addEvent(event);
-            ensureSchedulerStarted();
         }
     }
 
@@ -68,7 +145,7 @@ public class HarvestManager {
      */
     public void forceHarvestAll() {
         try {
-            if (schedulerStarted) {
+            if (scheduler.isRunning()) {
                 harvestRegular();
                 harvestLive();
                 deadLetterHandler.retryFailedEvents();
@@ -77,7 +154,13 @@ public class HarvestManager {
             // Perform emergency backup if crash-safe factory available
             if (factory != null) {
                 factory.performEmergencyBackup();
+            } else if (eventBuffer instanceof CrashSafeEventBuffer) {
+                // Emergency backup for crash-safe event buffer
+                ((CrashSafeEventBuffer) eventBuffer).emergencyBackup();
             }
+
+            // Emergency backup for dead letter handler
+            deadLetterHandler.emergencyBackup();
         } catch (Exception e) {
             System.err.println("[HarvestManager] Force harvest failed: " + e.getMessage());
         }
@@ -143,21 +226,6 @@ public class HarvestManager {
             }
         } catch (Exception e) {
             System.err.println("[HarvestManager] Emergency harvest failed: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Lazy scheduler initialization - starts only when first event is recorded
-     * This saves resources if NRVideo is initialized but never used for tracking
-     */
-    private void ensureSchedulerStarted() {
-        if (!schedulerStarted) {
-            synchronized (schedulerLock) {
-                if (!schedulerStarted) {
-                    scheduler.start();
-                    schedulerStarted = true;
-                }
-            }
         }
     }
 

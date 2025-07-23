@@ -156,7 +156,7 @@ public class NRTracker {
             attributes.put("actionName", action);
             NRVideo videoAgent = getInjectedVideoAgent();
             if (videoAgent != null) {
-                videoAgent.recordCustomEvent(eventType, attributes);
+                videoAgent.recordEvent(eventType, attributes);
             } else {
                 NRLog.e("⚠️ Failed to recordEvent. NRVideo is not initialized. ⚠️");
             }

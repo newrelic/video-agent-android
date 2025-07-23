@@ -6,6 +6,7 @@ import java.util.Map;
 /**
  * Interface for event buffering with priority support
  * Handles temporary storage of video analytics events before harvest
+ * Enhanced with capacity monitoring for 60% threshold scheduler startup
  */
 public interface EventBufferInterface {
 
@@ -40,11 +41,27 @@ public interface EventBufferInterface {
     void cleanup();
 
     /**
+     * Get maximum capacity of this buffer
+     */
+    int getMaxCapacity();
+
+    /**
+     * Check if buffer has reached capacity threshold (for scheduler startup)
+     */
+    boolean hasReachedCapacityThreshold(double threshold);
+
+    /**
      * Set overflow callback for buffers that support overflow prevention
-     * Default implementation does nothing - buffer implementations can override
      */
     default void setOverflowCallback(OverflowCallback callback) {
         // Default: no-op for buffers that don't support overflow prevention
+    }
+
+    /**
+     * Set capacity callback for monitoring buffer fill levels
+     */
+    default void setCapacityCallback(CapacityCallback callback) {
+        // Default: no-op for buffers that don't support capacity monitoring
     }
 
     /**
@@ -52,5 +69,12 @@ public interface EventBufferInterface {
      */
     interface OverflowCallback {
         void onBufferNearFull(String bufferType);
+    }
+
+    /**
+     * Interface for capacity monitoring callback
+     */
+    interface CapacityCallback {
+        void onCapacityThresholdReached(double currentCapacity, String bufferType);
     }
 }
