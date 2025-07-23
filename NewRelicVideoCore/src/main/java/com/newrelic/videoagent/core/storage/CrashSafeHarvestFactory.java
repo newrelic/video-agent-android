@@ -53,8 +53,7 @@ public class CrashSafeHarvestFactory extends HarvestComponentFactory {
                 deadLetterQueue,
                 crashSafeBuffer,
                 httpClient,
-                getConfiguration(),
-                context  // Added missing context parameter
+                getConfiguration()
             );
         }
         return integratedHandler;
