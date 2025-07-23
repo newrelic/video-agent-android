@@ -25,7 +25,6 @@ public class NRVideoLifecycleObserver implements Application.ActivityLifecycleCa
     private final LifecycleListener listener;
     private final AtomicInteger activeActivities = new AtomicInteger(0);
     private final AtomicBoolean isAppInBackground = new AtomicBoolean(false);
-    private final Context context;
     private final NRVideoConfiguration configuration;
     private final boolean isAndroidTV;
 
@@ -45,7 +44,6 @@ public class NRVideoLifecycleObserver implements Application.ActivityLifecycleCa
 
     public NRVideoLifecycleObserver(LifecycleListener listener, Context context, NRVideoConfiguration configuration) {
         this.listener = listener;
-        this.context = context;
         this.configuration = configuration;
         this.isAndroidTV = detectAndroidTV(context);
 
