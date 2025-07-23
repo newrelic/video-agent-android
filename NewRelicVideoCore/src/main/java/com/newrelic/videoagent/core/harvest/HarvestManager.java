@@ -46,8 +46,7 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback, NR
                 this.crashSafeFactory.createDeadLetterQueue(),
                 crashSafeBuffer,
                 httpClient,
-                factory.getConfiguration(),
-                factory.getContext()
+                factory.getConfiguration()
             );
         } else {
             // Fallback to regular factory
@@ -60,8 +59,7 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback, NR
                 factory.createDeadLetterQueue(),
                 null, // No crash-safe buffer for regular factory
                 httpClient,
-                factory.getConfiguration(),
-                factory.getContext()
+                factory.getConfiguration()
             );
         }
 
