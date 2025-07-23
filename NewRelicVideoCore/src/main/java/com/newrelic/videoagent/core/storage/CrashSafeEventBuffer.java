@@ -9,6 +9,7 @@ import com.newrelic.videoagent.core.harvest.SizeEstimator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Crash-safe event buffer optimized for mobile/TV environments
@@ -40,7 +41,7 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
 
     // Recovery state
     private volatile boolean isRecovering = false;
-    private volatile int lastEventCount = 0;
+    private final AtomicInteger lastEventCount = new AtomicInteger(0);
 
     public CrashSafeEventBuffer(Context context) {
         this.memoryBuffer = new PriorityEventBuffer();
@@ -82,10 +83,10 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
     public void addEvent(Map<String, Object> event) {
         // Always add to memory buffer first (fast path)
         memoryBuffer.addEvent(event);
-        lastEventCount++;
+        lastEventCount.incrementAndGet();
 
         // TV optimization: periodic background backup to prevent large crash losses
-        if (isTVDevice && lastEventCount % emergencyBackupThreshold == 0) {
+        if (isTVDevice && lastEventCount.get() % emergencyBackupThreshold == 0) {
             updateCrashDetectionCounter();
         }
     }
@@ -217,7 +218,7 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
      * Update crash detection counter for TV optimization
      */
     private void updateCrashDetectionCounter() {
-        crashPrefs.edit().putInt(KEY_LAST_EVENT_COUNT, lastEventCount).apply();
+        crashPrefs.edit().putInt(KEY_LAST_EVENT_COUNT, lastEventCount.get()).apply();
     }
 
     /**

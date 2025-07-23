@@ -89,10 +89,10 @@ public class OptimizedHttpClient implements HttpClientInterface {
         }
 
         // Attempt to send with domain failover and immediate retries
-        return sendEventsWithRetry(events, endpointType);
+        return sendEventsWithRetry(events);
     }
 
-    private boolean sendEventsWithRetry(List<Map<String, Object>> events, String endpointType) {
+    private boolean sendEventsWithRetry(List<Map<String, Object>> events) {
         final int maxRetryAttempts = 3;
 
         int attempt = 0;
