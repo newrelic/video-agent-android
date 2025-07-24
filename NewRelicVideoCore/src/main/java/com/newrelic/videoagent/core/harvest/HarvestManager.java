@@ -169,6 +169,9 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
                 boolean success = httpClient.sendEvents(events, harvestType);
                 if (!success) {
                     deadLetterHandler.handleFailedEvents(events, harvestType);
+                } else {
+                    // Notify event buffer about successful harvest to trigger any pending recovery
+                    eventBuffer.onSuccessfulHarvest();
                 }
 
                 // Debug logging for optimization monitoring

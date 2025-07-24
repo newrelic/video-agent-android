@@ -45,6 +45,7 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
 
     // Recovery state
     private volatile boolean isRecovering = false;
+    private volatile boolean hasPendingRecovery = false; // New flag for deferred recovery
     private final AtomicInteger lastEventCount = new AtomicInteger(0);
 
     public CrashSafeEventBuffer(Context context, NRVideoConfiguration configuration, VideoEventStorage videoEventStorage) {
@@ -164,7 +165,7 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
     }
 
     /**
-     * Check for crash recovery on app startup
+     * Check for crash recovery on app startup - defer until first successful harvest
      */
     private void checkCrashRecovery() {
         boolean wasSessionActive = crashPrefs.getBoolean(KEY_SESSION_ACTIVE, false);
@@ -172,8 +173,8 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
         if (wasSessionActive) {
             // Previous session didn't end cleanly - likely a crash
             if (storage.hasBackupData()) {
-                isRecovering = true;
-                Log.w(TAG, "Crash detected - recovery mode enabled");
+                hasPendingRecovery = true; // Set pending instead of immediate recovery
+                Log.w(TAG, "Crash detected - recovery will start after first successful harvest");
             }
         }
     }
@@ -239,6 +240,25 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
             memoryBuffer.getEventCount(),
             isTVDevice
         );
+    }
+
+    /**
+     * Called by HarvestManager after first successful harvest to start pending recovery
+     * This ensures scheduler is running before recovery begins
+     */
+    public void onSuccessfulHarvest() {
+        if (hasPendingRecovery && !isRecovering) {
+            isRecovering = true;
+            hasPendingRecovery = false;
+            Log.i(TAG, "Starting recovery after successful harvest - scheduler is now active");
+        }
+    }
+
+    /**
+     * Check if recovery is pending (for debugging/monitoring)
+     */
+    public boolean isRecoveryPending() {
+        return hasPendingRecovery;
     }
 
     public static class RecoveryStats {

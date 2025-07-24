@@ -60,6 +60,14 @@ public interface EventBufferInterface {
     }
 
     /**
+     * Called after a successful harvest to trigger any pending recovery operations
+     * Default implementation is no-op - only crash-safe implementations need to override
+     */
+    default void onSuccessfulHarvest() {
+        // No-op by default - only crash-safe event buffers need recovery logic
+    }
+
+    /**
      * Interface for overflow notification callback
      */
     interface OverflowCallback {

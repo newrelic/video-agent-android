@@ -49,58 +49,58 @@ public class OptimizedHttpClient implements HttpClientInterface {
     static {
         // US region domains (North America)
         REGIONAL_PRIMARY_DOMAINS.put("US", Arrays.asList(
-            "https://mobile-collector.newrelic.com/mobile/v3/data",
-            "https://mobile-collector-01.newrelic.com/mobile/v3/data",
-            "https://mobile-collector-02.newrelic.com/mobile/v3/data"
+            "https://mobile-collector.newrelic.com/mobile/v3/data"
+//            "https://mobile-collector-01.newrelic.com/mobile/v3/data",
+//            "https://mobile-collector-02.newrelic.com/mobile/v3/data"
         ));
         REGIONAL_BACKUP_DOMAINS.put("US", Arrays.asList(
-            "https://mobile-collector-backup.newrelic.com/mobile/v3/data",
-            "https://mobile-collector-fallback.newrelic.com/mobile/v3/data"
+            "https://mobile-collector.newrelic.com/mobile/v3/data"
+//            "https://mobile-collector-fallback.newrelic.com/mobile/v3/data"
         ));
 
         // EU region domains (Europe)
-        REGIONAL_PRIMARY_DOMAINS.put("EU", Arrays.asList(
-            "https://mobile-collector.eu.newrelic.com/mobile/v3/data",
-            "https://mobile-collector-01.eu.newrelic.com/mobile/v3/data",
-            "https://mobile-collector-02.eu.newrelic.com/mobile/v3/data"
-        ));
-        REGIONAL_BACKUP_DOMAINS.put("EU", Arrays.asList(
-            "https://mobile-collector-backup.eu.newrelic.com/mobile/v3/data",
-            "https://mobile-collector-fallback.eu.newrelic.com/mobile/v3/data"
-        ));
-
-        // AP region domains (Asia-Pacific)
-        REGIONAL_PRIMARY_DOMAINS.put("AP", Arrays.asList(
-            "https://mobile-collector.ap.newrelic.com/mobile/v3/data",
-            "https://mobile-collector-01.ap.newrelic.com/mobile/v3/data",
-            "https://mobile-collector-02.ap.newrelic.com/mobile/v3/data"
-        ));
-        REGIONAL_BACKUP_DOMAINS.put("AP", Arrays.asList(
-            "https://mobile-collector-backup.ap.newrelic.com/mobile/v3/data",
-            "https://mobile-collector-fallback.ap.newrelic.com/mobile/v3/data"
-        ));
-
-        // GOV region domains (US Government Cloud)
-        REGIONAL_PRIMARY_DOMAINS.put("GOV", Arrays.asList(
-            "https://mobile-collector.gov.newrelic.com/mobile/v3/data",
-            "https://mobile-collector-01.gov.newrelic.com/mobile/v3/data",
-            "https://mobile-collector-02.gov.newrelic.com/mobile/v3/data"
-        ));
-        REGIONAL_BACKUP_DOMAINS.put("GOV", Arrays.asList(
-            "https://mobile-collector-backup.gov.newrelic.com/mobile/v3/data",
-            "https://mobile-collector-fallback.gov.newrelic.com/mobile/v3/data"
-        ));
-
-        // STAGING region domains (for development/testing)
-        REGIONAL_PRIMARY_DOMAINS.put("STAGING", Arrays.asList(
-            "https://mobile-collector.staging.newrelic.com/mobile/v3/data",
-            "https://mobile-collector-01.staging.newrelic.com/mobile/v3/data",
-            "https://mobile-collector-02.staging.newrelic.com/mobile/v3/data"
-        ));
-        REGIONAL_BACKUP_DOMAINS.put("STAGING", Arrays.asList(
-            "https://mobile-collector-backup.staging.newrelic.com/mobile/v3/data",
-            "https://mobile-collector-fallback.staging.newrelic.com/mobile/v3/data"
-        ));
+//        REGIONAL_PRIMARY_DOMAINS.put("EU", Arrays.asList(
+//            "https://mobile-collector.eu.newrelic.com/mobile/v3/data",
+//            "https://mobile-collector-01.eu.newrelic.com/mobile/v3/data",
+//            "https://mobile-collector-02.eu.newrelic.com/mobile/v3/data"
+//        ));
+//        REGIONAL_BACKUP_DOMAINS.put("EU", Arrays.asList(
+//            "https://mobile-collector-backup.eu.newrelic.com/mobile/v3/data",
+//            "https://mobile-collector-fallback.eu.newrelic.com/mobile/v3/data"
+//        ));
+//
+//        // AP region domains (Asia-Pacific)
+//        REGIONAL_PRIMARY_DOMAINS.put("AP", Arrays.asList(
+//            "https://mobile-collector.ap.newrelic.com/mobile/v3/data",
+//            "https://mobile-collector-01.ap.newrelic.com/mobile/v3/data",
+//            "https://mobile-collector-02.ap.newrelic.com/mobile/v3/data"
+//        ));
+//        REGIONAL_BACKUP_DOMAINS.put("AP", Arrays.asList(
+//            "https://mobile-collector-backup.ap.newrelic.com/mobile/v3/data",
+//            "https://mobile-collector-fallback.ap.newrelic.com/mobile/v3/data"
+//        ));
+//
+//        // GOV region domains (US Government Cloud)
+//        REGIONAL_PRIMARY_DOMAINS.put("GOV", Arrays.asList(
+//            "https://mobile-collector.gov.newrelic.com/mobile/v3/data",
+//            "https://mobile-collector-01.gov.newrelic.com/mobile/v3/data",
+//            "https://mobile-collector-02.gov.newrelic.com/mobile/v3/data"
+//        ));
+//        REGIONAL_BACKUP_DOMAINS.put("GOV", Arrays.asList(
+//            "https://mobile-collector-backup.gov.newrelic.com/mobile/v3/data",
+//            "https://mobile-collector-fallback.gov.newrelic.com/mobile/v3/data"
+//        ));
+//
+//        // STAGING region domains (for development/testing)
+//        REGIONAL_PRIMARY_DOMAINS.put("STAGING", Arrays.asList(
+//            "https://mobile-collector.staging.newrelic.com/mobile/v3/data",
+//            "https://mobile-collector-01.staging.newrelic.com/mobile/v3/data",
+//            "https://mobile-collector-02.staging.newrelic.com/mobile/v3/data"
+//        ));
+//        REGIONAL_BACKUP_DOMAINS.put("STAGING", Arrays.asList(
+//            "https://mobile-collector-backup.staging.newrelic.com/mobile/v3/data",
+//            "https://mobile-collector-fallback.staging.newrelic.com/mobile/v3/data"
+//        ));
 
         // Default fallback for other regions (use US)
         REGIONAL_PRIMARY_DOMAINS.put("DEFAULT", REGIONAL_PRIMARY_DOMAINS.get("US"));

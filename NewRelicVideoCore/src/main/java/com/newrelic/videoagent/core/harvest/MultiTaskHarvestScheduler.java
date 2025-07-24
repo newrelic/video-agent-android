@@ -108,16 +108,18 @@ public class MultiTaskHarvestScheduler implements SchedulerInterface {
 
         if (NRVideoConstants.EVENT_TYPE_LIVE.equals(bufferType)) {
             if (isLiveRunning.compareAndSet(false, true)) {
-                backgroundHandler.postDelayed(liveHarvestRunnable, 2000); // 2 seconds
+                // Live events need immediate processing - minimal delay
+                backgroundHandler.postDelayed(liveHarvestRunnable, 500); // 0.5 seconds
                 if (debugEnabled) {
-                    Log.d(TAG, "Live scheduler started");
+                    Log.d(TAG, "Live scheduler started with immediate harvest");
                 }
             }
         } else if (NRVideoConstants.EVENT_TYPE_ONDEMAND.equals(bufferType)) {
             if (isOnDemandRunning.compareAndSet(false, true)) {
-                backgroundHandler.postDelayed(onDemandHarvestRunnable, 5000); // 5 seconds
+                // Immediate first harvest to prevent event loss during startup
+                backgroundHandler.postDelayed(onDemandHarvestRunnable, 1000); // 1 second instead of 5
                 if (debugEnabled) {
-                    Log.d(TAG, "OnDemand scheduler started");
+                    Log.d(TAG, "OnDemand scheduler started with quick first harvest");
                 }
             }
         }

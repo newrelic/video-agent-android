@@ -14,8 +14,11 @@ public final class NRVideoConstants {
     public static final String EVENT_TYPE_LIVE = "live";
     public static final String EVENT_TYPE_ONDEMAND = "ondemand";
 
-    // Event Categories
+    // Event Categories - DEPRECATED: These should be removed
+    // Use EVENT_TYPE_LIVE and EVENT_TYPE_ONDEMAND instead for priority-based polling
+    @Deprecated
     public static final String CATEGORY_DEFAULT = "default";
+    @Deprecated
     public static final String CATEGORY_NORMAL = "normal";
 
     // Health Status Constants

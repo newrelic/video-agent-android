@@ -160,8 +160,9 @@ public class IntegratedDeadLetterHandler {
             // Use appropriate batch size based on event type and configuration
             int batchSize = NRVideoConstants.EVENT_TYPE_LIVE.equals(eventType) ? liveBatchSizeForRetry : regularBatchSizeForRetry;
 
+            // Fixed: Use the actual eventType instead of deprecated CATEGORY_NORMAL
             List<Map<String, Object>> events = inMemoryQueue.pollBatchByPriority(
-                batchSize, new DefaultSizeEstimator(), NRVideoConstants.CATEGORY_NORMAL);
+                batchSize, new DefaultSizeEstimator(), eventType);
 
             if (events.isEmpty()) return;
 
@@ -202,7 +203,7 @@ public class IntegratedDeadLetterHandler {
                 configuration.getMaxDeadLetterSize() * 2;   // Mobile is conservative
 
             List<Map<String, Object>> pendingEvents = inMemoryQueue.pollBatchByPriority(
-                emergencyBatchSize, null, NRVideoConstants.CATEGORY_NORMAL);
+                emergencyBatchSize, null, NRVideoConstants.EVENT_TYPE_ONDEMAND);
 
             if (!pendingEvents.isEmpty()) {
                 List<Map<String, Object>> cleanEvents = new ArrayList<>();
@@ -380,7 +381,7 @@ public class IntegratedDeadLetterHandler {
 
                 for (int i = 0; i < eventsToRemove; i++) {
                     List<Map<String, Object>> removed = inMemoryQueue.pollBatchByPriority(
-                        1, new DefaultSizeEstimator(), NRVideoConstants.CATEGORY_NORMAL);
+                        1, new DefaultSizeEstimator(), NRVideoConstants.EVENT_TYPE_ONDEMAND);
                     if (removed.isEmpty()) break;
                 }
             }
