@@ -52,6 +52,9 @@ public final class NRVideo {
             CrashSafeHarvestFactory factory = new CrashSafeHarvestFactory(config, applicationContext);
             harvestManager = new HarvestManager(factory);
 
+            // CRITICAL: Inject this NRVideo instance into NRTracker so trackers can record events
+            NRTracker.injectVideoAgent(this);
+
             // Create and register lifecycle observer with crash-safe factory
             if (applicationContext instanceof Application) {
                 Application app = (Application) applicationContext;

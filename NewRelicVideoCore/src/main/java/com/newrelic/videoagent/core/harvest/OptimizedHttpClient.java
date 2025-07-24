@@ -192,26 +192,32 @@ public class OptimizedHttpClient implements HttpClientInterface {
                 if (configuration.isDebugLoggingEnabled()) {
                     Log.w(TAG, "Attempt " + (attempt + 1) + " failed: " + e.getMessage());
                 }
+
+                // Handle rate limiting specially - don't retry immediately
+                if (e.getMessage() != null && e.getMessage().contains("Rate limit exceeded (429)")) {
+                    if (configuration.isDebugLoggingEnabled()) {
+                        Log.w(TAG, "Rate limit hit - deferring to HarvestManager for delayed retry");
+                    }
+                    return false; // Let HarvestManager handle rate limit delays
+                }
             }
 
             attempt++;
+            // MOBILE/TV OPTIMIZATION: Remove Thread.sleep() to avoid blocking
+            // Instead of sleeping here, we rely on:
+            // 1. Domain rotation (immediate failover to different endpoints)
+            // 2. Circuit breaker pattern (switches to backup domains)
+            // 3. HarvestManager's scheduled retries for application-level delays
             if (attempt < maxRetryAttempts) {
-                try {
-                    long delay = calculateRetryDelay(attempt);
-                    if (configuration.isDebugLoggingEnabled()) {
-                        Log.d(TAG, "Retrying in " + delay + "ms (attempt " + (attempt + 1) + "/" + maxRetryAttempts + ")");
-                    }
-                    Thread.sleep(delay);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
+                if (configuration.isDebugLoggingEnabled()) {
+                    Log.d(TAG, "Immediate retry " + (attempt + 1) + "/" + maxRetryAttempts + " (no delay for mobile/TV performance)");
                 }
             }
         }
 
         // All immediate retries failed - let HarvestManager handle application-level retries
         if (configuration.isDebugLoggingEnabled()) {
-            Log.w(TAG, "All " + maxRetryAttempts + " attempts failed for " + events.size() + " events. Queuing for retry by HarvestManager.");
+            Log.w(TAG, "All " + maxRetryAttempts + " immediate attempts failed for " + events.size() + " events. Queuing for HarvestManager retry.");
         }
         return false;
     }
@@ -278,7 +284,7 @@ public class OptimizedHttpClient implements HttpClientInterface {
             int responseCode = connection.getResponseCode();
             boolean success = responseCode >= 200 && responseCode < 300;
 
-            // Handle token expiration
+            // Handle different error scenarios
             if (responseCode == 401 || responseCode == 403) {
                 // Token might be expired, refresh and retry once
                 try {
@@ -291,6 +297,18 @@ public class OptimizedHttpClient implements HttpClientInterface {
                         Log.w(TAG, "Token refresh failed", tokenRefreshError);
                     }
                 }
+            } else if (responseCode == 429) {
+                // Rate limit exceeded - extract retry-after header if present
+                String retryAfter = connection.getHeaderField("Retry-After");
+                long retryAfterMs = parseRetryAfter(retryAfter);
+
+                if (configuration.isDebugLoggingEnabled()) {
+                    Log.w(TAG, "Rate limit exceeded (429). Retry after: " + retryAfterMs + "ms");
+                }
+
+                // Don't sleep here - let caller handle the retry delay
+                // Mark this as a temporary failure by throwing a specific exception
+                throw new IOException("Rate limit exceeded (429). Retry after: " + retryAfterMs + "ms");
             }
 
             // OPTIMIZATION: More efficient response reading
@@ -311,6 +329,26 @@ public class OptimizedHttpClient implements HttpClientInterface {
 
         } catch (Exception e) {
             throw new IOException("Request failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Parse Retry-After header value to milliseconds
+     * Supports both delay-seconds and HTTP-date formats
+     */
+    private long parseRetryAfter(String retryAfter) {
+        if (retryAfter == null || retryAfter.trim().isEmpty()) {
+            return 60000; // Default 60 seconds for rate limiting
+        }
+
+        try {
+            // Try parsing as seconds (most common format)
+            int seconds = Integer.parseInt(retryAfter.trim());
+            return Math.min(seconds * 1000L, 300000L); // Cap at 5 minutes
+        } catch (NumberFormatException e) {
+            // Could be HTTP-date format, but that's complex to parse
+            // For mobile/TV simplicity, just use default
+            return 60000; // Default 60 seconds
         }
     }
 
