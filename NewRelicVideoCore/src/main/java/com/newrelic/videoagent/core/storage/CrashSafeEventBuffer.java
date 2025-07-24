@@ -103,9 +103,18 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
         // Primary: get events from memory (normal operation)
         List<Map<String, Object>> batch = new ArrayList<>(memoryBuffer.pollBatchByPriority(maxSizeBytes, sizeEstimator, priority));
 
-        // Recovery: gradually mix in backup events if recovering from crash
-        if (isRecovering && batch.size() < getOptimalBatchSize(priority)) {
-            batch.addAll(pollRecoveryEvents(priority));
+        // Recovery: Always try to recover SQLite events when in recovery mode
+        if (isRecovering) {
+            // Calculate remaining capacity in the batch (size-based or count-based)
+            int remainingCapacity = Math.max(0, getOptimalBatchSize(priority) - batch.size());
+
+            // Always try to recover at least some events, even if batch is full
+            int minRecoverySize = Math.max(remainingCapacity, isRecovering ? 5 : 0); // Minimum 5 events when recovering
+
+            if (minRecoverySize > 0) {
+                List<Map<String, Object>> recoveryEvents = pollRecoveryEvents(priority, minRecoverySize);
+                batch.addAll(recoveryEvents);
+            }
         }
 
         return batch;
@@ -183,8 +192,15 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
      * Poll recovery events in small batches
      */
     private List<Map<String, Object>> pollRecoveryEvents(String priority) {
+        return pollRecoveryEvents(priority, recoveryBatchSize);
+    }
+
+    /**
+     * Poll recovery events in small batches
+     */
+    private List<Map<String, Object>> pollRecoveryEvents(String priority, int maxSize) {
         try {
-            List<Map<String, Object>> recoveryEvents = storage.pollEvents(priority, recoveryBatchSize);
+            List<Map<String, Object>> recoveryEvents = storage.pollEvents(priority, maxSize);
 
             if (!recoveryEvents.isEmpty()) {
                 Log.d(TAG, "Recovered " + recoveryEvents.size() + " events (" + priority + ")");
@@ -246,11 +262,26 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
      * Called by HarvestManager after first successful harvest to start pending recovery
      * This ensures scheduler is running before recovery begins
      */
+    @Override
     public void onSuccessfulHarvest() {
+        boolean shouldStartRecovery = false;
+
+        // Case 1: Pending recovery from crash detection
         if (hasPendingRecovery && !isRecovering) {
-            isRecovering = true;
             hasPendingRecovery = false;
-            Log.i(TAG, "Starting recovery after successful harvest - scheduler is now active");
+            shouldStartRecovery = true;
+            Log.i(TAG, "Starting crash recovery after successful harvest - scheduler is now active");
+        }
+
+        // Case 2: Check if there's SQLite data to recover (even without pending flag)
+        if (!isRecovering && storage.hasBackupData()) {
+            shouldStartRecovery = true;
+            Log.i(TAG, "Starting SQLite recovery after successful harvest - backup data detected");
+        }
+
+        if (shouldStartRecovery) {
+            isRecovering = true;
+            Log.i(TAG, "Recovery mode activated - SQLite events will be included in future harvests");
         }
     }
 
