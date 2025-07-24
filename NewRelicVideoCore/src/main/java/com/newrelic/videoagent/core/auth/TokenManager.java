@@ -322,7 +322,8 @@ public class TokenManager {
             return null;
         }
 
-        int arrayEndIndex = response.indexOf(']', arrayStartIndex);
+        // Find the matching closing bracket, not just the first ']'
+        int arrayEndIndex = findMatchingCloseBracket(response, arrayStartIndex);
         if (arrayEndIndex == -1) {
             return null;
         }
@@ -338,6 +339,29 @@ public class TokenManager {
         }
 
         return parseTokenArray(arrayContent, "data_token");
+    }
+
+    /**
+     * Find the index of the matching closing bracket for a given opening bracket index
+     * Handles nested brackets and different data formats more robustly
+     */
+    private int findMatchingCloseBracket(String response, int openIndex) {
+        int bracketCount = 0;
+
+        for (int i = openIndex; i < response.length(); i++) {
+            char c = response.charAt(i);
+
+            if (c == '[') {
+                bracketCount++;
+            } else if (c == ']') {
+                bracketCount--;
+                if (bracketCount == 0) {
+                    return i; // Matching closing bracket found
+                }
+            }
+        }
+
+        return -1; // No matching closing bracket found
     }
 
     /**

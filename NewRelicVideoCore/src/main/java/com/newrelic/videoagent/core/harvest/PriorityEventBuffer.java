@@ -5,6 +5,8 @@ import java.util.Map;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.TimeUnit;
 import com.newrelic.videoagent.core.NRVideoConstants;
 
 /**
@@ -22,9 +24,12 @@ public class PriorityEventBuffer implements EventBufferInterface {
     // On-demand events can tolerate some delay (movies, series, recorded content)
     private final ConcurrentLinkedQueue<Map<String, Object>> ondemandEvents = new ConcurrentLinkedQueue<>();
 
-    // O(1) contiguous duplicate tracking - track the last actionName for each queue
-    private final AtomicReference<String> lastLiveActionName = new AtomicReference<>();
-    private final AtomicReference<String> lastOndemandActionName = new AtomicReference<>();
+    // Optimized locks for atomic polling operations with timeout support
+    private final ReentrantLock livePollingLock = new ReentrantLock();
+    private final ReentrantLock ondemandPollingLock = new ReentrantLock();
+
+    // Lock timeout for mobile/TV optimization (milliseconds)
+    private static final long POLLING_LOCK_TIMEOUT_MS = 50; // Quick timeout for responsiveness
 
     // OPTIMIZED for 2KB events - device-specific buffer sizes
     private final int MAX_LIVE_EVENTS;
@@ -75,25 +80,13 @@ public class PriorityEventBuffer implements EventBufferInterface {
 
         // Get the target queue and last action tracker for this event
         ConcurrentLinkedQueue<Map<String, Object>> targetQueue = isLiveContent ? liveEvents : ondemandEvents;
-        AtomicReference<String> lastActionTracker = isLiveContent ? lastLiveActionName : lastOndemandActionName;
         int maxCapacity = isLiveContent ? MAX_LIVE_EVENTS : MAX_ONDEMAND_EVENTS;
 
         // SCHEDULER STARTUP: Start scheduler on FIRST event of each category
         boolean wasEmpty = targetQueue.isEmpty();
 
-        // CONTIGUOUS DEDUPLICATION: O(1) check using atomic variable
-        String actionName = (String) event.get("actionName");
-        if (actionName != null && !actionName.trim().isEmpty()) {
-            removeContiguousDuplicates(targetQueue, lastActionTracker, actionName);
-        }
-
         // Add the new event (this will be the most recent one)
         targetQueue.offer(event);
-
-        // Update the last action tracker - O(1) atomic operation
-        if (actionName != null && !actionName.trim().isEmpty()) {
-            lastActionTracker.set(actionName);
-        }
 
         // CRITICAL: Start scheduler on first event of this category
         if (wasEmpty) {
@@ -126,86 +119,101 @@ public class PriorityEventBuffer implements EventBufferInterface {
         }
     }
 
-    /**
-     * Remove contiguous duplicate events - TRUE O(1) operation using atomic variable
-     * Only checks if the last actionName matches the new one
-     * This is sufficient for video analytics where we want to prevent consecutive identical events
-     *
-     * @param queue The queue to check for contiguous duplicates
-     * @param lastActionTracker Atomic reference tracking the last actionName
-     * @param actionName The action name to deduplicate (e.g., "CONTENT_DOWNLOAD_ERROR")
-     */
-    private void removeContiguousDuplicates(ConcurrentLinkedQueue<Map<String, Object>> queue,
-                                          AtomicReference<String> lastActionTracker,
-                                          String actionName) {
-        // O(1) check - just compare with the last actionName
-        String lastAction = lastActionTracker.get();
-        if (actionName.equals(lastAction)) {
-            // The last event has the same actionName - it's a contiguous duplicate
-            // We need to remove it, but since we don't have direct access to the last event,
-            // we'll remove from tail by polling and checking
-            Map<String, Object> lastEvent = pollLastEvent(queue);
-            if (lastEvent != null) {
-                String actualLastAction = (String) lastEvent.get("actionName");
-                if (!actionName.equals(actualLastAction)) {
-                    // Put it back if it's not actually a duplicate (race condition safety)
-                    queue.offer(lastEvent);
-                }
-                // If it was a duplicate, we successfully removed it
-            }
-        }
-    }
-
-    /**
-     * Poll the last event from the queue (tail removal)
-     * Since ConcurrentLinkedQueue doesn't have pollLast(), we use a workaround
-     */
-    private Map<String, Object> pollLastEvent(ConcurrentLinkedQueue<Map<String, Object>> queue) {
-        if (queue.isEmpty()) return null;
-
-        // Convert to array and get the last element, then remove it
-        // This is only called when we detect a duplicate, so it's rare
-        Map<String, Object>[] events = queue.toArray(new Map[0]);
-        if (events.length == 0) return null;
-
-        Map<String, Object> lastEvent = events[events.length - 1];
-        queue.remove(lastEvent); // Remove the last event
-        return lastEvent;
-    }
-
     @Override
     public List<Map<String, Object>> pollBatchByPriority(int maxSizeBytes, SizeEstimator sizeEstimator, String priority) {
-        List<Map<String, Object>> batch = new ArrayList<>();
-        ConcurrentLinkedQueue<Map<String, Object>> targetQueue = NRVideoConstants.EVENT_TYPE_LIVE.equals(priority) ? liveEvents : ondemandEvents;
+        // Platform-specific optimization: Use different strategies for mobile vs TV
+        boolean isLivePriority = NRVideoConstants.EVENT_TYPE_LIVE.equals(priority);
+        ReentrantLock pollingLock = isLivePriority ? livePollingLock : ondemandPollingLock;
 
-        int currentSize = 0;
-        // OPTIMIZED: Adjusted batch sizes for 2KB events and device capabilities
-        int maxEvents;
-        if (NRVideoConstants.EVENT_TYPE_LIVE.equals(priority)) {
-            // Live events: Quick, small batches for low latency
-            maxEvents = isAndroidTVDevice ? 25 : 15;  // TV: 50KB batches, Mobile: 30KB batches
-        } else {
-            // On-demand events: Larger batches for efficiency
-            maxEvents = isAndroidTVDevice ? 50 : 30;  // TV: 100KB batches, Mobile: 60KB batches
-        }
+        // Mobile/TV optimized timeout: TV can wait longer for larger batches
+        long lockTimeout = isAndroidTVDevice ? 100 : POLLING_LOCK_TIMEOUT_MS; // TV: 100ms, Mobile: 50ms
 
-        for (int i = 0; i < maxEvents && !targetQueue.isEmpty(); i++) {
-            Map<String, Object> event = targetQueue.poll();
-            if (event == null) break;
-
-            // Use actual 2KB size estimate if no estimator provided
-            int eventSize = sizeEstimator != null ? sizeEstimator.estimate(event) : 2048;
-            if (currentSize + eventSize > maxSizeBytes && !batch.isEmpty()) {
-                // Put the event back and break
-                targetQueue.offer(event);
-                break;
+        try {
+            // Fast path: Check if queue is empty before acquiring lock (optimization)
+            ConcurrentLinkedQueue<Map<String, Object>> targetQueue = isLivePriority ? liveEvents : ondemandEvents;
+            if (targetQueue.isEmpty()) {
+                return new ArrayList<>(); // No lock needed for empty queue
             }
 
-            batch.add(event);
-            currentSize += eventSize;
-        }
+            // Acquire the lock with platform-optimized timeout
+            if (!pollingLock.tryLock(lockTimeout, TimeUnit.MILLISECONDS)) {
+                return new ArrayList<>(); // Timeout, return empty batch
+            }
 
-        return batch;
+            // Pre-allocate batch with optimal capacity for mobile/TV
+            int estimatedBatchSize = isAndroidTVDevice ?
+                (isLivePriority ? 25 : 50) : (isLivePriority ? 15 : 30);
+            List<Map<String, Object>> batch = new ArrayList<>(estimatedBatchSize);
+
+            int currentSize = 0;
+            // PLATFORM-OPTIMIZED: Different strategies for mobile vs TV
+            int maxEvents;
+            if (isLivePriority) {
+                // Live events: Prioritize low latency
+                if (isAndroidTVDevice) {
+                    maxEvents = 25;  // TV: 50KB batches for live streaming
+                } else {
+                    maxEvents = 12;  // Mobile: Smaller batches to reduce memory pressure and improve battery
+                }
+            } else {
+                // On-demand events: Optimize for throughput
+                if (isAndroidTVDevice) {
+                    maxEvents = 60;  // TV: Larger batches for better network efficiency
+                } else {
+                    maxEvents = 25;  // Mobile: Balance between efficiency and memory usage
+                }
+            }
+
+            // Mobile optimization: Early break if memory pressure is high
+            boolean isLowMemory = !isAndroidTVDevice &&
+                Runtime.getRuntime().freeMemory() < Runtime.getRuntime().totalMemory() * 0.15; // <15% free memory
+
+            for (int i = 0; i < maxEvents && !targetQueue.isEmpty(); i++) {
+                Map<String, Object> event = targetQueue.poll();
+                if (event == null) break;
+
+                // Platform-optimized size estimation
+                int eventSize;
+                if (sizeEstimator != null) {
+                    eventSize = sizeEstimator.estimate(event);
+                } else {
+                    // Mobile: Conservative estimate, TV: Accurate estimate
+                    eventSize = isAndroidTVDevice ? 2048 : 1800; // TV can handle larger estimates
+                }
+
+                // Size-based early break with platform considerations
+                if (currentSize + eventSize > maxSizeBytes && !batch.isEmpty()) {
+                    // Put the event back and break
+                    targetQueue.offer(event);
+                    break;
+                }
+
+                // Mobile: Break early if low memory and we have some events
+                if (isLowMemory && batch.size() >= 8 && !batch.isEmpty()) {
+                    targetQueue.offer(event); // Put back for next harvest
+                    break;
+                }
+
+                batch.add(event);
+                currentSize += eventSize;
+
+                // TV optimization: Continue until batch is substantial
+                // Mobile optimization: Prefer smaller, frequent batches for responsiveness
+            }
+
+            return batch;
+        } catch (InterruptedException e) {
+            // Platform-aware interrupt handling
+            Thread.currentThread().interrupt(); // Restore interrupt status (required for both platforms)
+
+            // Mobile optimization: Return immediately to preserve battery
+            // TV optimization: Could retry once for stream continuity, but keep it simple for now
+            return new ArrayList<>(); // Return empty batch on interrupt
+        } finally {
+            if (pollingLock.isHeldByCurrentThread()) { // Safety check before unlock
+                pollingLock.unlock();
+            }
+        }
     }
 
     @Override
