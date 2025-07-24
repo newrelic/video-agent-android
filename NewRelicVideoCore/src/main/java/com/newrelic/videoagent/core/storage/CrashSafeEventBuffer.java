@@ -47,9 +47,9 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
     private volatile boolean isRecovering = false;
     private final AtomicInteger lastEventCount = new AtomicInteger(0);
 
-    public CrashSafeEventBuffer(Context context, NRVideoConfiguration configuration) {
+    public CrashSafeEventBuffer(Context context, NRVideoConfiguration configuration, VideoEventStorage videoEventStorage) {
         this.memoryBuffer = new PriorityEventBuffer();
-        this.storage = VideoEventStorage.getInstance(context);
+        this.storage = videoEventStorage; // Use injected storage instead of singleton
         this.crashPrefs = context.getSharedPreferences(CRASH_PREF_NAME, Context.MODE_PRIVATE);
 
         // Use the already detected device type from configuration instead of duplicating detection logic

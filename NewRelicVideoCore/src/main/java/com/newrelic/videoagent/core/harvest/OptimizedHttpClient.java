@@ -463,21 +463,6 @@ public class OptimizedHttpClient implements HttpClientInterface {
         return Math.min(delayWithJitter, maxRetryDelayMs);
     }
 
-    @Override
-    public void setConnectionTimeout(int timeoutMs) {
-        this.connectionTimeoutMs = timeoutMs;
-    }
-
-    @Override
-    public void setReadTimeout(int timeoutMs) {
-        this.readTimeoutMs = timeoutMs;
-    }
-
-    @Override
-    public void cleanup() {
-        resetToPrimary();
-    }
-
     private String escapeJsonString(String str) {
         if (str == null) return "null";
         return str.replace("\\", "\\\\")

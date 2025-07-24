@@ -1,34 +1,48 @@
 package com.newrelic.videoagent.core.harvest;
 
-import android.content.Context;
-import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.util.Log;
+import com.newrelic.videoagent.core.NRVideoConfiguration;
+import com.newrelic.videoagent.core.NRVideoConstants;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Android-optimized harvest scheduler using Handler instead of ScheduledExecutorService
  * Better for mobile/TV environments - respects Android lifecycle and power management
- * Includes accurate TV detection using androidx.leanback
+ * Uses NRVideoConfiguration for device type detection instead of redundant detection
  */
 public class MultiTaskHarvestScheduler implements SchedulerInterface {
+    private static final String TAG = "NRVideo.Scheduler";
+
     private final Handler backgroundHandler;
-    private final Runnable regularHarvestTask;
+    private final Runnable onDemandHarvestTask;
     private final Runnable liveHarvestTask;
-    private final int regularIntervalMs;
+    private final int onDemandIntervalMs;
     private final int liveIntervalMs;
-    private final AtomicBoolean isRegularRunning = new AtomicBoolean(false);
+    private final AtomicBoolean isOnDemandRunning = new AtomicBoolean(false);
     private final AtomicBoolean isLiveRunning = new AtomicBoolean(false);
+    private final AtomicBoolean isShutdown = new AtomicBoolean(false);
     private final boolean isAndroidTVDevice;
+    private final boolean debugEnabled;
 
     // Runnable wrappers for self-scheduling
-    private final Runnable regularHarvestRunnable = new Runnable() {
+    private final Runnable onDemandHarvestRunnable = new Runnable() {
         @Override
         public void run() {
-            if (isRegularRunning.get() && regularHarvestTask != null) {
-                regularHarvestTask.run();
-                // Re-schedule next execution
-                backgroundHandler.postDelayed(this, regularIntervalMs);
+            if (isOnDemandRunning.get() && !isShutdown.get() && onDemandHarvestTask != null) {
+                try {
+                    onDemandHarvestTask.run();
+                } catch (Exception e) {
+                    if (debugEnabled) {
+                        Log.e(TAG, "OnDemand harvest task failed", e);
+                    }
+                }
+                // Re-schedule next execution if still running
+                if (isOnDemandRunning.get() && !isShutdown.get()) {
+                    backgroundHandler.postDelayed(this, onDemandIntervalMs);
+                }
             }
         }
     };
@@ -36,23 +50,30 @@ public class MultiTaskHarvestScheduler implements SchedulerInterface {
     private final Runnable liveHarvestRunnable = new Runnable() {
         @Override
         public void run() {
-            if (isLiveRunning.get() && liveHarvestTask != null) {
-                liveHarvestTask.run();
-                // Re-schedule next execution
-                backgroundHandler.postDelayed(this, liveIntervalMs);
+            if (isLiveRunning.get() && !isShutdown.get() && liveHarvestTask != null) {
+                try {
+                    liveHarvestTask.run();
+                } catch (Exception e) {
+                    if (debugEnabled) {
+                        Log.e(TAG, "Live harvest task failed", e);
+                    }
+                }
+                // Re-schedule next execution if still running
+                if (isLiveRunning.get() && !isShutdown.get()) {
+                    backgroundHandler.postDelayed(this, liveIntervalMs);
+                }
             }
         }
     };
 
-    public MultiTaskHarvestScheduler(Runnable regularHarvestTask, Runnable liveHarvestTask,
-                                   int regularIntervalSeconds, int liveIntervalSeconds) {
-        this.regularHarvestTask = regularHarvestTask;
+    public MultiTaskHarvestScheduler(Runnable onDemandHarvestTask, Runnable liveHarvestTask,
+                                   NRVideoConfiguration configuration) {
+        this.onDemandHarvestTask = onDemandHarvestTask;
         this.liveHarvestTask = liveHarvestTask;
-        this.regularIntervalMs = regularIntervalSeconds * 1000;
-        this.liveIntervalMs = liveIntervalSeconds * 1000;
-
-        // Detect Android TV platform at initialization
-        this.isAndroidTVDevice = detectAndroidTV();
+        this.onDemandIntervalMs = configuration.getHarvestCycleSeconds() * 1000;
+        this.liveIntervalMs = configuration.getLiveHarvestCycleSeconds() * 1000;
+        this.isAndroidTVDevice = configuration.isTV();
+        this.debugEnabled = configuration.isDebugLoggingEnabled();
 
         // Create background handler with platform-optimized thread priority
         HandlerThread backgroundThread = new HandlerThread(
@@ -62,257 +83,187 @@ public class MultiTaskHarvestScheduler implements SchedulerInterface {
         );
         backgroundThread.start();
         this.backgroundHandler = new Handler(backgroundThread.getLooper());
-    }
 
-    /**
-     * Accurate Android TV detection using multiple reliable methods
-     * Compatible with API 16+ and works across all Android TV devices
-     */
-    private boolean detectAndroidTV() {
-        try {
-            // Get context from main looper (safer than static access)
-            Context context = getCurrentContext();
-            if (context != null) {
-                PackageManager pm = context.getPackageManager();
-
-                // Method 1: Check for Android TV Leanback UI (most accurate)
-                if (pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)) {
-                    return true;
-                }
-
-                // Method 2: Check for television feature
-                if (pm.hasSystemFeature(PackageManager.FEATURE_TELEVISION)) {
-                    return true;
-                }
-
-                // Method 3: Check if touchscreen is NOT required (TV indicator)
-                if (!pm.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)) {
-                    return true;
-                }
-            }
-
-            // Fallback: Use system properties (API 16+ compatible)
-            return detectTVFromSystemProperties();
-
-        } catch (Exception e) {
-            // If any detection fails, fall back to system properties
-            return detectTVFromSystemProperties();
+        if (debugEnabled) {
+            Log.d(TAG, "Scheduler initialized for " + (isAndroidTVDevice ? "TV" : "Mobile") +
+                " - OnDemand: " + configuration.getHarvestCycleSeconds() + "s, Live: " +
+                configuration.getLiveHarvestCycleSeconds() + "s");
         }
-    }
-
-    /**
-     * Get current context safely (works across different Android versions)
-     */
-    private Context getCurrentContext() {
-        try {
-            // Try to get context from ActivityThread (works on most Android versions)
-            Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
-            Object activityThread = activityThreadClass.getMethod("currentActivityThread").invoke(null);
-            if (activityThread != null) {
-                return (Context) activityThreadClass.getMethod("getApplication").invoke(activityThread);
-            }
-        } catch (Exception e) {
-            // Fallback methods could be added here if needed
-        }
-        return null;
-    }
-
-    /**
-     * Fallback TV detection using only public APIs (API 16+ compatible)
-     */
-    private boolean detectTVFromSystemProperties() {
-        try {
-            // Method 1: Check build type for TV indicators
-            String buildType = android.os.Build.TYPE;
-            if (buildType != null && buildType.toLowerCase().contains("tv")) {
-                return true;
-            }
-
-            // Method 2: Check device model for TV indicators
-            String model = android.os.Build.MODEL;
-            if (model != null) {
-                String modelLower = model.toLowerCase();
-                if (modelLower.contains("tv") || modelLower.contains("chromecast") ||
-                    modelLower.contains("android_tv") || modelLower.contains("shield") ||
-                    modelLower.contains("nexus_player") || modelLower.contains("mibox")) {
-                    return true;
-                }
-            }
-
-            // Method 3: Check manufacturer for TV-specific brands
-            String manufacturer = android.os.Build.MANUFACTURER;
-            if (manufacturer != null) {
-                String mfgLower = manufacturer.toLowerCase();
-                if (mfgLower.contains("nvidia") && model != null && model.toLowerCase().contains("shield")) {
-                    return true; // NVIDIA Shield TV
-                }
-                if (mfgLower.contains("xiaomi") && model != null && model.toLowerCase().contains("mibox")) {
-                    return true; // Xiaomi Mi Box
-                }
-            }
-
-            // Method 4: Check product name for TV indicators
-            String product = android.os.Build.PRODUCT;
-            if (product != null) {
-                String productLower = product.toLowerCase();
-                if (productLower.contains("tv") || productLower.contains("atv") ||
-                    productLower.contains("googletv") || productLower.contains("androidtv")) {
-                    return true;
-                }
-            }
-
-            // Method 5: Use reflection to safely check system properties (if available)
-            return checkSystemPropertiesSafely();
-
-        } catch (Exception e) {
-            // If any method fails, assume mobile (safer default)
-            return false;
-        }
-    }
-
-    /**
-     * Safely check system properties using reflection to avoid compilation issues
-     */
-    private boolean checkSystemPropertiesSafely() {
-        try {
-            // Use reflection to access SystemProperties without direct import
-            Class<?> systemPropertiesClass = Class.forName("android.os.SystemProperties");
-            java.lang.reflect.Method getMethod = systemPropertiesClass.getMethod("get", String.class, String.class);
-
-            // Check ro.build.characteristics property
-            String characteristics = (String) getMethod.invoke(null, "ro.build.characteristics", "");
-            if (characteristics != null && !characteristics.isEmpty()) {
-                String charLower = characteristics.toLowerCase();
-                if (charLower.contains("tv") || charLower.contains("television")) {
-                    return true;
-                }
-            }
-
-            // Check ro.build.type property
-            String buildType = (String) getMethod.invoke(null, "ro.build.type", "");
-            if ("tv".equals(buildType)) {
-                return true;
-            }
-
-        } catch (Exception e) {
-            // Reflection failed - this is expected on some devices/Android versions
-            // SystemProperties access may be restricted
-        }
-
-        return false;
     }
 
     @Override
     public void start() {
-        start("regular");
-        start("live");
+        start(NRVideoConstants.EVENT_TYPE_ONDEMAND);
+        start(NRVideoConstants.EVENT_TYPE_LIVE);
     }
 
     @Override
     public void start(String bufferType) {
-        if ("live".equals(bufferType)) {
+        if (isShutdown.get()) {
+            if (debugEnabled) {
+                Log.w(TAG, "Cannot start " + bufferType + " scheduler - already shutdown");
+            }
+            return;
+        }
+
+        if (NRVideoConstants.EVENT_TYPE_LIVE.equals(bufferType)) {
             if (isLiveRunning.compareAndSet(false, true)) {
                 backgroundHandler.postDelayed(liveHarvestRunnable, 2000); // 2 seconds
+                if (debugEnabled) {
+                    Log.d(TAG, "Live scheduler started");
+                }
             }
-        } else { // "regular" or "ondemand"
-            if (isRegularRunning.compareAndSet(false, true)) {
-                backgroundHandler.postDelayed(regularHarvestRunnable, 5000); // 5 seconds
+        } else if (NRVideoConstants.EVENT_TYPE_ONDEMAND.equals(bufferType)) {
+            if (isOnDemandRunning.compareAndSet(false, true)) {
+                backgroundHandler.postDelayed(onDemandHarvestRunnable, 5000); // 5 seconds
+                if (debugEnabled) {
+                    Log.d(TAG, "OnDemand scheduler started");
+                }
             }
         }
     }
 
     @Override
     public void shutdown() {
-        boolean wasRegularRunning = isRegularRunning.getAndSet(false);
-        boolean wasLiveRunning = isLiveRunning.getAndSet(false);
-
-        if (wasRegularRunning || wasLiveRunning) {
-            // CRITICAL: Harvest remaining events immediately before shutdown
-            immediateHarvestAll();
-
-            // Remove all pending callbacks
-            backgroundHandler.removeCallbacks(regularHarvestRunnable);
-            backgroundHandler.removeCallbacks(liveHarvestRunnable);
-
-            // Quit background thread gracefully with API level compatibility
-            if (backgroundHandler.getLooper() != null) {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR2) {
-                    // API 18+: Use quitSafely() for graceful shutdown
-                    backgroundHandler.getLooper().quitSafely();
-                } else {
-                    // API 16-17: Use quit() - less graceful but compatible
-                    backgroundHandler.getLooper().quit();
-                }
+        if (isShutdown.compareAndSet(false, true)) {
+            if (debugEnabled) {
+                Log.d(TAG, "Shutting down scheduler");
             }
+
+            // Stop both schedulers
+            stopAllSchedulers();
+
+            // CRITICAL: Harvest remaining events immediately before shutdown
+            executeImmediateHarvest("SHUTDOWN");
+
+            // Cleanup handler thread
+            cleanupHandlerThread();
         }
     }
 
+    @Override
+    public void forceHarvest() {
+        executeImmediateHarvest("FORCE_HARVEST");
+    }
+
+    @Override
+    public boolean isRunning() {
+        return !isShutdown.get() && (isOnDemandRunning.get() || isLiveRunning.get());
+    }
+
     /**
-     * CRITICAL METHOD: Immediately harvest all pending events
-     * Called when app is backgrounded or closed to prevent data loss
+     * Pause scheduling (used by lifecycle observer for background behavior)
      */
-    public void immediateHarvestAll() {
+    public void pause() {
+        if (isShutdown.get()) return;
+
+        if (debugEnabled) {
+            Log.d(TAG, "Pausing scheduler");
+        }
+
+        removeAllCallbacks();
+    }
+
+    /**
+     * Resume scheduling with specified behavior (used by lifecycle observer)
+     */
+    public void resume(boolean useExtendedIntervals) {
+        if (isShutdown.get()) return;
+
+        if (debugEnabled) {
+            Log.d(TAG, "Resuming scheduler - Extended intervals: " + useExtendedIntervals);
+        }
+
+        removeAllCallbacks(); // Clear any existing callbacks
+
+        if (useExtendedIntervals && isAndroidTVDevice) {
+            // TV background behavior: extended intervals
+            resumeWithExtendedIntervals();
+        } else {
+            // Normal foreground behavior
+            resumeWithNormalIntervals();
+        }
+    }
+
+    // ========== PRIVATE HELPER METHODS ==========
+
+    /**
+     * Centralized method for immediate harvest execution
+     * Reduces code duplication and ensures consistent error handling
+     */
+    private void executeImmediateHarvest(String reason) {
+        if (debugEnabled) {
+            Log.d(TAG, "Executing immediate harvest - Reason: " + reason);
+        }
+
         try {
             // Execute both harvest tasks immediately and synchronously
-            if (regularHarvestTask != null) {
-                regularHarvestTask.run();
+            if (onDemandHarvestTask != null) {
+                onDemandHarvestTask.run();
             }
             if (liveHarvestTask != null) {
                 liveHarvestTask.run();
             }
         } catch (Exception e) {
-            android.util.Log.e("NRVideo", "Immediate harvest failed", e);
+            Log.e(TAG, "Immediate harvest failed for reason: " + reason, e);
         }
     }
 
-    @Override
-    public void onAppBackgrounded() {
-        // Use the pre-detected TV status for better performance
-        if (isAndroidTVDevice) {
-            // TV-specific: Reduce harvest frequency when paused instead of stopping
-            backgroundHandler.removeCallbacks(regularHarvestRunnable);
-            backgroundHandler.removeCallbacks(liveHarvestRunnable);
+    /**
+     * Stop all running schedulers without executing harvest
+     */
+    private void stopAllSchedulers() {
+        isOnDemandRunning.set(false);
+        isLiveRunning.set(false);
+        removeAllCallbacks();
+    }
 
-            // Immediate harvest
-            immediateHarvestAll();
-
-            // Resume with longer intervals (TV-optimized for pause state)
-            if (isRegularRunning.get()) {
-                backgroundHandler.postDelayed(regularHarvestRunnable, regularIntervalMs * 2); // Double interval
-            }
-            if (isLiveRunning.get()) {
-                backgroundHandler.postDelayed(liveHarvestRunnable, liveIntervalMs * 2);       // Double interval
-            }
-        } else {
-            // Mobile behavior: full pause
-            backgroundHandler.removeCallbacks(regularHarvestRunnable);
+    /**
+     * Remove all pending callbacks from the handler
+     */
+    private void removeAllCallbacks() {
+        if (backgroundHandler != null) {
+            backgroundHandler.removeCallbacks(onDemandHarvestRunnable);
             backgroundHandler.removeCallbacks(liveHarvestRunnable);
-            immediateHarvestAll();
         }
     }
 
-    @Override
-    public void onAppForegrounded() {
-        // Resume normal scheduling - works for both mobile and TV
-        backgroundHandler.removeCallbacks(regularHarvestRunnable); // Clear any existing scheduled tasks
-        backgroundHandler.removeCallbacks(liveHarvestRunnable);
+    /**
+     * Resume scheduling with extended intervals (TV background behavior)
+     */
+    private void resumeWithExtendedIntervals() {
+        if (isOnDemandRunning.get()) {
+            backgroundHandler.postDelayed(onDemandHarvestRunnable, onDemandIntervalMs * 2);
+        }
+        if (isLiveRunning.get()) {
+            backgroundHandler.postDelayed(liveHarvestRunnable, liveIntervalMs * 2);
+        }
+    }
 
-        // Resume with normal intervals
-        if (isRegularRunning.get()) {
-            backgroundHandler.postDelayed(regularHarvestRunnable, 1000); // Resume in 1 second
+    /**
+     * Resume scheduling with normal intervals (foreground behavior)
+     */
+    private void resumeWithNormalIntervals() {
+        if (isOnDemandRunning.get()) {
+            backgroundHandler.postDelayed(onDemandHarvestRunnable, 1000); // Resume in 1 second
         }
         if (isLiveRunning.get()) {
             backgroundHandler.postDelayed(liveHarvestRunnable, 500);     // Resume in 0.5 seconds
         }
     }
 
-    @Override
-    public void forceHarvest() {
-        immediateHarvestAll();
-    }
-
-    @Override
-    public boolean isRunning() {
-        return isRegularRunning.get() || isLiveRunning.get();
+    /**
+     * Cleanup handler thread gracefully
+     */
+    private void cleanupHandlerThread() {
+        if (backgroundHandler != null && backgroundHandler.getLooper() != null) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR2) {
+                // API 18+: Use quitSafely() for graceful shutdown
+                backgroundHandler.getLooper().quitSafely();
+            } else {
+                // API 16-17: Use quit() - less graceful but compatible
+                backgroundHandler.getLooper().quit();
+            }
+        }
     }
 }

@@ -14,6 +14,7 @@ import java.util.Map;
 /**
  * Optimized SQLite storage for crash recovery and failed event backup
  * Designed for minimal overhead - only used during failures/crashes
+ * No longer a singleton - managed by CrashSafeHarvestFactory
  */
 public class VideoEventStorage extends SQLiteOpenHelper {
 
@@ -27,17 +28,8 @@ public class VideoEventStorage extends SQLiteOpenHelper {
     private static final String COL_PRIORITY = "priority";
     private static final String COL_TIMESTAMP = "timestamp";
 
-    private static VideoEventStorage instance;
-
-    private VideoEventStorage(Context context) {
-        super(context, DB_NAME, null, DB_VERSION);
-    }
-
-    public static synchronized VideoEventStorage getInstance(Context context) {
-        if (instance == null) {
-            instance = new VideoEventStorage(context.getApplicationContext());
-        }
-        return instance;
+    public VideoEventStorage(Context context) {
+        super(context.getApplicationContext(), DB_NAME, null, DB_VERSION);
     }
 
     @Override

@@ -1,5 +1,6 @@
 package com.newrelic.videoagent.core.harvest;
 
+import android.content.Context;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
 
 /**
@@ -9,7 +10,7 @@ import com.newrelic.videoagent.core.NRVideoConfiguration;
  */
 public class HarvestComponentFactory {
     private final NRVideoConfiguration configuration;
-    private final android.content.Context context;
+    private final Context context;
 
     public HarvestComponentFactory(NRVideoConfiguration configuration, android.content.Context context) {
         this.configuration = configuration;
@@ -33,21 +34,13 @@ public class HarvestComponentFactory {
     }
 
     /**
-     * Creates a size estimator for mobile optimization
-     */
-    public SizeEstimator createSizeEstimator() {
-        return new DefaultSizeEstimator();
-    }
-
-    /**
      * Creates a multi-task scheduler for different harvest intervals
      */
-    public SchedulerInterface createScheduler(Runnable regularTask, Runnable liveTask) {
+    public SchedulerInterface createScheduler(Runnable onDemandTask, Runnable liveTask) {
         return new MultiTaskHarvestScheduler(
-            regularTask,
+            onDemandTask,
             liveTask,
-            configuration.getHarvestCycleSeconds(),
-            configuration.getLiveHarvestCycleSeconds()
+            configuration
         );
     }
 

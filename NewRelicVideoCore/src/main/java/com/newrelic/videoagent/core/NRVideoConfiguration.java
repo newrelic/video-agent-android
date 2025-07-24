@@ -45,7 +45,6 @@ public final class NRVideoConfiguration {
     private final int maxDeadLetterSize;
     private final boolean memoryOptimized;
     private final boolean debugLoggingEnabled;
-    private final boolean enableCrashSafety;
     private final boolean isTV;
 
     private NRVideoConfiguration(Builder builder) {
@@ -59,7 +58,6 @@ public final class NRVideoConfiguration {
         this.maxDeadLetterSize = builder.maxDeadLetterSize;
         this.memoryOptimized = builder.memoryOptimized;
         this.debugLoggingEnabled = builder.debugLoggingEnabled;
-        this.enableCrashSafety = builder.enableCrashSafety;
         this.isTV = builder.isTV;
     }
 
@@ -77,9 +75,6 @@ public final class NRVideoConfiguration {
     public int getMaxDeadLetterSize() { return maxDeadLetterSize; }
     public boolean isMemoryOptimized() { return memoryOptimized; }
     public boolean isDebugLoggingEnabled() { return debugLoggingEnabled; }
-    public boolean isCrashSafety() {
-        return enableCrashSafety;
-    }
     public boolean isTV() { return isTV; }
 
     /**
@@ -299,7 +294,6 @@ public final class NRVideoConfiguration {
         private int maxDeadLetterSize = 500;
         private boolean memoryOptimized = true;
         private boolean debugLoggingEnabled = false;
-        private boolean enableCrashSafety = true; // Always enabled for crash safety
         private boolean isTV = false;
 
         public Builder(String applicationToken) {
@@ -354,11 +348,6 @@ public final class NRVideoConfiguration {
             return this;
         }
 
-        public Builder disableCrashSafety() {
-            this.enableCrashSafety = false;
-            return this;
-        }
-
         private Builder isTV(boolean isTV) {
             this.isTV = isTV;
             return this;
@@ -410,34 +399,126 @@ public final class NRVideoConfiguration {
         }
 
         /**
-         * Detect if this is an Android TV device
+         * Comprehensive Android TV detection using multiple reliable methods
+         * Compatible with API 16+ and works across all Android TV devices
          */
         private boolean detectTVDevice(Context context) {
             try {
                 PackageManager pm = context.getPackageManager();
 
-                // Primary detection: Android TV Leanback UI
-                if (pm.hasSystemFeature("android.software.leanback")) {
+                // Method 1: Check for Android TV Leanback UI (most accurate)
+                if (pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)) {
                     return true;
                 }
 
-                // Secondary detection: Television feature
-                if (pm.hasSystemFeature("android.hardware.type.television")) {
+                // Method 2: Check for television feature
+                if (pm.hasSystemFeature(PackageManager.FEATURE_TELEVISION)) {
                     return true;
                 }
 
-                // Tertiary detection: No touchscreen requirement (TV indicator)
-                if (!pm.hasSystemFeature("android.hardware.touchscreen")) {
+                // Method 3: Check if touchscreen is NOT required (TV indicator)
+                if (!pm.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)) {
                     return true;
                 }
 
-                return false;
+                // Fallback: Use system properties and device characteristics
+                return detectTVFromSystemProperties();
+
             } catch (Exception e) {
                 if (debugLoggingEnabled) {
-                    Log.w(TAG, "TV detection failed, defaulting to mobile", e);
+                    Log.w(TAG, "PackageManager TV detection failed, using system properties fallback", e);
                 }
-                return false; // Default to mobile if detection fails
+                // If PackageManager detection fails, fall back to system properties
+                return detectTVFromSystemProperties();
             }
+        }
+
+        /**
+         * Fallback TV detection using system properties and device characteristics (API 16+ compatible)
+         */
+        private boolean detectTVFromSystemProperties() {
+            try {
+                // Method 1: Check build type for TV indicators
+                String buildType = android.os.Build.TYPE;
+                if (buildType != null && buildType.toLowerCase().contains("tv")) {
+                    return true;
+                }
+
+                // Method 2: Check device model for TV indicators
+                String model = android.os.Build.MODEL;
+                if (model != null) {
+                    String modelLower = model.toLowerCase();
+                    if (modelLower.contains("tv") || modelLower.contains("chromecast") ||
+                        modelLower.contains("android_tv") || modelLower.contains("shield") ||
+                        modelLower.contains("nexus_player") || modelLower.contains("mibox")) {
+                        return true;
+                    }
+                }
+
+                // Method 3: Check manufacturer for TV-specific brands
+                String manufacturer = android.os.Build.MANUFACTURER;
+                if (manufacturer != null) {
+                    String mfgLower = manufacturer.toLowerCase();
+                    if (mfgLower.contains("nvidia") && model != null && model.toLowerCase().contains("shield")) {
+                        return true; // NVIDIA Shield TV
+                    }
+                    if (mfgLower.contains("xiaomi") && model != null && model.toLowerCase().contains("mibox")) {
+                        return true; // Xiaomi Mi Box
+                    }
+                }
+
+                // Method 4: Check product name for TV indicators
+                String product = android.os.Build.PRODUCT;
+                if (product != null) {
+                    String productLower = product.toLowerCase();
+                    if (productLower.contains("tv") || productLower.contains("atv") ||
+                        productLower.contains("googletv") || productLower.contains("androidtv")) {
+                        return true;
+                    }
+                }
+
+                // Method 5: Use reflection to safely check system properties (if available)
+                return checkSystemPropertiesSafely();
+
+            } catch (Exception e) {
+                if (debugLoggingEnabled) {
+                    Log.w(TAG, "System properties TV detection failed, defaulting to mobile", e);
+                }
+                // If any method fails, assume mobile (safer default)
+                return false;
+            }
+        }
+
+        /**
+         * Safely check system properties using reflection to avoid compilation issues
+         */
+        private boolean checkSystemPropertiesSafely() {
+            try {
+                // Use reflection to access SystemProperties without direct import
+                Class<?> systemPropertiesClass = Class.forName("android.os.SystemProperties");
+                java.lang.reflect.Method getMethod = systemPropertiesClass.getMethod("get", String.class, String.class);
+
+                // Check ro.build.characteristics property
+                String characteristics = (String) getMethod.invoke(null, "ro.build.characteristics", "");
+                if (characteristics != null && !characteristics.isEmpty()) {
+                    String charLower = characteristics.toLowerCase();
+                    if (charLower.contains("tv") || charLower.contains("television")) {
+                        return true;
+                    }
+                }
+
+                // Check ro.build.type property
+                String buildType = (String) getMethod.invoke(null, "ro.build.type", "");
+                if ("tv".equals(buildType)) {
+                    return true;
+                }
+
+            } catch (Exception e) {
+                // Reflection failed - this is expected on some devices/Android versions
+                // SystemProperties access may be restricted
+            }
+
+            return false;
         }
 
     }

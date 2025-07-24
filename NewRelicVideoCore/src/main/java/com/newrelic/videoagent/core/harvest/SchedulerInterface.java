@@ -2,7 +2,7 @@ package com.newrelic.videoagent.core.harvest;
 
 /**
  * Interface for harvest scheduling implementations
- * Includes app lifecycle awareness for data loss prevention
+ * Includes lifecycle control methods for proper Android lifecycle management
  */
 public interface SchedulerInterface {
 
@@ -13,7 +13,7 @@ public interface SchedulerInterface {
 
     /**
      * Start a specific harvest task based on buffer type
-     * @param bufferType The type of buffer ("live" or "regular")
+     * @param bufferType The type of buffer ("live" or "ondemand")
      */
     void start(String bufferType);
 
@@ -22,18 +22,6 @@ public interface SchedulerInterface {
      * Should perform immediate harvest before shutdown to prevent data loss
      */
     void shutdown();
-
-    /**
-     * Called when app goes to background
-     * Should immediately harvest all pending events to prevent data loss
-     */
-    void onAppBackgrounded();
-
-    /**
-     * Called when app comes to foreground
-     * Can resume normal scheduling behavior
-     */
-    void onAppForegrounded();
 
     /**
      * Force immediate harvest of all pending events
@@ -45,4 +33,15 @@ public interface SchedulerInterface {
      * Check if scheduler is currently running
      */
     boolean isRunning();
+
+    /**
+     * Pause all scheduled harvests (used during app lifecycle changes)
+     */
+    void pause();
+
+    /**
+     * Resume scheduled harvests with optional extended intervals
+     * @param useExtendedIntervals true for background/TV behavior, false for normal intervals
+     */
+    void resume(boolean useExtendedIntervals);
 }

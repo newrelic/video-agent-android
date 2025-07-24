@@ -18,16 +18,18 @@ public class CrashSafeHarvestFactory extends HarvestComponentFactory {
     private final Context context;
     private CrashSafeEventBuffer crashSafeBuffer;
     private IntegratedDeadLetterHandler integratedHandler;
+    private VideoEventStorage videoEventStorage; // Managed storage instance
 
     public CrashSafeHarvestFactory(NRVideoConfiguration configuration, Context context) {
         super(configuration, context);
         this.context = context;
+        this.videoEventStorage = new VideoEventStorage(context); // Create instance here
     }
 
     @Override
     public EventBufferInterface createEventBuffer() {
         if (crashSafeBuffer == null) {
-            crashSafeBuffer = new CrashSafeEventBuffer(context, super.getConfiguration());
+            crashSafeBuffer = new CrashSafeEventBuffer(context, super.getConfiguration(), videoEventStorage);
         }
         return crashSafeBuffer;
     }
@@ -76,19 +78,46 @@ public class CrashSafeHarvestFactory extends HarvestComponentFactory {
     }
 
     /**
+     * Emergency backup for specific lifecycle events with context
+     * This method should be called by lifecycle observers for crash scenarios
+     */
+    public void performLifecycleEmergencyBackup(String reason, boolean isAndroidTV, int activeActivities) {
+        try {
+            if (videoEventStorage != null) {
+                // Create emergency lifecycle event
+                java.util.Map<String, Object> emergencyEvent = new java.util.HashMap<>();
+                emergencyEvent.put("eventType", "EMERGENCY_BACKUP");
+                emergencyEvent.put("reason", reason);
+                emergencyEvent.put("timestamp", System.currentTimeMillis());
+                emergencyEvent.put("deviceType", isAndroidTV ? "TV" : "Mobile");
+                emergencyEvent.put("activeActivities", activeActivities);
+
+                java.util.List<java.util.Map<String, Object>> events = new java.util.ArrayList<>();
+                events.add(emergencyEvent);
+
+                // Use the managed VideoEventStorage instance
+                videoEventStorage.backupFailedEvents(events);
+            }
+
+            // Perform regular emergency backup
+            performEmergencyBackup();
+
+        } catch (Exception e) {
+            System.err.println("[CrashSafeFactory] Lifecycle emergency backup failed: " + e.getMessage());
+        }
+    }
+
+    /**
      * Check if in recovery mode
      */
     public boolean isRecovering() {
-        return crashSafeBuffer != null && crashSafeBuffer.getRecoveryStats().isRecovering;
+        return crashSafeBuffer.getRecoveryStats().isRecovering;
     }
 
     /**
      * Get recovery statistics
      */
     public String getRecoveryStats() {
-        if (crashSafeBuffer != null) {
-            return crashSafeBuffer.getRecoveryStats().toString();
-        }
-        return "No crash-safe buffer initialized";
+        return crashSafeBuffer.getRecoveryStats().toString();
     }
 }

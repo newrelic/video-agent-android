@@ -6,6 +6,7 @@ import java.util.Map;
 /**
  * Interface for HTTP client implementations
  * Handles sending events to New Relic endpoints
+ * OPTIMIZED: Removed unused timeout and cleanup methods
  */
 public interface HttpClientInterface {
 
@@ -16,19 +17,4 @@ public interface HttpClientInterface {
      * @return true if successful, false otherwise
      */
     boolean sendEvents(List<Map<String, Object>> events, String endpointType);
-
-    /**
-     * Sets connection timeout in milliseconds
-     */
-    void setConnectionTimeout(int timeoutMs);
-
-    /**
-     * Sets read timeout in milliseconds
-     */
-    void setReadTimeout(int timeoutMs);
-
-    /**
-     * Cleans up resources
-     */
-    void cleanup();
 }

@@ -6,7 +6,7 @@ import android.content.Context;
 import android.util.Log;
 import androidx.media3.exoplayer.ExoPlayer;
 import com.newrelic.videoagent.core.harvest.HarvestManager;
-import com.newrelic.videoagent.core.harvest.HarvestComponentFactory;
+import com.newrelic.videoagent.core.lifecycle.NRVideoLifecycleObserver;
 import com.newrelic.videoagent.core.storage.CrashSafeHarvestFactory;
 import com.newrelic.videoagent.core.tracker.NRTracker;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
@@ -19,8 +19,6 @@ public final class NRVideo {
     private static final String TAG = "NRVideo";
 
     private volatile HarvestManager harvestManager;
-    private Context applicationContext;
-    private NRVideoConfiguration configuration;
 
     /**
      * Sets up the New Relic Video agent.
@@ -48,21 +46,31 @@ public final class NRVideo {
 
     private Integer initialize(ExoPlayer player, Context context, NRVideoConfiguration config) {
         try {
-            this.applicationContext = context.getApplicationContext();
-            this.configuration = config;
+            Context applicationContext = context.getApplicationContext();
 
-            // Initialize harvest components with crash safety
-            HarvestComponentFactory factory;
-            if (config.isCrashSafety() && context != null) {
-                factory = new CrashSafeHarvestFactory(config, applicationContext);
-            } else {
-                factory = new HarvestComponentFactory(config, applicationContext);
-            }
-
+            // Always use crash-safe storage - it's now the default behavior
+            CrashSafeHarvestFactory factory = new CrashSafeHarvestFactory(config, applicationContext);
             harvestManager = new HarvestManager(factory);
 
-            // Register lifecycle observer with the application for proper lifecycle management
-            registerLifecycleObserver();
+            // Create and register lifecycle observer with crash-safe factory
+            if (applicationContext instanceof Application) {
+                Application app = (Application) applicationContext;
+                NRVideoLifecycleObserver lifecycleObserver =
+                    new NRVideoLifecycleObserver(
+                        applicationContext,
+                        config,
+                        harvestManager,
+                        factory.createScheduler(harvestManager::harvestOnDemand, harvestManager::harvestLive),
+                        factory
+                    );
+
+                // Register with application
+                app.registerActivityLifecycleCallbacks(lifecycleObserver);
+
+                if (config.isDebugLoggingEnabled()) {
+                    Log.d(TAG, "Lifecycle observer created and registered with crash-safe storage");
+                }
+            }
 
             // Create trackers
             NRTracker adsTracker = null;
@@ -75,23 +83,6 @@ public final class NRVideo {
             return NewRelicVideoAgent.getInstance().start(adsTracker, tracker);
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialize NRVideo components", e);
-        }
-    }
-
-    /**
-     * Register lifecycle observer with the application for proper integration
-     */
-    private void registerLifecycleObserver() {
-        if (applicationContext instanceof Application && harvestManager != null) {
-            Application app = (Application) applicationContext;
-            com.newrelic.videoagent.core.lifecycle.NRVideoLifecycleObserver lifecycleObserver = harvestManager.getLifecycleObserver();
-            app.registerActivityLifecycleCallbacks(lifecycleObserver);
-
-            if (configuration.isDebugLoggingEnabled()) {
-                Log.d(TAG, "Lifecycle observer registered with application");
-            }
-        } else {
-            Log.w(TAG, "Warning: Could not register lifecycle observer - context is not Application instance");
         }
     }
 
