@@ -117,9 +117,7 @@ public class PriorityEventBuffer implements EventBufferInterface {
             ondemandEvents.poll();
         }
 
-        // IMPORTANT: Call callbacks AFTER all queue operations are complete
         if (shouldStartScheduler) {
-            // Start scheduler immediately when first event arrives
             capacityCallback.onCapacityThresholdReached(0.0, isLiveContent ? NRVideoConstants.EVENT_TYPE_LIVE : NRVideoConstants.EVENT_TYPE_ONDEMAND);
         }
 

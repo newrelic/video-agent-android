@@ -27,10 +27,10 @@ public class HarvestComponentFactory {
 
     /**
      * Creates a dead letter queue for failed events
-     * Uses isTV flag from configuration for consistency
+     * Uses dedicated DeadLetterEventBuffer for cleaner separation of concerns
      */
     public EventBufferInterface createDeadLetterQueue() {
-        return new PriorityEventBuffer(configuration.isTV());
+        return new DeadLetterEventBuffer(configuration.isTV());
     }
 
     /**

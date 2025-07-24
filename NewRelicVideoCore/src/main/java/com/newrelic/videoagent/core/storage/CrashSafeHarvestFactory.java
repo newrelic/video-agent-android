@@ -5,9 +5,8 @@ import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.harvest.HarvestComponentFactory;
 import com.newrelic.videoagent.core.harvest.EventBufferInterface;
 import com.newrelic.videoagent.core.harvest.HttpClientInterface;
-import com.newrelic.videoagent.core.harvest.SchedulerInterface;
 import com.newrelic.videoagent.core.harvest.OptimizedHttpClient;
-import com.newrelic.videoagent.core.harvest.PriorityEventBuffer;
+import com.newrelic.videoagent.core.harvest.DeadLetterEventBuffer;
 
 /**
  * Clean integration factory for crash-safe storage
@@ -36,8 +35,8 @@ public class CrashSafeHarvestFactory extends HarvestComponentFactory {
 
     @Override
     public EventBufferInterface createDeadLetterQueue() {
-        // Regular in-memory queue for dead letter operations
-        return new PriorityEventBuffer();
+        // Use dedicated dead letter buffer - cleaner separation of concerns
+        return new DeadLetterEventBuffer(getConfiguration().isTV());
     }
 
     @Override
