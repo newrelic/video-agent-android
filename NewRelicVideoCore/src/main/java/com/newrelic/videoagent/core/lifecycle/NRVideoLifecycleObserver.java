@@ -114,7 +114,8 @@ public class NRVideoLifecycleObserver implements Application.ActivityLifecycleCa
     }
 
     /**
-     * Emergency harvest - used for background, crashes, and critical scenarios
+     * Emergency backup - prioritize SQLite storage over immediate network harvest
+     * Network harvest during lifecycle transitions is unreliable
      */
     private void performEmergencyHarvest(String reason) {
         if (!emergencyBackupInProgress.compareAndSet(false, true)) {
@@ -122,17 +123,19 @@ public class NRVideoLifecycleObserver implements Application.ActivityLifecycleCa
         }
 
         try {
-            // Force harvest manager to send all pending events (includes scheduler tasks)
-            harvestManager.forceHarvestAll();
+            // SKIP immediate network harvest - prioritize reliable SQLite backup
+            // Immediate network operations during app lifecycle transitions often fail
+
+            // Always perform emergency backup to SQLite (reliable)
+            crashSafeFactory.performEmergencyBackup();
 
             if (configuration.isDebugLoggingEnabled()) {
-                Log.d("LifecycleObserver", "Emergency harvest completed - " +
-                    (isAndroidTV ? "TV" : "Mobile") + " - Reason: " + reason);
+                Log.d("LifecycleObserver", "Emergency backup to SQLite completed - " +
+                    (isAndroidTV ? "TV" : "Mobile") + " - Reason: " + reason +
+                    " (network harvest skipped for reliability)");
             }
         } catch (Exception e) {
-            Log.e("LifecycleObserver", "Emergency harvest failed: " + e.getMessage());
-            // Last resort: delegate to storage layer for emergency backup
-            crashSafeFactory.performLifecycleEmergencyBackup(reason, isAndroidTV, activeActivities.get());
+            Log.e("LifecycleObserver", "Emergency backup failed: " + e.getMessage());
         } finally {
             emergencyBackupInProgress.set(false);
         }
@@ -150,9 +153,6 @@ public class NRVideoLifecycleObserver implements Application.ActivityLifecycleCa
             public void uncaughtException(Thread thread, Throwable exception) {
                 // CRITICAL: Immediate emergency harvest and storage before crash
                 performEmergencyHarvest("APP_CRASH");
-                // Delegate emergency storage to storage layer
-                crashSafeFactory.performLifecycleEmergencyBackup("APP_CRASH", isAndroidTV, activeActivities.get());
-
                 if (defaultHandler != null) {
                     defaultHandler.uncaughtException(thread, exception);
                 } else {

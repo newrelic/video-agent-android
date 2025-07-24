@@ -76,35 +76,6 @@ public class CrashSafeHarvestFactory extends HarvestComponentFactory {
         }
     }
 
-    /**
-     * Emergency backup for specific lifecycle events with context
-     * This method should be called by lifecycle observers for crash scenarios
-     */
-    public void performLifecycleEmergencyBackup(String reason, boolean isAndroidTV, int activeActivities) {
-        try {
-            if (videoEventStorage != null) {
-                // Create emergency lifecycle event
-                java.util.Map<String, Object> emergencyEvent = new java.util.HashMap<>();
-                emergencyEvent.put("eventType", "EMERGENCY_BACKUP");
-                emergencyEvent.put("reason", reason);
-                emergencyEvent.put("timestamp", System.currentTimeMillis());
-                emergencyEvent.put("deviceType", isAndroidTV ? "TV" : "Mobile");
-                emergencyEvent.put("activeActivities", activeActivities);
-
-                java.util.List<java.util.Map<String, Object>> events = new java.util.ArrayList<>();
-                events.add(emergencyEvent);
-
-                // Use the managed VideoEventStorage instance
-                videoEventStorage.backupFailedEvents(events);
-            }
-
-            // Perform regular emergency backup
-            performEmergencyBackup();
-
-        } catch (Exception e) {
-            System.err.println("[CrashSafeFactory] Lifecycle emergency backup failed: " + e.getMessage());
-        }
-    }
 
     /**
      * Check if in recovery mode

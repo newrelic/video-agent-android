@@ -35,14 +35,8 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
         this.eventBuffer = factory.createEventBuffer();
         this.httpClient = factory.createHttpClient();
 
-        // Create IntegratedDeadLetterHandler with crash-safe integration
-        CrashSafeEventBuffer crashSafeBuffer = (CrashSafeEventBuffer) this.eventBuffer;
-        this.deadLetterHandler = new IntegratedDeadLetterHandler(
-            factory.createDeadLetterQueue(),
-            crashSafeBuffer,
-            httpClient,
-            factory.getConfiguration()
-        );
+        // Use factory method to create IntegratedDeadLetterHandler for proper integration
+        this.deadLetterHandler = factory.createIntegratedDeadLetterHandler(httpClient);
 
         this.scheduler = factory.createScheduler(this::harvestOnDemand, this::harvestLive);
 
