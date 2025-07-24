@@ -13,34 +13,110 @@ import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 
 /**
  * New Relic Video Agent - Android Mobile & TV Optimized
+ * Singleton pattern with Builder for robust initialization
  * Supports ExoPlayer and IMA with automatic device detection
  */
 public final class NRVideo {
     private static final String TAG = "NRVideo";
 
+    // Singleton instance
+    private static volatile NRVideo instance;
+    private static final Object lock = new Object();
+
     private volatile HarvestManager harvestManager;
+    private volatile boolean isInitialized = false;
+
+    // Private constructor for singleton
+    private NRVideo() {}
 
     /**
-     * Sets up the New Relic Video agent.
-     *
-     * @param player The ExoPlayer instance.
-     * @param context The application context.
-     * @param config The video agent configuration.
-     * @return The tracker ID.
+     * Get the singleton instance
+     * @return NRVideo instance, or null if not initialized yet
      */
-    public Integer setUP(ExoPlayer player, Context context, NRVideoConfiguration config) {
-        return initialize(player, context, config);
+    public static NRVideo getInstance() {
+        return instance;
     }
 
     /**
-     * Records a custom event.
+     * Check if NRVideo is initialized and ready for use
+     */
+    public static boolean isInitialized() {
+        return instance != null && instance.isInitialized;
+    }
+
+    /**
+     * Records a custom event - safe to call from trackers
      *
      * @param eventType The event type.
      * @param attributes A map of attributes for the event.
      */
     public void recordEvent(String eventType, Map<String, Object> attributes) {
-        if (harvestManager != null) {
+        if (harvestManager != null && isInitialized) {
             harvestManager.recordCustomEvent(eventType, attributes);
+        } else {
+            Log.w(TAG, "recordEvent called before NRVideo is fully initialized - event dropped");
+        }
+    }
+
+    /**
+     * Create a new builder for setting up NRVideo
+     * @param context The application context
+     * @return Builder instance
+     */
+    public static Builder newBuilder(Context context) {
+        return new Builder(context);
+    }
+
+    /**
+     * Builder pattern for robust NRVideo initialization
+     */
+    public static class Builder {
+        private final Context context;
+        private NRVideoConfiguration config;
+        private ExoPlayer player;
+
+        private Builder(Context context) {
+            this.context = context.getApplicationContext();
+        }
+
+        public Builder withConfiguration(NRVideoConfiguration config) {
+            this.config = config;
+            return this;
+        }
+
+        public Builder withPlayer(ExoPlayer player) {
+            this.player = player;
+            return this;
+        }
+
+        /**
+         * Build and initialize NRVideo singleton
+         * @return The tracker ID
+         * @throws IllegalStateException if required parameters are missing
+         * @throws RuntimeException if initialization fails or already initialized
+         */
+        public Integer build() {
+            if (config == null) {
+                throw new IllegalStateException("Configuration is required - call withConfiguration()");
+            }
+            if (player == null) {
+                throw new IllegalStateException("ExoPlayer is required - call withPlayer()");
+            }
+
+            // Check if already initialized (fast path - no lock needed)
+            if (instance != null && instance.isInitialized) {
+                throw new RuntimeException("NRVideo is already initialized. Multiple initialization attempts are not allowed.");
+            }
+
+            synchronized (lock) {
+                // Double-check after acquiring lock
+                if (instance != null && instance.isInitialized) {
+                    throw new RuntimeException("NRVideo is already initialized. Multiple initialization attempts are not allowed.");
+                }
+
+                instance = new NRVideo();
+                return instance.initialize(player, context, config);
+            }
         }
     }
 
@@ -51,9 +127,6 @@ public final class NRVideo {
             // Always use crash-safe storage - it's now the default behavior
             CrashSafeHarvestFactory factory = new CrashSafeHarvestFactory(config, applicationContext);
             harvestManager = new HarvestManager(factory);
-
-            // CRITICAL: Inject this NRVideo instance into NRTracker so trackers can record events
-            NRTracker.injectVideoAgent(this);
 
             // Create and register lifecycle observer with crash-safe factory
             if (applicationContext instanceof Application) {
@@ -83,8 +156,20 @@ public final class NRVideo {
             }
             ((NRVideoTracker) tracker).setPlayer(player);
 
-            return NewRelicVideoAgent.getInstance().start(tracker, adsTracker);
+            // Mark as fully initialized BEFORE starting trackers
+            isInitialized = true;
+
+            // Now start the tracker system
+            Integer trackerId = NewRelicVideoAgent.getInstance().start(adsTracker, tracker);
+
+            if (config.isDebugLoggingEnabled()) {
+                Log.d(TAG, "NRVideo initialization completed successfully with tracker ID: " + trackerId);
+            }
+
+            return trackerId;
         } catch (Exception e) {
+            // Clean up on failure
+            instance = null;
             throw new RuntimeException("Failed to initialize NRVideo components", e);
         }
     }
@@ -192,5 +277,4 @@ public final class NRVideo {
     public void setGlobalAttribute(String key, Object value) {
         NewRelicVideoAgent.getInstance().setGlobalAttribute(key, value);
     }
-
 }

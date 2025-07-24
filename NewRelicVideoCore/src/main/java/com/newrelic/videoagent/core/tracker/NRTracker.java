@@ -154,7 +154,7 @@ public class NRTracker {
 
         if (preSend(action, attributes)) {
             attributes.put("actionName", action);
-            NRVideo videoAgent = getInjectedVideoAgent();
+            NRVideo videoAgent = NRVideo.getInstance();
             if (videoAgent != null) {
                 videoAgent.recordEvent(eventType, attributes);
             } else {
@@ -249,12 +249,4 @@ public class NRTracker {
         return NewRelicVideoAgent.getInstance().getSessionId();
     }
 
-    // Dependency injection for NRVideo
-    private static NRVideo injectedVideoAgent;
-    public static void injectVideoAgent(NRVideo agent) {
-        injectedVideoAgent = agent;
-    }
-    public static NRVideo getInjectedVideoAgent() {
-        return injectedVideoAgent;
-    }
 }
