@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
+import com.newrelic.videoagent.core.NRVideoConstants;
 import com.newrelic.videoagent.core.harvest.EventBufferInterface;
 import com.newrelic.videoagent.core.harvest.PriorityEventBuffer;
 import com.newrelic.videoagent.core.harvest.SizeEstimator;
@@ -144,8 +145,8 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
      */
     public void emergencyBackup() {
         try {
-            List<Map<String, Object>> liveEvents = memoryBuffer.pollBatchByPriority(Integer.MAX_VALUE, null, "live");
-            List<Map<String, Object>> ondemandEvents = memoryBuffer.pollBatchByPriority(Integer.MAX_VALUE, null, "ondemand");
+            List<Map<String, Object>> liveEvents = memoryBuffer.pollBatchByPriority(Integer.MAX_VALUE, null, NRVideoConstants.EVENT_TYPE_LIVE);
+            List<Map<String, Object>> ondemandEvents = memoryBuffer.pollBatchByPriority(Integer.MAX_VALUE, null, NRVideoConstants.EVENT_TYPE_ONDEMAND);
 
             if (!liveEvents.isEmpty() || !ondemandEvents.isEmpty()) {
                 storage.backupEvents(liveEvents, ondemandEvents);
@@ -242,7 +243,7 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
 
     // Helper methods
     private int getOptimalBatchSize(String priority) {
-        int baseSize = "live".equals(priority) ? 50 : 100;
+        int baseSize = NRVideoConstants.EVENT_TYPE_LIVE.equals(priority) ? 50 : 100;
         return isTVDevice ? baseSize * 2 : baseSize; // TV can handle larger batches
     }
 

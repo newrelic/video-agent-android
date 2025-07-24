@@ -5,7 +5,6 @@ import com.newrelic.videoagent.core.auth.TokenManager;
 import com.newrelic.videoagent.core.device.DeviceInformation;
 import android.util.Log;
 import com.newrelic.videoagent.core.util.JsonStreamUtil;
-import org.json.JSONArray;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -18,18 +17,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * Optimized HTTP client for mobile/TV environments with domain resilience
+ * Optimized HTTP client for mobile/TV environments
  * Uses only Android built-in APIs to avoid external dependencies
  * Features:
  * - Automatic app token management with persistent caching
- * - Multiple primary domains with intelligent failover
- * - Backup domains for extreme network conditions
- * - Circuit breaker pattern for failed domains
+ * - Regional endpoint selection
  * - Mobile/TV specific optimizations (battery, bandwidth)
  * - Connection reuse where possible
  * - Device information integration for analytics
@@ -42,102 +37,33 @@ public class OptimizedHttpClient implements HttpClientInterface {
     private final TokenManager tokenManager;
     private final DeviceInformation deviceInfo;
 
-    // Region-based domain configuration
-    private static final Map<String, List<String>> REGIONAL_PRIMARY_DOMAINS = new HashMap<>();
-    private static final Map<String, List<String>> REGIONAL_BACKUP_DOMAINS = new HashMap<>();
+    // Simplified regional endpoint configuration
+    private static final Map<String, String> REGIONAL_ENDPOINTS = new HashMap<>();
 
     static {
-        // US region domains (North America)
-        REGIONAL_PRIMARY_DOMAINS.put("US", Arrays.asList(
-            "https://mobile-collector.newrelic.com/mobile/v3/data"
-//            "https://mobile-collector-01.newrelic.com/mobile/v3/data",
-//            "https://mobile-collector-02.newrelic.com/mobile/v3/data"
-        ));
-        REGIONAL_BACKUP_DOMAINS.put("US", Arrays.asList(
-            "https://mobile-collector.newrelic.com/mobile/v3/data"
-//            "https://mobile-collector-fallback.newrelic.com/mobile/v3/data"
-        ));
-
-        // EU region domains (Europe)
-//        REGIONAL_PRIMARY_DOMAINS.put("EU", Arrays.asList(
-//            "https://mobile-collector.eu.newrelic.com/mobile/v3/data",
-//            "https://mobile-collector-01.eu.newrelic.com/mobile/v3/data",
-//            "https://mobile-collector-02.eu.newrelic.com/mobile/v3/data"
-//        ));
-//        REGIONAL_BACKUP_DOMAINS.put("EU", Arrays.asList(
-//            "https://mobile-collector-backup.eu.newrelic.com/mobile/v3/data",
-//            "https://mobile-collector-fallback.eu.newrelic.com/mobile/v3/data"
-//        ));
-//
-//        // AP region domains (Asia-Pacific)
-//        REGIONAL_PRIMARY_DOMAINS.put("AP", Arrays.asList(
-//            "https://mobile-collector.ap.newrelic.com/mobile/v3/data",
-//            "https://mobile-collector-01.ap.newrelic.com/mobile/v3/data",
-//            "https://mobile-collector-02.ap.newrelic.com/mobile/v3/data"
-//        ));
-//        REGIONAL_BACKUP_DOMAINS.put("AP", Arrays.asList(
-//            "https://mobile-collector-backup.ap.newrelic.com/mobile/v3/data",
-//            "https://mobile-collector-fallback.ap.newrelic.com/mobile/v3/data"
-//        ));
-//
-//        // GOV region domains (US Government Cloud)
-//        REGIONAL_PRIMARY_DOMAINS.put("GOV", Arrays.asList(
-//            "https://mobile-collector.gov.newrelic.com/mobile/v3/data",
-//            "https://mobile-collector-01.gov.newrelic.com/mobile/v3/data",
-//            "https://mobile-collector-02.gov.newrelic.com/mobile/v3/data"
-//        ));
-//        REGIONAL_BACKUP_DOMAINS.put("GOV", Arrays.asList(
-//            "https://mobile-collector-backup.gov.newrelic.com/mobile/v3/data",
-//            "https://mobile-collector-fallback.gov.newrelic.com/mobile/v3/data"
-//        ));
-//
-//        // STAGING region domains (for development/testing)
-//        REGIONAL_PRIMARY_DOMAINS.put("STAGING", Arrays.asList(
-//            "https://mobile-collector.staging.newrelic.com/mobile/v3/data",
-//            "https://mobile-collector-01.staging.newrelic.com/mobile/v3/data",
-//            "https://mobile-collector-02.staging.newrelic.com/mobile/v3/data"
-//        ));
-//        REGIONAL_BACKUP_DOMAINS.put("STAGING", Arrays.asList(
-//            "https://mobile-collector-backup.staging.newrelic.com/mobile/v3/data",
-//            "https://mobile-collector-fallback.staging.newrelic.com/mobile/v3/data"
-//        ));
-
-        // Default fallback for other regions (use US)
-        REGIONAL_PRIMARY_DOMAINS.put("DEFAULT", REGIONAL_PRIMARY_DOMAINS.get("US"));
-        REGIONAL_BACKUP_DOMAINS.put("DEFAULT", REGIONAL_BACKUP_DOMAINS.get("US"));
+        REGIONAL_ENDPOINTS.put("US", "https://mobile-collector.newrelic.com/mobile/v3/data");
+        REGIONAL_ENDPOINTS.put("EU", "https://mobile-collector.eu.newrelic.com/mobile/v3/data");
+        REGIONAL_ENDPOINTS.put("AP", "https://mobile-collector.ap.newrelic.com/mobile/v3/data");
+        REGIONAL_ENDPOINTS.put("GOV", "https://mobile-collector.gov.newrelic.com/mobile/v3/data");
+        REGIONAL_ENDPOINTS.put("STAGING", "https://mobile-collector.staging.newrelic.com/mobile/v3/data");
+        REGIONAL_ENDPOINTS.put("DEFAULT", REGIONAL_ENDPOINTS.get("US"));
     }
 
-    // Pre-computed URLs for current region
-    private final List<String> primaryUrls;
-    private final List<String> backupUrls;
+    // Single endpoint URL for current region
+    private final String endpointUrl;
 
-    // Circular failover state
-    private final AtomicInteger currentPrimaryIndex = new AtomicInteger(0);
-    private final AtomicInteger currentBackupIndex = new AtomicInteger(0);
-    private final AtomicLong lastFailureTime = new AtomicLong(0);
-    private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
-    private volatile boolean usingBackupDomains = false;
-
-    // Mobile/TV optimized timeouts - aligned with New Relic Android Agent 7.6.3
-    private int connectionTimeoutMs = 30000;  // 30 seconds - standard for New Relic mobile agents
-    private int readTimeoutMs = 60000;        // 60 seconds - standard for New Relic mobile agents
-
-    // Circuit breaker settings
-    private static final int MAX_CONSECUTIVE_FAILURES = 3;
-    private static final long CIRCUIT_BREAKER_TIMEOUT = 300000; // 5 minutes
+    // Mobile/TV optimized timeouts
+    private int connectionTimeoutMs = 30000;  // 30 seconds
+    private int readTimeoutMs = 60000;        // 60 seconds
 
     public OptimizedHttpClient(NRVideoConfiguration configuration, android.content.Context context) {
         this.configuration = configuration;
         this.tokenManager = new TokenManager(context, configuration);
         this.deviceInfo = DeviceInformation.getInstance(context);
 
-        // Pre-compute URLs based on region
+        // Set endpoint URL based on region, defaulting to US if not found
         String region = configuration.getRegion().toUpperCase();
-
-        // Use regional domains with fallback to DEFAULT if region not found
-        String regionKey = REGIONAL_PRIMARY_DOMAINS.containsKey(region) ? region : "DEFAULT";
-        this.primaryUrls = REGIONAL_PRIMARY_DOMAINS.get(regionKey);
-        this.backupUrls = REGIONAL_BACKUP_DOMAINS.get(regionKey);
+        this.endpointUrl = REGIONAL_ENDPOINTS.getOrDefault(region, REGIONAL_ENDPOINTS.get("DEFAULT"));
 
         if (configuration.isMemoryOptimized()) {
             connectionTimeoutMs = 6000;
@@ -151,8 +77,7 @@ public class OptimizedHttpClient implements HttpClientInterface {
 
         if (configuration.isDebugLoggingEnabled()) {
             Log.d(TAG, "Initialized with region: " + region +
-                  ", primary URLs: " + (primaryUrls != null ? primaryUrls.size() : 0) +
-                  ", backup URLs: " + (backupUrls != null ? backupUrls.size() : 0));
+                  ", endpoint URL: " + endpointUrl);
         }
     }
 
@@ -162,12 +87,7 @@ public class OptimizedHttpClient implements HttpClientInterface {
             return true;
         }
 
-        // Check and reset circuit breaker if enough time has passed
-        if (shouldResetCircuitBreaker()) {
-            resetToPrimary();
-        }
-
-        // Attempt to send with domain failover and immediate retries
+        // Attempt to send with immediate retries
         return sendEventsWithRetry(events);
     }
 
@@ -177,21 +97,15 @@ public class OptimizedHttpClient implements HttpClientInterface {
 
         while (attempt < maxRetryAttempts) {
             try {
-                String currentUrl = selectOptimalUrl();
-
-                boolean result = performHttpRequest(events, currentUrl);
+                boolean result = performHttpRequest(events, endpointUrl);
                 if (result) {
-                    consecutiveFailures.set(0); // Reset on success
                     if (configuration.isDebugLoggingEnabled()) {
-                        Log.d(TAG, "Successfully sent " + events.size() + " events on attempt " + (attempt + 1) + " to " + currentUrl);
+                        Log.d(TAG, "Successfully sent " + events.size() + " events on attempt " + (attempt + 1) + " to " + endpointUrl);
                     }
                     return true;
                 }
 
-                markDomainFailed();
-
             } catch (IOException e) {
-                markDomainFailed();
                 if (configuration.isDebugLoggingEnabled()) {
                     Log.w(TAG, "Attempt " + (attempt + 1) + " failed: " + e.getMessage());
                 }
@@ -374,83 +288,6 @@ public class OptimizedHttpClient implements HttpClientInterface {
      */
     private void streamJsonToOutputStream(List<Object> events, OutputStream outputStream) throws IOException {
         JsonStreamUtil.streamJsonToOutputStream(events, outputStream);
-    }
-
-    private String selectOptimalUrl() {
-        if (usingBackupDomains) {
-            return selectBackupUrl();
-        } else {
-            return selectPrimaryUrl();
-        }
-    }
-
-    private String selectPrimaryUrl() {
-        int index = currentPrimaryIndex.get();
-        return primaryUrls.get(index % primaryUrls.size());
-    }
-
-    private String selectBackupUrl() {
-        int index = currentBackupIndex.get();
-        return backupUrls.get(index % backupUrls.size());
-    }
-
-    private void markDomainFailed() {
-        int failures = consecutiveFailures.incrementAndGet();
-        lastFailureTime.set(System.currentTimeMillis());
-
-        if (failures >= MAX_CONSECUTIVE_FAILURES) {
-            if (!usingBackupDomains) {
-                usingBackupDomains = true;
-                currentBackupIndex.set(0);
-                if (configuration.isDebugLoggingEnabled()) {
-                    Log.w(TAG, "Circuit breaker activated: switching to backup domains after " + failures + " failures");
-                }
-            } else {
-                // Rotate to next backup domain in circular fashion
-                int currentIndex = currentBackupIndex.get();
-                int nextIndex = (currentIndex + 1) % backupUrls.size();
-                currentBackupIndex.set(nextIndex);
-                if (configuration.isDebugLoggingEnabled()) {
-                    Log.d(TAG, "Rotating to next backup URL: " + backupUrls.get(nextIndex));
-                }
-            }
-        } else {
-            if (!usingBackupDomains) {
-                // Rotate to next primary domain in circular fashion
-                int currentIndex = currentPrimaryIndex.get();
-                int nextIndex = (currentIndex + 1) % primaryUrls.size();
-                currentPrimaryIndex.set(nextIndex);
-                if (configuration.isDebugLoggingEnabled()) {
-                    Log.d(TAG, "Rotating to next primary URL: " + primaryUrls.get(nextIndex));
-                }
-            }
-        }
-    }
-
-    private boolean shouldResetCircuitBreaker() {
-        long timeSinceLastFailure = System.currentTimeMillis() - lastFailureTime.get();
-        return timeSinceLastFailure > CIRCUIT_BREAKER_TIMEOUT;
-    }
-
-    private void resetToPrimary() {
-        usingBackupDomains = false;
-        consecutiveFailures.set(0);
-        currentPrimaryIndex.set(0);
-        currentBackupIndex.set(0);
-
-        if (configuration.isDebugLoggingEnabled()) {
-            Log.d(TAG, "Circuit breaker reset: returning to primary domains");
-        }
-    }
-
-
-    private String escapeJsonString(String str) {
-        if (str == null) return "null";
-        return str.replace("\\", "\\\\")
-                 .replace("\"", "\\\"")
-                 .replace("\n", "\\n")
-                 .replace("\r", "\\r")
-                 .replace("\t", "\\t");
     }
 
 }
