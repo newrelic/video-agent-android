@@ -337,7 +337,14 @@ public class TokenManager {
             return new ArrayList<>();
         }
 
-        // Parse comma-separated long values with optimized approach
+        return parseTokenArray(arrayContent, "data_token");
+    }
+
+    /**
+     * Parse comma-separated token array content into List<Long>
+     * Optimized for mobile/TV performance with minimal object allocation
+     */
+    private List<Long> parseTokenArray(String arrayContent, String context) {
         // Pre-allocate ArrayList with estimated capacity to reduce memory allocations
         List<Long> tokenList = new ArrayList<>(4); // Most tokens have 2-4 elements
 
@@ -348,29 +355,40 @@ public class TokenManager {
         for (int i = 0; i < arrayContent.length(); i++) {
             char c = arrayContent.charAt(i);
 
-            if (c == ',' || i == arrayContent.length() - 1) {
-                // End of token or end of string - parse accumulated token
-                if (tokenBuilder.length() > 0) {
-                    String tokenStr = tokenBuilder.toString().trim();
-                    if (!tokenStr.isEmpty()) {
-                        try {
-                            long value = Long.parseLong(tokenStr);
-                            tokenList.add(value);
-                        } catch (NumberFormatException e) {
-                            if (configuration.isDebugLoggingEnabled()) {
-                                Log.w("TokenManager", "Invalid number format in data_token: " + tokenStr);
-                            }
-                        }
-                    }
-                    tokenBuilder.setLength(0); // Reset StringBuilder for reuse
-                }
+            if (c == ',') {
+                // End of token - parse accumulated token
+                parseAndAddToken(tokenBuilder, tokenList, context);
             } else if (!Character.isWhitespace(c)) {
-                // Only append non-whitespace characters
+                // Append non-whitespace characters (digits, etc.)
                 tokenBuilder.append(c);
             }
         }
 
+        // Handle the last token (after the final comma or if no commas exist)
+        parseAndAddToken(tokenBuilder, tokenList, context);
+
         return tokenList;
+    }
+
+    /**
+     * Parse and add a single token from StringBuilder to the token list
+     * Handles the common parsing logic to eliminate duplication
+     */
+    private void parseAndAddToken(StringBuilder tokenBuilder, List<Long> tokenList, String context) {
+        if (tokenBuilder.length() > 0) {
+            String tokenStr = tokenBuilder.toString().trim();
+            if (!tokenStr.isEmpty()) {
+                try {
+                    long value = Long.parseLong(tokenStr);
+                    tokenList.add(value);
+                } catch (NumberFormatException e) {
+                    if (configuration.isDebugLoggingEnabled()) {
+                        Log.w("TokenManager", "Invalid number format in " + context + ": " + tokenStr);
+                    }
+                }
+            }
+            tokenBuilder.setLength(0); // Reset StringBuilder for reuse
+        }
     }
 
     /**
@@ -417,37 +435,7 @@ public class TokenManager {
                     return new ArrayList<>();
                 }
 
-                // Use optimized parsing similar to extractTokenFromResponse
-                List<Long> tokenList = new ArrayList<>(4); // Pre-allocate with estimated capacity
-                StringBuilder tokenBuilder = new StringBuilder(16); // Reusable StringBuilder
-
-                // Parse character by character to avoid split() overhead
-                for (int i = 0; i < content.length(); i++) {
-                    char c = content.charAt(i);
-
-                    if (c == ',' || i == content.length() - 1) {
-                        // End of token or end of string
-                        if (tokenBuilder.length() > 0) {
-                            String tokenStr = tokenBuilder.toString().trim();
-                            if (!tokenStr.isEmpty()) {
-                                try {
-                                    long value = Long.parseLong(tokenStr);
-                                    tokenList.add(value);
-                                } catch (NumberFormatException e) {
-                                    if (configuration.isDebugLoggingEnabled()) {
-                                        Log.w("TokenManager", "Invalid cached token format: " + tokenStr);
-                                    }
-                                }
-                            }
-                            tokenBuilder.setLength(0); // Reset for reuse
-                        }
-                    } else if (!Character.isWhitespace(c)) {
-                        // Only append non-whitespace characters
-                        tokenBuilder.append(c);
-                    }
-                }
-
-                return tokenList;
+                return parseTokenArray(content, "cached token");
             }
         } catch (Exception e) {
             if (configuration.isDebugLoggingEnabled()) {
