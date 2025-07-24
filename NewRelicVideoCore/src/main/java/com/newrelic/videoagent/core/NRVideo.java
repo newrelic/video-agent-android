@@ -45,26 +45,35 @@ public final class NRVideo {
     }
 
     /**
-     * Records a custom event - safe to call from trackers
-     *
-     * @param eventType The event type.
-     * @param attributes A map of attributes for the event.
-     */
-    public void recordEvent(String eventType, Map<String, Object> attributes) {
-        if (harvestManager != null && isInitialized) {
-            harvestManager.recordCustomEvent(eventType, attributes);
-        } else {
-            Log.w(TAG, "recordEvent called before NRVideo is fully initialized - event dropped");
-        }
-    }
-
-    /**
      * Create a new builder for setting up NRVideo
      * @param context The application context
      * @return Builder instance
      */
     public static Builder newBuilder(Context context) {
         return new Builder(context);
+    }
+
+    /**
+     * Static convenience method for recording events without needing getInstance()
+     *
+     * @param eventType The event type.
+     * @param attributes A map of attributes for the event.
+     */
+    public static void recordEvent(String eventType, Map<String, Object> attributes) {
+        if (instance != null && instance.isInitialized) {
+            instance.harvestManager.recordCustomEvent(eventType, attributes);
+        } else {
+            Log.w(TAG, "recordEvent called before NRVideo is fully initialized - event dropped");
+        }
+    }
+
+    /**
+     * Static convenience method for recording custom video events
+     *
+     * @param attributes A map of attributes for the event.
+     */
+    public static void recordCustomEvent(Map<String, Object> attributes) {
+        recordEvent("VideoCustomAction", attributes);
     }
 
     /**

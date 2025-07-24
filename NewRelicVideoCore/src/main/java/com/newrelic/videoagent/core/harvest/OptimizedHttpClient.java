@@ -2,15 +2,18 @@ package com.newrelic.videoagent.core.harvest;
 
 import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.auth.TokenManager;
+import com.newrelic.videoagent.core.device.DeviceInformation;
 import android.util.Log;
+import com.newrelic.videoagent.core.util.JsonStreamUtil;
+import org.json.JSONArray;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -29,6 +32,7 @@ import java.util.zip.GZIPOutputStream;
  * - Circuit breaker pattern for failed domains
  * - Mobile/TV specific optimizations (battery, bandwidth)
  * - Connection reuse where possible
+ * - Device information integration for analytics
  */
 public class OptimizedHttpClient implements HttpClientInterface {
 
@@ -36,6 +40,7 @@ public class OptimizedHttpClient implements HttpClientInterface {
 
     private final NRVideoConfiguration configuration;
     private final TokenManager tokenManager;
+    private final DeviceInformation deviceInfo;
 
     // Region-based domain configuration
     private static final Map<String, List<String>> REGIONAL_PRIMARY_DOMAINS = new HashMap<>();
@@ -121,12 +126,10 @@ public class OptimizedHttpClient implements HttpClientInterface {
     private static final int MAX_CONSECUTIVE_FAILURES = 3;
     private static final long CIRCUIT_BREAKER_TIMEOUT = 300000; // 5 minutes
 
-    // UTF-8 charset constant for API 16+ compatibility
-    private static final String UTF_8 = "UTF-8";
-
     public OptimizedHttpClient(NRVideoConfiguration configuration, android.content.Context context) {
         this.configuration = configuration;
         this.tokenManager = new TokenManager(context, configuration);
+        this.deviceInfo = DeviceInformation.getInstance(context);
 
         // Pre-compute URLs based on region
         String region = configuration.getRegion().toUpperCase();
@@ -239,28 +242,41 @@ public class OptimizedHttpClient implements HttpClientInterface {
             boolean useCompression = events.size() > 10;
 
             // Get app token (cached or generate new one)
-            String appToken;
-            try {
-                appToken = tokenManager.getAppToken();
-                if (appToken == null) {
-                    if (configuration.isDebugLoggingEnabled()) {
-                        Log.e(TAG, "Failed to get app token");
-                    }
-                    return false;
-                }
-            } catch (IOException e) {
-                if (configuration.isDebugLoggingEnabled()) {
-                    Log.e(TAG, "Token generation failed", e);
-                }
-                return false;
-            }
+            List<Long> appToken = tokenManager.getAppToken();
 
-            // Set headers with app token
+            // Set headers with app token and device information
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            connection.setRequestProperty("Authorization", "Bearer " + appToken);
             connection.setRequestProperty("Accept", "application/json");
-            connection.setRequestProperty("User-Agent", "NewRelic-VideoAgent-Android/1.0");
+            connection.setRequestProperty("User-Agent", deviceInfo.getUserAgent());
             connection.setRequestProperty("Connection", "keep-alive");
+            connection.setRequestProperty("X-App-License-Key", configuration.getApplicationToken());
+
+            List<Object> payload = new ArrayList<>();
+            payload.add(appToken);
+            payload.add(Arrays.asList(
+                    deviceInfo.getOsName(),
+                    deviceInfo.getOsVersion(),
+                    deviceInfo.getArchitecture(),
+                    deviceInfo.getAgentName(),
+                    deviceInfo.getAgentVersion(),
+                    deviceInfo.getDeviceId(),
+                    "",
+                    "",
+                    deviceInfo.getManufacturer(),
+                    new HashMap<String, Object>() {{
+                        put("size", deviceInfo.getSize());
+                        put("platform", deviceInfo.getApplicationFramework());
+                        put("platformVersion", deviceInfo.getApplicationFrameworkVersion());
+                    }}
+            ));
+            payload.add(0);
+            payload.add(new ArrayList<>()); // []
+            payload.add(new ArrayList<>()); // []
+            payload.add(new ArrayList<>()); // []
+            payload.add(new ArrayList<>()); // []
+            payload.add(new ArrayList<>()); // []
+            payload.add(new HashMap<>());   // {}
+            payload.add(events);
 
             if (useCompression) {
                 connection.setRequestProperty("Content-Encoding", "gzip");
@@ -271,11 +287,11 @@ public class OptimizedHttpClient implements HttpClientInterface {
             try (OutputStream outputStream = new BufferedOutputStream(connection.getOutputStream())) {
                 if (useCompression) {
                     try (GZIPOutputStream gzipStream = new GZIPOutputStream(outputStream)) {
-                        streamJsonToOutputStream(events, gzipStream);
+                        streamJsonToOutputStream(payload, gzipStream);
                         gzipStream.finish();
                     }
                 } else {
-                    streamJsonToOutputStream(events, outputStream);
+                    streamJsonToOutputStream(payload, outputStream);
                 }
                 outputStream.flush();
             }
@@ -356,72 +372,8 @@ public class OptimizedHttpClient implements HttpClientInterface {
      * OPTIMIZATION: Stream JSON directly to OutputStream without creating intermediate strings
      * This saves memory and is faster for large event batches
      */
-    private void streamJsonToOutputStream(List<Map<String, Object>> events, OutputStream outputStream) throws IOException {
-        try {
-            byte[] openBracket = "[".getBytes(UTF_8);
-            byte[] closeBracket = "]".getBytes(UTF_8);
-            byte[] comma = ",".getBytes(UTF_8);
-
-            outputStream.write(openBracket);
-
-            for (int i = 0; i < events.size(); i++) {
-                if (i > 0) {
-                    outputStream.write(comma);
-                }
-                streamMapToOutputStream(events.get(i), outputStream);
-            }
-
-            outputStream.write(closeBracket);
-        } catch (UnsupportedEncodingException e) {
-            throw new IOException("UTF-8 encoding not supported", e);
-        }
-    }
-
-    /**
-     * Stream individual map to OutputStream as JSON
-     */
-    private void streamMapToOutputStream(Map<String, Object> map, OutputStream outputStream) throws IOException {
-        try {
-            byte[] openBrace = "{".getBytes(UTF_8);
-            byte[] closeBrace = "}".getBytes(UTF_8);
-            byte[] comma = ",".getBytes(UTF_8);
-            byte[] colon = ":".getBytes(UTF_8);
-            byte[] quote = "\"".getBytes(UTF_8);
-
-            outputStream.write(openBrace);
-
-            boolean first = true;
-            for (Map.Entry<String, Object> entry : map.entrySet()) {
-                if (!first) {
-                    outputStream.write(comma);
-                }
-
-                // Write key
-                outputStream.write(quote);
-                outputStream.write(escapeJsonString(entry.getKey()).getBytes(UTF_8));
-                outputStream.write(quote);
-                outputStream.write(colon);
-
-                // Write value
-                Object value = entry.getValue();
-                if (value instanceof String) {
-                    outputStream.write(quote);
-                    outputStream.write(escapeJsonString((String) value).getBytes(UTF_8));
-                    outputStream.write(quote);
-                } else if (value instanceof Number || value instanceof Boolean) {
-                    outputStream.write(value.toString().getBytes(UTF_8));
-                } else {
-                    outputStream.write(quote);
-                    outputStream.write(escapeJsonString(value != null ? value.toString() : "null").getBytes(UTF_8));
-                    outputStream.write(quote);
-                }
-                first = false;
-            }
-
-            outputStream.write(closeBrace);
-        } catch (UnsupportedEncodingException e) {
-            throw new IOException("UTF-8 encoding not supported", e);
-        }
+    private void streamJsonToOutputStream(List<Object> events, OutputStream outputStream) throws IOException {
+        JsonStreamUtil.streamJsonToOutputStream(events, outputStream);
     }
 
     private String selectOptimalUrl() {
@@ -491,15 +443,6 @@ public class OptimizedHttpClient implements HttpClientInterface {
         }
     }
 
-    private long calculateRetryDelay(int attempt) {
-        final long baseRetryDelayMs = 1000;
-        final long maxRetryDelayMs = 30000;
-
-        long exponentialDelay = baseRetryDelayMs * (1L << attempt);
-        double jitter = 0.1 + (Math.random() * 0.1);
-        long delayWithJitter = (long) (exponentialDelay * (1 + jitter));
-        return Math.min(delayWithJitter, maxRetryDelayMs);
-    }
 
     private String escapeJsonString(String str) {
         if (str == null) return "null";
@@ -508,5 +451,24 @@ public class OptimizedHttpClient implements HttpClientInterface {
                  .replace("\n", "\\n")
                  .replace("\r", "\\r")
                  .replace("\t", "\\t");
+    }
+
+    private void addDeviceHeaders(HttpURLConnection connection) {
+        // Add device information headers matching AndroidAgentImpl.java fields
+        connection.setRequestProperty("X-Device-Model", deviceInfo.getModel());
+        connection.setRequestProperty("X-Device-Manufacturer", deviceInfo.getManufacturer());
+        connection.setRequestProperty("X-Device-Type", deviceInfo.getSize()); // "phone" or "tablet"
+        connection.setRequestProperty("X-Device-OS", deviceInfo.getOsName() + " " + deviceInfo.getOsVersion());
+        connection.setRequestProperty("X-Device-OS-Build", deviceInfo.getOsBuild());
+        connection.setRequestProperty("X-Device-Architecture", deviceInfo.getArchitecture());
+        connection.setRequestProperty("X-Device-Runtime", deviceInfo.getRunTime());
+        connection.setRequestProperty("X-Device-ID", deviceInfo.getDeviceId());
+        connection.setRequestProperty("X-Agent-Name", deviceInfo.getAgentName());
+        connection.setRequestProperty("X-Agent-Version", deviceInfo.getAgentVersion());
+        connection.setRequestProperty("X-Application-Framework", deviceInfo.getApplicationFramework());
+        if (!deviceInfo.getApplicationFrameworkVersion().isEmpty()) {
+            connection.setRequestProperty("X-Application-Framework-Version", deviceInfo.getApplicationFrameworkVersion());
+        }
+
     }
 }
