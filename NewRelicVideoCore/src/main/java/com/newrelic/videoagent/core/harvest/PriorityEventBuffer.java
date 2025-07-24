@@ -121,7 +121,7 @@ public class PriorityEventBuffer implements EventBufferInterface {
             capacityCallback.onCapacityThresholdReached(0.0, isLiveContent ? NRVideoConstants.EVENT_TYPE_LIVE : NRVideoConstants.EVENT_TYPE_ONDEMAND);
         }
 
-        if (shouldTriggerHarvest && overflowCallback != null) {
+        if (shouldTriggerHarvest) {
             overflowCallback.onBufferNearFull(harvestType);
         }
     }

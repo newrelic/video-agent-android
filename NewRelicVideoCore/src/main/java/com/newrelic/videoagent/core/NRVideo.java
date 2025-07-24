@@ -169,7 +169,7 @@ public final class NRVideo {
             isInitialized = true;
 
             // Now start the tracker system
-            Integer trackerId = NewRelicVideoAgent.getInstance().start(adsTracker, tracker);
+            Integer trackerId = NewRelicVideoAgent.getInstance().start(tracker, adsTracker);
 
             if (config.isDebugLoggingEnabled()) {
                 Log.d(TAG, "NRVideo initialization completed successfully with tracker ID: " + trackerId);

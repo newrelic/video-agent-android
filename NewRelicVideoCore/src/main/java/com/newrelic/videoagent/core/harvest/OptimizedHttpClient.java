@@ -453,22 +453,4 @@ public class OptimizedHttpClient implements HttpClientInterface {
                  .replace("\t", "\\t");
     }
 
-    private void addDeviceHeaders(HttpURLConnection connection) {
-        // Add device information headers matching AndroidAgentImpl.java fields
-        connection.setRequestProperty("X-Device-Model", deviceInfo.getModel());
-        connection.setRequestProperty("X-Device-Manufacturer", deviceInfo.getManufacturer());
-        connection.setRequestProperty("X-Device-Type", deviceInfo.getSize()); // "phone" or "tablet"
-        connection.setRequestProperty("X-Device-OS", deviceInfo.getOsName() + " " + deviceInfo.getOsVersion());
-        connection.setRequestProperty("X-Device-OS-Build", deviceInfo.getOsBuild());
-        connection.setRequestProperty("X-Device-Architecture", deviceInfo.getArchitecture());
-        connection.setRequestProperty("X-Device-Runtime", deviceInfo.getRunTime());
-        connection.setRequestProperty("X-Device-ID", deviceInfo.getDeviceId());
-        connection.setRequestProperty("X-Agent-Name", deviceInfo.getAgentName());
-        connection.setRequestProperty("X-Agent-Version", deviceInfo.getAgentVersion());
-        connection.setRequestProperty("X-Application-Framework", deviceInfo.getApplicationFramework());
-        if (!deviceInfo.getApplicationFrameworkVersion().isEmpty()) {
-            connection.setRequestProperty("X-Application-Framework-Version", deviceInfo.getApplicationFrameworkVersion());
-        }
-
-    }
 }

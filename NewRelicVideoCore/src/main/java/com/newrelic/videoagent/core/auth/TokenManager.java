@@ -37,7 +37,7 @@ public class TokenManager {
     private static final String PREFS_NAME = "nr_video_tokens";
     private static final String KEY_APP_TOKEN = "app_token";
     private static final String KEY_TOKEN_TIMESTAMP = "token_timestamp";
-    private static final long TOKEN_VALIDITY_MS = 30L * 24 * 60 * 60 * 1000; // 30 days
+    private static final long TOKEN_VALIDITY_MS = 14L * 24 * 60 * 60 * 1000; // 30 days
     private static final int CONNECT_TIMEOUT_MS = 10000; // 10 seconds
     private static final int READ_TIMEOUT_MS = 15000; // 15 seconds
     private static final int BUFFER_SIZE = 8192; // Increased buffer size for better I/O performance
