@@ -83,7 +83,7 @@ public final class NRVideo {
             }
             ((NRVideoTracker) tracker).setPlayer(player);
 
-            return NewRelicVideoAgent.getInstance().start(adsTracker, tracker);
+            return NewRelicVideoAgent.getInstance().start(tracker, adsTracker);
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialize NRVideo components", e);
         }

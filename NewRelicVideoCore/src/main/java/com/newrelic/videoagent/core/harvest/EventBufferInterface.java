@@ -26,11 +26,6 @@ public interface EventBufferInterface {
     int getEventCount();
 
     /**
-     * Get estimated size of all events in buffer
-     */
-    int getSize(SizeEstimator sizeEstimator);
-
-    /**
      * Check if buffer is empty
      */
     boolean isEmpty();

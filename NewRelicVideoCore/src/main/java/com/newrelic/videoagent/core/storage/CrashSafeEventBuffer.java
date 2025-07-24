@@ -112,13 +112,9 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
 
     @Override
     public int getEventCount() {
+        // Return combined count during recovery, memory-only otherwise
         int memoryCount = memoryBuffer.getEventCount();
         return isRecovering ? memoryCount + storage.getEventCount() : memoryCount;
-    }
-
-    @Override
-    public int getSize(SizeEstimator sizeEstimator) {
-        return memoryBuffer.getSize(sizeEstimator);
     }
 
     @Override

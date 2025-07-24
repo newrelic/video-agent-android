@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicReference;
+import com.newrelic.videoagent.core.NRVideoConstants;
 
 /**
  * Video-optimized priority event buffer for mobile/TV environments
@@ -69,13 +70,16 @@ public class PriorityEventBuffer implements EventBufferInterface {
         // Check if this is a live streaming event
         boolean isLiveContent = isLiveStreamingEvent(event);
         boolean shouldTriggerHarvest = false;
-        boolean shouldTriggerCapacityCallback = false;
+        boolean shouldStartScheduler = false;
         String harvestType = null;
 
         // Get the target queue and last action tracker for this event
         ConcurrentLinkedQueue<Map<String, Object>> targetQueue = isLiveContent ? liveEvents : ondemandEvents;
         AtomicReference<String> lastActionTracker = isLiveContent ? lastLiveActionName : lastOndemandActionName;
         int maxCapacity = isLiveContent ? MAX_LIVE_EVENTS : MAX_ONDEMAND_EVENTS;
+
+        // SCHEDULER STARTUP: Start scheduler on FIRST event of each category
+        boolean wasEmpty = targetQueue.isEmpty();
 
         // CONTIGUOUS DEDUPLICATION: O(1) check using atomic variable
         String actionName = (String) event.get("actionName");
@@ -91,18 +95,18 @@ public class PriorityEventBuffer implements EventBufferInterface {
             lastActionTracker.set(actionName);
         }
 
+        // CRITICAL: Start scheduler on first event of this category
+        if (wasEmpty) {
+            shouldStartScheduler = true;
+        }
+
         // Check capacity thresholds AFTER the event is added
         double currentCapacity = (double) targetQueue.size() / maxCapacity;
-
-        // Check for 60% threshold (scheduler startup)
-        if (currentCapacity >= 0.6 && capacityCallback != null) {
-            shouldTriggerCapacityCallback = true;
-        }
 
         // Check for 90% threshold (overflow prevention)
         if (currentCapacity >= 0.9) {
             shouldTriggerHarvest = true;
-            harvestType = isLiveContent ? "live" : "ondemand";
+            harvestType = isLiveContent ? NRVideoConstants.EVENT_TYPE_LIVE : NRVideoConstants.EVENT_TYPE_ONDEMAND;
         }
 
         // Fallback: if we somehow still reach max capacity, remove oldest events
@@ -114,8 +118,9 @@ public class PriorityEventBuffer implements EventBufferInterface {
         }
 
         // IMPORTANT: Call callbacks AFTER all queue operations are complete
-        if (shouldTriggerCapacityCallback) {
-            capacityCallback.onCapacityThresholdReached(currentCapacity, isLiveContent ? "live" : "ondemand");
+        if (shouldStartScheduler) {
+            // Start scheduler immediately when first event arrives
+            capacityCallback.onCapacityThresholdReached(0.0, isLiveContent ? NRVideoConstants.EVENT_TYPE_LIVE : NRVideoConstants.EVENT_TYPE_ONDEMAND);
         }
 
         if (shouldTriggerHarvest && overflowCallback != null) {
@@ -173,12 +178,12 @@ public class PriorityEventBuffer implements EventBufferInterface {
     @Override
     public List<Map<String, Object>> pollBatchByPriority(int maxSizeBytes, SizeEstimator sizeEstimator, String priority) {
         List<Map<String, Object>> batch = new ArrayList<>();
-        ConcurrentLinkedQueue<Map<String, Object>> targetQueue = "live".equals(priority) ? liveEvents : ondemandEvents;
+        ConcurrentLinkedQueue<Map<String, Object>> targetQueue = NRVideoConstants.EVENT_TYPE_LIVE.equals(priority) ? liveEvents : ondemandEvents;
 
         int currentSize = 0;
         // OPTIMIZED: Adjusted batch sizes for 2KB events and device capabilities
         int maxEvents;
-        if ("live".equals(priority)) {
+        if (NRVideoConstants.EVENT_TYPE_LIVE.equals(priority)) {
             // Live events: Quick, small batches for low latency
             maxEvents = isAndroidTVDevice ? 25 : 15;  // TV: 50KB batches, Mobile: 30KB batches
         } else {
@@ -208,34 +213,6 @@ public class PriorityEventBuffer implements EventBufferInterface {
     @Override
     public int getEventCount() {
         return liveEvents.size() + ondemandEvents.size();
-    }
-
-    @Override
-    public int getSize(SizeEstimator sizeEstimator) {
-        if (sizeEstimator == null) return 0;
-
-        int totalSize = 0;
-        // Sample a few events to estimate total size (avoid expensive full iteration)
-        int sampleCount = 0;
-        int maxSamples = 10;
-
-        for (Map<String, Object> event : liveEvents) {
-            if (sampleCount++ >= maxSamples) break;
-            totalSize += sizeEstimator.estimate(event);
-        }
-
-        for (Map<String, Object> event : ondemandEvents) {
-            if (sampleCount++ >= maxSamples) break;
-            totalSize += sizeEstimator.estimate(event);
-        }
-
-        // Extrapolate based on sample
-        if (sampleCount > 0) {
-            int totalEvents = getEventCount();
-            totalSize = (totalSize * totalEvents) / sampleCount;
-        }
-
-        return totalSize;
     }
 
     @Override
