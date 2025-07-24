@@ -84,26 +84,6 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
     }
 
     /**
-     * CRITICAL: Force harvest all pending events
-     * Enhanced with crash-safe emergency backup
-     */
-    public void forceHarvestAll() {
-        try {
-            if (scheduler.isRunning()) {
-                harvestOnDemand();
-                harvestLive();
-                deadLetterHandler.retryFailedEvents();
-            }
-
-            // Always perform emergency backup (crash-safe factory always available)
-            factory.performEmergencyBackup();
-            deadLetterHandler.emergencyBackup();
-        } catch (Exception e) {
-            Log.e(TAG, "Force harvest failed: " + e.getMessage(), e);
-        }
-    }
-
-    /**
      * Harvest on-demand events with optimized batch sizes from configuration
      * Public to allow method references from NRVideo initialization
      */
