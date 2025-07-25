@@ -1,7 +1,10 @@
 package com.newrelic.videoagent.core.device;
 
+import android.app.ActivityManager;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.os.Build;
+import android.util.Log;
 import com.newrelic.videoagent.core.BuildConfig;
 
 import java.util.UUID;
@@ -9,16 +12,15 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Device information collector matching AndroidAgentImpl.getDeviceInformation() from New Relic Android Agent
- * Based on the exact fields and method calls from the official New Relic Android Agent repository
- * Initialized once and reused across HTTP requests for optimal performance
- * Thread-safe singleton pattern with lazy initialization
+ * Thread-safe singleton with comprehensive device detection and caching
+ * Zero performance impact after initialization with proper error handling
  */
-public class DeviceInformation {
+public final class DeviceInformation {
 
+    private static final String TAG = "NRVideo.DeviceInfo";
     private static final AtomicReference<DeviceInformation> instance = new AtomicReference<>();
 
-    // Core Device Information (exactly matching AndroidAgentImpl.getDeviceInformation())
+    // Immutable device information fields
     private final String osName;
     private final String osVersion;
     private final String osBuild;
@@ -32,11 +34,14 @@ public class DeviceInformation {
     private final String size;
     private final String applicationFramework;
     private final String applicationFrameworkVersion;
-    private final  String userAgent;
+    private final String userAgent;
+    private final boolean isTV;
+    private final boolean isLowMemoryDevice;
 
     private DeviceInformation(Context context) {
+        Context appContext = context.getApplicationContext();
 
-        // Exact same field assignments as AndroidAgentImpl.getDeviceInformation()
+        // Core device information
         this.osName = "Android";
         this.osVersion = Build.VERSION.RELEASE;
         this.osBuild = Build.VERSION.INCREMENTAL;
@@ -44,173 +49,246 @@ public class DeviceInformation {
         this.agentName = "NewRelic-VideoAgent-Android"; // Using our agent name instead of "AndroidAgent"
         this.agentVersion = BuildConfig.VERSION_NAME; // Use version from build.gradle versionName
         this.manufacturer = Build.MANUFACTURER;
-        this.deviceId = generatePersistentUUID();
-        this.architecture = System.getProperty("os.arch");
-        this.runTime = System.getProperty("java.vm.version");
-        this.size = determineDeviceForm(context);
-        this.applicationFramework = determineApplicationFramework(context); // Detect framework type
-        this.applicationFrameworkVersion = determineFrameworkVersion(); // Detect framework version
-        this.userAgent = String.format(Locale.US, "%s/%s", agentName, agentVersion);
+        this.deviceId = generatePersistentDeviceId();
+        this.architecture = getSystemArchitecture();
+        this.runTime = getJavaVMVersion();
+
+        // Enhanced device detection
+        this.isTV = detectTVPlatform(appContext);
+        this.isLowMemoryDevice = detectLowMemoryDevice(appContext);
+        this.size = determineDeviceForm(appContext);
+        this.applicationFramework = determineApplicationFramework(appContext);
+        this.applicationFrameworkVersion = determineFrameworkVersion();
+        this.userAgent = createUserAgent();
     }
 
     /**
-     * Generate a persistent UUID similar to AndroidAgentImpl.getUUID()
-     * This mimics the behavior of PersistentUUID from the New Relic agent
-     */
-    private String generatePersistentUUID() {
-        try {
-            // Use Build.FINGERPRINT as a consistent device identifier
-            // This provides a stable identifier across app sessions
-            return Build.FINGERPRINT;
-        } catch (Exception e) {
-            return UUID.randomUUID().toString();
-        }
-    }
-
-    /**
-     * Determine device form factor exactly matching AndroidAgentImpl.deviceForm()
-     * Uses Android's Configuration.screenLayout to classify device size
-     * Returns lowercase string matching the original implementation
-     */
-    private String determineDeviceForm(Context context) {
-        try {
-            DeviceForm deviceForm = getDeviceForm(context);
-            return deviceForm.name().toLowerCase(Locale.getDefault());
-        } catch (Exception e) {
-            // Default to unknown if detection fails
-            return DeviceForm.UNKNOWN.name().toLowerCase(Locale.getDefault());
-        }
-    }
-
-    /**
-     * Get device form enum exactly matching AndroidAgentImpl.deviceForm() logic
-     * Uses Android's Configuration.screenLayout to classify device size
-     */
-    private static DeviceForm getDeviceForm(Context context) {
-        final int deviceSize = context.getResources().getConfiguration().screenLayout & android.content.res.Configuration.SCREENLAYOUT_SIZE_MASK;
-
-        switch (deviceSize) {
-            case android.content.res.Configuration.SCREENLAYOUT_SIZE_SMALL:
-                return DeviceForm.SMALL;
-            case android.content.res.Configuration.SCREENLAYOUT_SIZE_NORMAL:
-                return DeviceForm.NORMAL;
-            case android.content.res.Configuration.SCREENLAYOUT_SIZE_LARGE:
-                return DeviceForm.LARGE;
-            default:
-                // Android 2.2 doesn't have the XLARGE constant.
-                if (deviceSize > android.content.res.Configuration.SCREENLAYOUT_SIZE_LARGE) {
-                    return DeviceForm.XLARGE;
-                } else {
-                    return DeviceForm.UNKNOWN;
-                }
-        }
-    }
-
-    /**
-     * Get or create device information singleton
-     * Thread-safe lazy initialization matching AndroidAgentImpl pattern
+     * Thread-safe singleton instance with lazy initialization
      */
     public static DeviceInformation getInstance(Context context) {
         DeviceInformation current = instance.get();
         if (current == null) {
-            current = new DeviceInformation(context);
-            if (!instance.compareAndSet(null, current)) {
-                // Another thread beat us to it, use their instance
+            synchronized (DeviceInformation.class) {
                 current = instance.get();
+                if (current == null) {
+                    try {
+                        current = new DeviceInformation(context);
+                        instance.set(current);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to initialize DeviceInformation: " + e.getMessage(), e);
+                        throw new RuntimeException("DeviceInformation initialization failed", e);
+                    }
+                }
             }
         }
         return current;
     }
 
     /**
-     * Determine the application framework type
-     * This should detect what framework the app is built with
+     * Generate persistent device ID with multiple fallback strategies
+     */
+    private String generatePersistentDeviceId() {
+        try {
+            // Use Build.FINGERPRINT for consistency across app sessions
+            String fingerprint = Build.FINGERPRINT;
+            if (fingerprint != null && !fingerprint.trim().isEmpty()) {
+                return fingerprint.trim();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to get device fingerprint: " + e.getMessage());
+        }
+
+        try {
+            // Fallback to combination of device identifiers
+            String deviceIdentifier = Build.BRAND + "_" + Build.DEVICE + "_" + Build.MODEL;
+            return deviceIdentifier.replaceAll("\\s+", "_");
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to create device identifier: " + e.getMessage());
+        }
+
+        // Final fallback to random UUID
+        return UUID.randomUUID().toString();
+    }
+
+    /**
+     * Get system architecture with proper error handling
+     */
+    private String getSystemArchitecture() {
+        try {
+            String arch = System.getProperty("os.arch");
+            return arch != null ? arch : "unknown";
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to get system architecture: " + e.getMessage());
+            return "unknown";
+        }
+    }
+
+    /**
+     * Get Java VM version with proper error handling
+     */
+    private String getJavaVMVersion() {
+        try {
+            String vmVersion = System.getProperty("java.vm.version");
+            return vmVersion != null ? vmVersion : "unknown";
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to get Java VM version: " + e.getMessage());
+            return "unknown";
+        }
+    }
+
+    /**
+     * Comprehensive TV platform detection with multiple strategies
+     */
+    private boolean detectTVPlatform(Context context) {
+        try {
+            PackageManager pm = context.getPackageManager();
+
+            // Primary: Android TV leanback feature
+            if (pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)) {
+                return true;
+            }
+
+            // Secondary: No touchscreen (common on TV)
+            if (!pm.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)) {
+                return true;
+            }
+
+            // Tertiary: UI mode detection
+            android.content.res.Configuration config = context.getResources().getConfiguration();
+            int uiMode = config.uiMode & android.content.res.Configuration.UI_MODE_TYPE_MASK;
+            if (uiMode == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION) {
+                return true;
+            }
+
+            return false;
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to detect TV platform: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Detect low memory device conditions
+     */
+    private boolean detectLowMemoryDevice(Context context) {
+        try {
+            ActivityManager activityManager =
+                (android.app.ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+
+            if (activityManager == null) {
+                return false;
+            }
+
+            // Check if device is officially low RAM (API 19+)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                if (activityManager.isLowRamDevice()) {
+                    return true;
+                }
+            }
+
+            // Check current memory conditions
+            android.app.ActivityManager.MemoryInfo memoryInfo = new android.app.ActivityManager.MemoryInfo();
+            activityManager.getMemoryInfo(memoryInfo);
+
+            // Consider low memory if less than 512MB available or in low memory state
+            return memoryInfo.availMem < 512 * 1024 * 1024 || memoryInfo.lowMemory;
+
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to detect low memory device: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Determine device form factor with enhanced logic
+     */
+    private String determineDeviceForm(Context context) {
+        try {
+            DeviceForm deviceForm = getDeviceForm(context);
+            return deviceForm.name().toLowerCase(Locale.US);
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to determine device form: " + e.getMessage());
+            return DeviceForm.UNKNOWN.name().toLowerCase(Locale.US);
+        }
+    }
+
+    /**
+     * Enhanced device form detection
+     */
+    private DeviceForm getDeviceForm(Context context) {
+        try {
+            android.content.res.Configuration config = context.getResources().getConfiguration();
+            int screenLayout = config.screenLayout;
+            int deviceSize = screenLayout & android.content.res.Configuration.SCREENLAYOUT_SIZE_MASK;
+
+            // Enhanced detection for TV and tablets
+            if (isTV) {
+                return DeviceForm.TV;
+            }
+
+            switch (deviceSize) {
+                case android.content.res.Configuration.SCREENLAYOUT_SIZE_SMALL:
+                    return DeviceForm.SMALL;
+                case android.content.res.Configuration.SCREENLAYOUT_SIZE_NORMAL:
+                    return DeviceForm.NORMAL;
+                case android.content.res.Configuration.SCREENLAYOUT_SIZE_LARGE:
+                    return DeviceForm.LARGE;
+                default:
+                    // XLARGE typically indicates tablet
+                    if (deviceSize > android.content.res.Configuration.SCREENLAYOUT_SIZE_LARGE) {
+                        return DeviceForm.TABLET;
+                    }
+                    return DeviceForm.NORMAL;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to get device form: " + e.getMessage());
+            return DeviceForm.UNKNOWN;
+        }
+    }
+
+    /**
+     * Determine application framework type
      */
     private String determineApplicationFramework(Context context) {
         try {
-            // Check for React Native
-            if (isReactNativeApp(context)) {
+            // Detect common frameworks
+            if (isReactNative()) {
                 return "React Native";
-            }
-
-            // Check for Flutter
-            if (isFlutterApp(context)) {
+            } else if (isFlutter()) {
                 return "Flutter";
-            }
-
-            // Check for Xamarin
-            if (isXamarinApp(context)) {
+            } else if (isXamarin()) {
                 return "Xamarin";
-            }
-
-            // Check for Unity
-            if (isUnityApp(context)) {
-                return "Unity";
-            }
-
-            // Check for Cordova/PhoneGap
-            if (isCordovaApp(context)) {
+            } else if (isCordova(context)) {
                 return "Cordova";
+            } else {
+                return "Native Android";
             }
-
-            // Default to Native Android
-            return "Native";
-
         } catch (Exception e) {
-            return "Native"; // Default fallback
+            Log.w(TAG, "Failed to determine application framework: " + e.getMessage());
+            return "Unknown";
         }
     }
 
-    /**
-     * Check if this is a React Native application
-     */
-    private boolean isReactNativeApp(Context context) {
+    private boolean isReactNative() {
         try {
-            // React Native apps typically have these classes
             Class.forName("com.facebook.react.ReactApplication");
             return true;
         } catch (ClassNotFoundException e) {
-            // Check for React Native in package name or assets
-            try {
-                String[] assets = context.getAssets().list("");
-                for (String asset : assets) {
-                    if (asset.equals("index.android.bundle") || asset.equals("index.bundle")) {
-                        return true;
-                    }
-                }
-            } catch (Exception ex) {
-                // Ignore
-            }
+            return false;
         }
-        return false;
     }
 
-    /**
-     * Check if this is a Flutter application
-     */
-    private boolean isFlutterApp(Context context) {
+    private boolean isFlutter() {
         try {
-            // Flutter apps have this class
-            Class.forName("io.flutter.embedding.android.FlutterActivity");
+            Class.forName("io.flutter.embedding.engine.FlutterEngine");
             return true;
         } catch (ClassNotFoundException e) {
-            // Check for Flutter assets
-            try {
-                String[] assets = context.getAssets().list("flutter_assets");
-                return assets != null && assets.length > 0;
-            } catch (Exception ex) {
-                // Ignore
-            }
+            return false;
         }
-        return false;
     }
 
-    /**
-     * Check if this is a Xamarin application
-     */
-    private boolean isXamarinApp(Context context) {
+    private boolean isXamarin() {
         try {
-            // Xamarin apps have these classes
             Class.forName("mono.MonoRuntimeProvider");
             return true;
         } catch (ClassNotFoundException e) {
@@ -218,52 +296,37 @@ public class DeviceInformation {
         }
     }
 
-    /**
-     * Check if this is a Unity application
-     */
-    private boolean isUnityApp(Context context) {
+    private boolean isCordova(Context context) {
         try {
-            // Unity apps have this class
-            Class.forName("com.unity3d.player.UnityPlayer");
-            return true;
-        } catch (ClassNotFoundException e) {
+            String packageName = context.getPackageName();
+            return packageName.contains("cordova") || packageName.contains("phonegap");
+        } catch (Exception e) {
             return false;
         }
     }
 
     /**
-     * Check if this is a Cordova/PhoneGap application
-     */
-    private boolean isCordovaApp(Context context) {
-        try {
-            // Cordova apps have this class
-            Class.forName("org.apache.cordova.CordovaActivity");
-            return true;
-        } catch (ClassNotFoundException e) {
-            return false;
-        }
-    }
-
-    /**
-     * Determine the application framework version
-     * This should reflect the version of the framework the app is built with
+     * Determine framework version
      */
     private String determineFrameworkVersion() {
-        // For native Android apps, this could be the Android Gradle Plugin version,
-        // Kotlin version, or Android SDK compile version
-
-        // Option 1: Use Android SDK compile version (most common for native apps)
-        return String.valueOf(Build.VERSION.SDK_INT);
-
-        // Option 2: If you want to use a specific framework version, you could add it to BuildConfig:
-        // return BuildConfig.FRAMEWORK_VERSION; // Would need to be added to build.gradle
-
-        // Option 3: For React Native apps, this would be the RN version
-        // Option 4: For Flutter apps, this would be the Flutter version
-        // Option 5: For Xamarin apps, this would be the Xamarin version
+        return Build.VERSION.RELEASE;
     }
 
-    // Getters exactly matching AndroidAgentImpl.java DeviceInformation fields
+    /**
+     * Create optimized user agent string
+     */
+    private String createUserAgent() {
+        try {
+            return String.format(Locale.US, "%s/%s (Android %s; %s %s%s)",
+                agentName, agentVersion, osVersion, manufacturer, model,
+                isTV ? "; TV" : isLowMemoryDevice ? "; LowMem" : "");
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to create user agent: " + e.getMessage());
+            return String.format(Locale.US, "%s/%s", agentName, agentVersion);
+        }
+    }
+
+    // Immutable getters
     public String getOsName() { return osName; }
     public String getOsVersion() { return osVersion; }
     public String getOsBuild() { return osBuild; }
@@ -277,11 +340,8 @@ public class DeviceInformation {
     public String getSize() { return size; }
     public String getApplicationFramework() { return applicationFramework; }
     public String getApplicationFrameworkVersion() { return applicationFrameworkVersion; }
+    public String getUserAgent() { return userAgent; }
+    public boolean isTV() { return isTV; }
+    public boolean isLowMemoryDevice() { return isLowMemoryDevice; }
 
-    // Legacy getters for backward compatibility with existing OptimizedHttpClient
-    public String getDeviceModel() { return model; }
-
-    public String getUserAgent() {
-        return userAgent;
-    }
 }

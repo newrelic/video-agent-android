@@ -7,7 +7,6 @@ import java.util.Locale;
 import android.util.Log;
 import com.newrelic.videoagent.core.storage.CrashSafeHarvestFactory;
 import com.newrelic.videoagent.core.storage.IntegratedDeadLetterHandler;
-import com.newrelic.videoagent.core.storage.CrashSafeEventBuffer;
 import com.newrelic.videoagent.core.NRVideoConstants;
 
 /**

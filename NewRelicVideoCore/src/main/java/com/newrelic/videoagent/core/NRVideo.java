@@ -1,10 +1,10 @@
 package com.newrelic.videoagent.core;
 
+import java.util.HashMap;
 import java.util.Map;
 import android.app.Application;
 import android.content.Context;
 import android.util.Log;
-import androidx.media3.exoplayer.ExoPlayer;
 import com.newrelic.videoagent.core.harvest.HarvestManager;
 import com.newrelic.videoagent.core.lifecycle.NRVideoLifecycleObserver;
 import com.newrelic.videoagent.core.storage.CrashSafeHarvestFactory;
@@ -25,6 +25,7 @@ public final class NRVideo {
 
     private volatile HarvestManager harvestManager;
     private volatile boolean isInitialized = false;
+    private final Map<String, Integer> trackerIds = new HashMap<>();
 
     // Private constructor for singleton
     private NRVideo() {}
@@ -44,6 +45,54 @@ public final class NRVideo {
         return instance != null && instance.isInitialized;
     }
 
+    public static Integer addPlayer(NRVideoPlayerConfiguration config) {
+        if (!isInitialized()) {
+            Log.w(TAG, "NRVideo not initialized - cannot add player");
+            throw new IllegalStateException("NRVideo is not initialized. Call NRVideo.newBuilder(context).withConfiguration(config).build() first.");
+        }
+
+        // Create content tracker with ExoPlayer instance
+        NRTracker contentTracker = createContentTracker();
+        NRTracker adsTracker = null;
+        if (config.isAdEnabled()) {
+            adsTracker = createAdTracker();
+        }
+        ((NRVideoTracker) contentTracker).setPlayer(config.getPlayer());
+
+        // Now start the tracker system
+        Integer trackerId = NewRelicVideoAgent.getInstance().start(contentTracker, adsTracker);
+        Log.i(TAG, "NRVideo initialization completed successfully with tracker ID: " + trackerId + " and player name:" + config.getPlayerName());
+        if (config.getCustomAttributes() != null && !config.getCustomAttributes().isEmpty()) {
+            for (Map.Entry<String, Object> entry : config.getCustomAttributes().entrySet()) {
+                NRVideo.setAttribute(trackerId, entry.getKey(), entry.getValue());
+                Log.d(TAG, "Set custom attribute for tracker " + trackerId + ": " + entry.getKey() + " = " + entry.getValue());
+            }
+        }
+        NRVideo.getInstance().trackerIds.put(config.getPlayerName(),  trackerId);
+        return trackerId;
+    }
+
+    public static void releaseTracker(Integer trackerId) {
+        if (!isInitialized()) {
+            Log.w(TAG, "NRVideo not initialized - cannot release tracker");
+            throw new IllegalStateException("NRVideo is not initialized. Call NRVideo.newBuilder(context).withConfiguration(config).build() first.");
+        }
+        NewRelicVideoAgent.getInstance().releaseTracker(trackerId);
+        Log.i(TAG, "Released tracker with ID: " + trackerId);
+    }
+
+    public static void releaseTracker(String playerName) {
+        if (!isInitialized()) {
+            Log.w(TAG, "NRVideo not initialized - cannot release tracker");
+            throw new IllegalStateException("NRVideo is not initialized. Call NRVideo.newBuilder(context).withConfiguration(config).build() first.");
+        }
+        Integer trackerId = NRVideo.getInstance().trackerIds.get(playerName);
+        if (trackerId != null) {
+            NewRelicVideoAgent.getInstance().releaseTracker(trackerId);
+        }
+        Log.i(TAG, "Released tracker with ID: " + trackerId);
+    }
+
     /**
      * Create a new builder for setting up NRVideo
      * @param context The application context
@@ -60,7 +109,7 @@ public final class NRVideo {
      * @param attributes A map of attributes for the event.
      */
     public static void recordEvent(String eventType, Map<String, Object> attributes) {
-        if (instance != null && instance.isInitialized) {
+        if (isInitialized()) {
             instance.harvestManager.recordCustomEvent(eventType, attributes);
         } else {
             Log.w(TAG, "recordEvent called before NRVideo is fully initialized - event dropped");
@@ -82,7 +131,7 @@ public final class NRVideo {
     public static class Builder {
         private final Context context;
         private NRVideoConfiguration config;
-        private ExoPlayer player;
+//        private ExoPlayer player;
 
         private Builder(Context context) {
             this.context = context.getApplicationContext();
@@ -93,27 +142,18 @@ public final class NRVideo {
             return this;
         }
 
-        public Builder withPlayer(ExoPlayer player) {
-            this.player = player;
-            return this;
-        }
-
         /**
          * Build and initialize NRVideo singleton
          * @return The tracker ID
          * @throws IllegalStateException if required parameters are missing
          * @throws RuntimeException if initialization fails or already initialized
          */
-        public Integer build() {
+        public NRVideo build() {
             if (config == null) {
                 throw new IllegalStateException("Configuration is required - call withConfiguration()");
             }
-            if (player == null) {
-                throw new IllegalStateException("ExoPlayer is required - call withPlayer()");
-            }
-
             // Check if already initialized (fast path - no lock needed)
-            if (instance != null && instance.isInitialized) {
+            if (isInitialized()) {
                 throw new RuntimeException("NRVideo is already initialized. Multiple initialization attempts are not allowed.");
             }
 
@@ -124,12 +164,12 @@ public final class NRVideo {
                 }
 
                 instance = new NRVideo();
-                return instance.initialize(player, context, config);
+                return instance.initialize(context, config);
             }
         }
     }
 
-    private Integer initialize(ExoPlayer player, Context context, NRVideoConfiguration config) {
+    private NRVideo initialize(Context context, NRVideoConfiguration config) {
         try {
             Context applicationContext = context.getApplicationContext();
 
@@ -156,26 +196,7 @@ public final class NRVideo {
                     Log.d(TAG, "Lifecycle observer created and registered with crash-safe storage");
                 }
             }
-
-            // Create trackers
-            NRTracker adsTracker = null;
-            NRTracker tracker = createContentTracker(config);
-            if (config.isAdTrackingEnabled()) {
-                adsTracker = createAdTracker(config);
-            }
-            ((NRVideoTracker) tracker).setPlayer(player);
-
-            // Mark as fully initialized BEFORE starting trackers
-            isInitialized = true;
-
-            // Now start the tracker system
-            Integer trackerId = NewRelicVideoAgent.getInstance().start(tracker, adsTracker);
-
-            if (config.isDebugLoggingEnabled()) {
-                Log.d(TAG, "NRVideo initialization completed successfully with tracker ID: " + trackerId);
-            }
-
-            return trackerId;
+            return this;
         } catch (Exception e) {
             // Clean up on failure
             instance = null;
@@ -183,31 +204,25 @@ public final class NRVideo {
         }
     }
 
-    private NRTracker createContentTracker(NRVideoConfiguration config) {
+    private static NRTracker createContentTracker() {
         try {
             // Create ExoPlayer tracker with player instance
             Class<?> exoTrackerClass = Class.forName("com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer");
             return (NRTracker) exoTrackerClass.newInstance();
         } catch (Exception e) {
-            if (config.isDebugLoggingEnabled()) {
-                Log.e(TAG, "Failed to create specific tracker, using default: " + e.getMessage());
-            }
             // Fallback to basic video tracker
             throw new RuntimeException("Failed to create NRTrackerExoPlayer", e);
         }
     }
 
-    private NRTracker createAdTracker(NRVideoConfiguration config) {
+    private static NRTracker createAdTracker() {
 
         try {
             // Always use IMA tracker for ads
             Class<?> imaTrackerClass = Class.forName("com.newrelic.videoagent.ima.tracker.NRTrackerIMA");
             return (NRTracker) imaTrackerClass.newInstance();
         } catch (Exception e) {
-            if (config.isDebugLoggingEnabled()) {
-                Log.e(TAG, "Failed to create IMA ad tracker: " + e.getMessage());
-            }
-            return null; // No ad tracking if IMA tracker can't be created
+            return null;
         }
     }
 
@@ -216,7 +231,7 @@ public final class NRVideo {
      *
      * @param userId The user ID.
      */
-    public void setUserId(String userId) {
+    public static void setUserId(String userId) {
         NewRelicVideoAgent.getInstance().setUserId(userId);
     }
 
@@ -228,7 +243,7 @@ public final class NRVideo {
      * @param value The attribute value.
      * @param action The action name to associate with the attribute.
      */
-    public void setAttribute(Integer trackerId, String key, Object value, String action) {
+    public static void setAttribute(Integer trackerId, String key, Object value, String action) {
         NewRelicVideoAgent.getInstance().setAttribute(trackerId, key, value, action);
     }
 
@@ -240,7 +255,7 @@ public final class NRVideo {
      * @param value The attribute value.
      * @param action The action name to associate with the attribute.
      */
-    public void setAdAttribute(Integer trackerId, String key, Object value, String action) {
+    public static void setAdAttribute(Integer trackerId, String key, Object value, String action) {
         NewRelicVideoAgent.getInstance().setAdAttribute(trackerId, key, value, action);
     }
 
@@ -251,7 +266,7 @@ public final class NRVideo {
      * @param value The attribute value.
      * @param action The action name to associate with the attribute.
      */
-    public void setGlobalAttribute(String key, Object value, String action) {
+    public static void setGlobalAttribute(String key, Object value, String action) {
         NewRelicVideoAgent.getInstance().setGlobalAttribute(key, value, action);
     }
 
@@ -262,7 +277,7 @@ public final class NRVideo {
      * @param key The attribute key.
      * @param value The attribute value.
      */
-    public void setAttribute(Integer trackerId, String key, Object value) {
+    public static void setAttribute(Integer trackerId, String key, Object value) {
         NewRelicVideoAgent.getInstance().setAttribute(trackerId, key, value);
     }
 
@@ -273,7 +288,7 @@ public final class NRVideo {
      * @param key The attribute key.
      * @param value The attribute value.
      */
-    public void setAdAttribute(Integer trackerId, String key, Object value) {
+    public static void setAdAttribute(Integer trackerId, String key, Object value) {
         NewRelicVideoAgent.getInstance().setAdAttribute(trackerId, key, value);
     }
 
@@ -283,7 +298,7 @@ public final class NRVideo {
      * @param key The attribute key.
      * @param value The attribute value.
      */
-    public void setGlobalAttribute(String key, Object value) {
+    public static void setGlobalAttribute(String key, Object value) {
         NewRelicVideoAgent.getInstance().setGlobalAttribute(key, value);
     }
 }

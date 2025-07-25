@@ -4,10 +4,8 @@ import android.net.Uri;
 import android.os.Bundle;
 import com.google.ads.interactivemedia.v3.api.AdErrorEvent;
 import com.google.ads.interactivemedia.v3.api.AdEvent;
-import com.newrelic.videoagent.core.NewRelicVideoAgent;
-import com.newrelic.videoagent.core.tracker.NRVideoTracker;
-import com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer;
-import com.newrelic.videoagent.ima.tracker.NRTrackerIMA;
+import com.newrelic.videoagent.core.NRVideo;
+import com.newrelic.videoagent.core.NRVideoPlayerConfiguration;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.util.Util;
@@ -60,16 +58,11 @@ public class VideoPlayerAds extends AppCompatActivity implements AdErrorEvent.Ad
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        ((NRVideoTracker) NewRelicVideoAgent.getInstance().getContentTracker(trackerId)).sendEnd();
-        NewRelicVideoAgent.getInstance().releaseTracker(trackerId);
+        NRVideo.releaseTracker(trackerId);
         player.stop();
     }
 
     private void playVideo(String videoUrl) {
-        // Init trackers
-        NRTrackerExoPlayer tracker = new NRTrackerExoPlayer();
-        NRTrackerIMA adsTracker = new NRTrackerIMA();
-        trackerId = NewRelicVideoAgent.getInstance().start(tracker, adsTracker);
 
         ImaAdsLoader.Builder builder = new ImaAdsLoader.Builder(this);
         // NOTE: The NRTrackerIMA instance can be used as a listener for both AdErrorEvent and AdEvent.
@@ -89,11 +82,8 @@ public class VideoPlayerAds extends AppCompatActivity implements AdErrorEvent.Ad
         playerView.setPlayer(player);
         adsLoader.setPlayer(player);
 
-        // Set the user ID
-        NewRelicVideoAgent.getInstance().setUserId("your_user_id");
-
-        // Pass the player to the content tracker
-        tracker.setPlayer(player);
+        NRVideoPlayerConfiguration playerConfiguration = new NRVideoPlayerConfiguration("test-player-something-else", player, true, null);
+        trackerId = NRVideo.addPlayer(playerConfiguration);
 
         // Create the MediaItem to play, specifying the content URI and ad tag URI.
         Uri contentUri = Uri.parse(videoUrl);
@@ -110,16 +100,12 @@ public class VideoPlayerAds extends AppCompatActivity implements AdErrorEvent.Ad
     //AdErrorEvent.AdErrorListener
     @Override
     public void onAdError(AdErrorEvent adErrorEvent) {
-        if (NewRelicVideoAgent.getInstance().getAdTracker(trackerId) != null) {
-            ((NRTrackerIMA) NewRelicVideoAgent.getInstance().getAdTracker(trackerId)).onAdError(adErrorEvent);
-        }
+        System.out.println("adErrorEvent" + adErrorEvent);
     }
 
     //AdEvent.AdEventListener
     @Override
     public void onAdEvent(AdEvent adEvent) {
-        if (NewRelicVideoAgent.getInstance().getAdTracker(trackerId) != null) {
-            ((NRTrackerIMA) NewRelicVideoAgent.getInstance().getAdTracker(trackerId)).onAdEvent(adEvent);
-        }
+        System.out.println("adEvent" + adEvent);
     }
 }

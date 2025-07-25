@@ -5,7 +5,6 @@ import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.os.Build;
 import android.util.Log;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.device.DeviceInformation;
@@ -21,171 +20,213 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * Manages New Relic app token generation and persistent caching
- * - Generates app token from application token via New Relic API
- * - Caches token persistently in SharedPreferences
- * - Handles token refresh when expired
- * - Thread-safe operations for concurrent access
- * - Optimized for performance and resource usage
+ * Optimized for Android TV and mobile with comprehensive error handling
+ * Features:
+ * - Thread-safe token generation and caching
+ * - Persistent storage with SharedPreferences
+ * - Automatic token refresh and validation
+ * - Performance optimizations for mobile/TV environments
+ * - Comprehensive error handling and fallback strategies
  */
-public class TokenManager {
+public final class TokenManager {
 
+    private static final String TAG = "NRVideo.TokenManager";
+
+    // Constants optimized for mobile/TV performance
     private static final String PREFS_NAME = "nr_video_tokens";
     private static final String KEY_APP_TOKEN = "app_token";
     private static final String KEY_TOKEN_TIMESTAMP = "token_timestamp";
-    private static final long TOKEN_VALIDITY_MS = 14L * 24 * 60 * 60 * 1000; // 30 days
-    private static final int CONNECT_TIMEOUT_MS = 10000; // 10 seconds
-    private static final int READ_TIMEOUT_MS = 15000; // 15 seconds
-    private static final int BUFFER_SIZE = 8192; // Increased buffer size for better I/O performance
-    private static final String UTF_8 = "UTF-8"; // Compatibility with API level 16
+    private static final long TOKEN_VALIDITY_MS = 14L * 24 * 60 * 60 * 1000; // 14 days for security
+    private static final int CONNECT_TIMEOUT_MS = 15000; // 15 seconds for TV networks
+    private static final int READ_TIMEOUT_MS = 30000;    // 30 seconds for TV networks
+    private static final int BUFFER_SIZE = 8192;
 
+    // Thread-safe fields
     private final Context context;
     private final NRVideoConfiguration configuration;
     private final AtomicReference<List<Long>> cachedToken = new AtomicReference<>();
+    private final AtomicLong lastTokenTime = new AtomicLong(0);
     private final ReentrantReadWriteLock tokenLock = new ReentrantReadWriteLock();
-    private final Object tokenGenerationLock = new Object(); // Separate lock for token generation
-    private volatile long lastTokenTime = 0;
-    private final String cachedTokenEndpoint; // Cache endpoint URL
+    private final Object tokenGenerationLock = new Object();
+
+    // Immutable fields for performance
+    private final String tokenEndpoint;
     private final DeviceInformation deviceInfo;
+    private final SharedPreferences prefs;
 
     public TokenManager(Context context, NRVideoConfiguration configuration) {
-        this.context = context;
+        if (context == null) {
+            throw new IllegalArgumentException("Context cannot be null");
+        }
+        if (configuration == null) {
+            throw new IllegalArgumentException("Configuration cannot be null");
+        }
+
+        this.context = context.getApplicationContext();
         this.configuration = configuration;
-        this.cachedTokenEndpoint = buildTokenEndpoint(); // Cache endpoint on initialization
-        this.deviceInfo = DeviceInformation.getInstance(context);
+        this.tokenEndpoint = buildTokenEndpoint();
+        this.deviceInfo = DeviceInformation.getInstance(this.context);
+        this.prefs = this.context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+
+        // Load cached token on initialization
         loadCachedToken();
     }
 
     /**
-     * Get valid app token - returns cached token or generates new one if needed
-     * Optimized with read-write locks for better concurrent access
+     * Get valid app token with optimized thread-safe access
+     * Uses read-write locks for better concurrent performance
      */
     public List<Long> getAppToken() throws IOException {
-        // Fast path: use read lock for checking cached token
+        // Fast path: read lock for checking cached token
         tokenLock.readLock().lock();
         try {
             List<Long> token = cachedToken.get();
             if (token != null && isTokenValid()) {
-                return token;
+                return new ArrayList<>(token); // Return defensive copy
             }
         } finally {
             tokenLock.readLock().unlock();
         }
 
-        // Slow path: generate new token with separate synchronization
+        // Slow path: generate new token with proper synchronization
         synchronized (tokenGenerationLock) {
-            // Double-check pattern with read lock
+            // Double-check pattern
             tokenLock.readLock().lock();
             try {
                 List<Long> token = cachedToken.get();
                 if (token != null && isTokenValid()) {
-                    return token;
+                    return new ArrayList<>(token);
                 }
             } finally {
                 tokenLock.readLock().unlock();
             }
 
-            // Generate and cache new token
+            // Generate new token
             List<Long> newToken = generateAppToken();
             if (newToken != null && !newToken.isEmpty()) {
                 tokenLock.writeLock().lock();
                 try {
                     cacheToken(newToken);
                     cachedToken.set(newToken);
-                    lastTokenTime = System.currentTimeMillis();
+                    lastTokenTime.set(System.currentTimeMillis());
+                    return new ArrayList<>(newToken);
                 } finally {
                     tokenLock.writeLock().unlock();
                 }
+            } else {
+                throw new IOException("Failed to generate valid app token");
             }
-
-            return newToken;
         }
     }
 
     /**
-     * Force token refresh - useful when token becomes invalid
+     * Refresh token - force generation of new token
      */
     public void refreshToken() throws IOException {
         synchronized (tokenGenerationLock) {
-            List<Long> newToken = generateAppToken();
-            if (newToken != null && !newToken.isEmpty()) {
-                tokenLock.writeLock().lock();
-                try {
-                    cacheToken(newToken);
-                    cachedToken.set(newToken);
-                    lastTokenTime = System.currentTimeMillis();
-                } finally {
-                    tokenLock.writeLock().unlock();
+            tokenLock.writeLock().lock();
+            try {
+                // Clear cached token to force regeneration
+                cachedToken.set(null);
+                lastTokenTime.set(0);
+                clearCachedToken();
+
+                if (configuration.isDebugLoggingEnabled()) {
+                    Log.d(TAG, "Token cache cleared, forcing refresh");
                 }
+            } finally {
+                tokenLock.writeLock().unlock();
             }
+
+            // Generate new token
+            getAppToken();
         }
     }
 
     /**
-     * Generate app token from application token via New Relic API
-     * Optimized with better resource management and error handling
+     * Check if current token is still valid
      */
-    private List<Long> generateAppToken() throws IOException {
-        String payload = buildTokenRequestPayload();
-        URL url = new URL(cachedTokenEndpoint); // Use cached endpoint
-        HttpURLConnection connection = null;
+    private boolean isTokenValid() {
+        long currentTime = System.currentTimeMillis();
+        long tokenAge = currentTime - lastTokenTime.get();
+        return tokenAge < TOKEN_VALIDITY_MS;
+    }
 
+    /**
+     * Build token endpoint URL based on region
+     */
+    private String buildTokenEndpoint() {
+        String region = configuration.getRegion().toUpperCase();
+        switch (region) {
+            case "EU":
+                return "https://mobile-collector.eu.newrelic.com/mobile/v5/connect";
+            case "AP":
+                return "https://mobile-collector.ap.newrelic.com/mobile/v5/connect";
+            case "GOV":
+                return "https://mobile-collector.gov.newrelic.com/mobile/v5/connect";
+            case "STAGING":
+                return "https://mobile-collector.staging.newrelic.com/mobile/v5/connect";
+            default:
+                return "https://mobile-collector.newrelic.com/mobile/v5/connect";
+        }
+    }
+
+    /**
+     * Generate new app token from New Relic API
+     */
+    private List<Long> generateAppToken() {
+        HttpURLConnection connection = null;
         try {
+            URL url = new URL(tokenEndpoint);
             connection = (HttpURLConnection) url.openConnection();
 
-            // Configure connection for token request
+            // Configure connection for mobile/TV optimization
             connection.setRequestMethod("POST");
             connection.setDoOutput(true);
             connection.setDoInput(true);
+            connection.setUseCaches(false);
             connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
             connection.setReadTimeout(READ_TIMEOUT_MS);
-            connection.setUseCaches(false); // Disable caching for auth requests
 
             // Set headers
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("User-Agent", deviceInfo.getUserAgent());
-            connection.setRequestProperty("Content-Length", String.valueOf(payload.length()));
             connection.setRequestProperty("X-App-License-Key", configuration.getApplicationToken());
 
-            // Send request with proper resource management
-            try (OutputStream outputStream = new BufferedOutputStream(connection.getOutputStream(), BUFFER_SIZE)) {
-                outputStream.write(payload.getBytes(UTF_8));
+            // Build request payload
+            List<Object> payload = buildTokenRequestPayload();
+
+            // Send request
+            try (OutputStream outputStream = new BufferedOutputStream(connection.getOutputStream())) {
+                JsonStreamUtil.streamJsonToOutputStream(payload, outputStream);
                 outputStream.flush();
             }
 
-            // Read response
+            // Process response
             int responseCode = connection.getResponseCode();
             if (responseCode >= 200 && responseCode < 300) {
-                try (InputStream responseStream = connection.getInputStream()) {
-                    String response = readInputStream(responseStream);
-                    return extractTokenFromResponse(response);
+                try (InputStream inputStream = connection.getInputStream()) {
+                    return parseTokenResponse(inputStream);
                 }
             } else {
-                // Read error stream for better debugging
-                String errorMessage = null;
-                try (InputStream errorStream = connection.getErrorStream()) {
-                    if (errorStream != null) {
-                        errorMessage = readInputStream(errorStream);
-                    }
-                } catch (IOException ignored) {
-                    // Ignore errors reading error stream
-                }
-
+                String errorMessage = "Token generation failed with response code: " + responseCode;
                 if (configuration.isDebugLoggingEnabled()) {
-                    Log.e("TokenManager", "Token generation failed with code: " + responseCode +
-                                     (errorMessage != null ? ", error: " + errorMessage : ""));
+                    Log.e(TAG, errorMessage);
                 }
-
-                // Throw specific exception for better error handling upstream
-                throw new IOException("Token generation failed with HTTP " + responseCode +
-                                    (errorMessage != null ? ": " + errorMessage : ""));
+                return null;
             }
 
+        } catch (Exception e) {
+            if (configuration.isDebugLoggingEnabled()) {
+                Log.e(TAG, "Failed to generate app token: " + e.getMessage(), e);
+            }
+            return null;
         } finally {
             if (connection != null) {
                 connection.disconnect();
@@ -194,31 +235,31 @@ public class TokenManager {
     }
 
     /**
-     * Build token endpoint URL based on region (cached for performance)
+     * Build comprehensive token request payload
      */
-    private String buildTokenEndpoint() {
-        String region = configuration.getRegion().toUpperCase();
-        if ("EU".equals(region)) {
-            return "https://mobile-collector.eu.newrelic.com/mobile/v5/connect";
-        } else {
-            return "https://mobile-collector.newrelic.com/mobile/v5/connect";
+    private List<Object> buildTokenRequestPayload() {
+        // Application information
+        PackageManager pm = context.getPackageManager();
+        String packageName = context.getPackageName(); //package name is application name
+        String applicationVersion = "unknown";
+        String appname = "unknown";
+        try {
+
+            PackageInfo packageInfo = pm.getPackageInfo(packageName, 0);
+            ApplicationInfo appInfo = packageInfo.applicationInfo;
+            appname = pm.getApplicationLabel(appInfo).toString();
+            applicationVersion = packageInfo.versionName;
+        } catch (PackageManager.NameNotFoundException e) {
+            if (configuration.isDebugLoggingEnabled()) {
+                Log.w(TAG, "Failed to get package info: " + e.getMessage());
+            }
         }
-    }
-
-    /**
-     * Build JSON payload for token request using actual app information from Context
-     */
-    private String buildTokenRequestPayload() throws IOException {
-        // Get actual app information from Context
-        AppInfo appInfo = getAppInfoFromContext();
-
         List<Object> payload = new ArrayList<>();
-
         // First array: App information [appName, appVersion, packageName]
         payload.add(Arrays.asList(
-                appInfo.appName,
-                appInfo.appVersion,
-                appInfo.packageName
+                appname,
+                applicationVersion,
+                packageName
         ));
 
         // Second array: Device and agent information
@@ -239,325 +280,151 @@ public class TokenManager {
                 }}
         ));
 
-        // Use the new JsonStreamUtil for optimized JSON generation
-        return JsonStreamUtil.streamJsonToString(payload);
+        return payload;
+
     }
 
     /**
-     * Extract actual application information from Android Context
+     * Parse token response from New Relic API
      */
-    private AppInfo getAppInfoFromContext() {
+    private List<Long> parseTokenResponse(InputStream inputStream) {
+        // Simple JSON parsing for token response
+        // Expected format: {"data_token":[123456,789854],...}
         try {
-            String packageName = context.getPackageName();
-            PackageManager pm = context.getPackageManager();
-            PackageInfo packageInfo;
+            // Read response and extract token array
+            // This is a simplified implementation - in production, use proper JSON parsing
+            byte[] buffer = new byte[BUFFER_SIZE];
+            StringBuilder response = new StringBuilder();
+            int bytesRead;
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                packageInfo = pm.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0));
-            } else {
-                packageInfo = pm.getPackageInfo(packageName, 0);
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                response.append(new String(buffer, 0, bytesRead, "UTF-8"));
             }
 
-            String appVersion = packageInfo.versionName != null ? packageInfo.versionName : "unknown";
+            String responseStr = response.toString().trim();
+            // Expected format: {"data_token":[123456,789854],...}
+            String dataTokenKey = "\"data_token\"";
+            int dataTokenIndex = responseStr.indexOf(dataTokenKey);
 
-            // Get app name from application label
-            ApplicationInfo appInfo = packageInfo.applicationInfo;
-            String appName = pm.getApplicationLabel(appInfo).toString();
+            if (dataTokenIndex == -1) {
+                if (configuration.isDebugLoggingEnabled()) {
+                    Log.w("TokenManager", "data_token field not found in response");
+                }
+                return null;
+            }
 
-            return new AppInfo(appName, appVersion, packageName);
+            // Find the start of the array after "data_token":
+            int colonIndex = responseStr.indexOf(':', dataTokenIndex);
+            if (colonIndex == -1) {
+                return null;
+            }
+            if (responseStr.startsWith("[") && responseStr.endsWith("]")) {
+                // Extract numbers from array format
+                String[] parts = responseStr.substring(1, responseStr.length() - 1).split(",");
+                List<Long> tokens = new ArrayList<>();
+
+                for (String part : parts) {
+                    try {
+                        tokens.add(Long.parseLong(part.trim()));
+                    } catch (NumberFormatException e) {
+                        Log.w(TAG, "Failed to parse token part: " + part);
+                    }
+                }
+
+                return tokens;
+            }
+
+            return null;
 
         } catch (Exception e) {
             if (configuration.isDebugLoggingEnabled()) {
-                Log.e("TokenManager", "Failed to get app info from context: " + e.getMessage());
-            }
-            // Return fallback values
-            return new AppInfo("unknown", "unknown", context.getPackageName());
-        }
-    }
-
-    /**
-     * Simple data holder for app information
-     */
-    private static class AppInfo {
-        final String appName;
-        final String appVersion;
-        final String packageName;
-
-        AppInfo(String appName, String appVersion, String packageName) {
-            this.appName = appName;
-            this.appVersion = appVersion;
-            this.packageName = packageName;
-        }
-    }
-
-    /**
-     * Extract app token from JSON response and return as List of Long
-     * Optimized lightweight JSON parsing for mobile/TV performance
-     * Avoids JSONObject/JSONArray overhead for better resource usage
-     */
-    private List<Long> extractTokenFromResponse(String response) {
-        if (response == null || response.isEmpty()) {
-            return null;
-        }
-
-        // Expected format: {"data_token":[123456,789854],...}
-        String dataTokenKey = "\"data_token\"";
-        int dataTokenIndex = response.indexOf(dataTokenKey);
-
-        if (dataTokenIndex == -1) {
-            if (configuration.isDebugLoggingEnabled()) {
-                Log.w("TokenManager", "data_token field not found in response");
+                Log.w(TAG, "Error parsing data_token array in response " + e.getMessage());
             }
             return null;
-        }
-
-        // Find the start of the array after "data_token":
-        int colonIndex = response.indexOf(':', dataTokenIndex);
-        if (colonIndex == -1) {
-            return null;
-        }
-
-        int arrayStartIndex = response.indexOf('[', colonIndex);
-        if (arrayStartIndex == -1) {
-            return null;
-        }
-
-        // Find the matching closing bracket, not just the first ']'
-        int arrayEndIndex = findMatchingCloseBracket(response, arrayStartIndex);
-        if (arrayEndIndex == -1) {
-            return null;
-        }
-
-        // Extract the content between brackets: 123456,789854
-        String arrayContent = response.substring(arrayStartIndex + 1, arrayEndIndex).trim();
-
-        if (arrayContent.isEmpty()) {
-            if (configuration.isDebugLoggingEnabled()) {
-                Log.w("TokenManager", "Empty data_token array in response");
-            }
-            return new ArrayList<>();
-        }
-
-        return parseTokenArray(arrayContent, "data_token");
-    }
-
-    /**
-     * Find the index of the matching closing bracket for a given opening bracket index
-     * Handles nested brackets and different data formats more robustly
-     */
-    private int findMatchingCloseBracket(String response, int openIndex) {
-        int bracketCount = 0;
-
-        for (int i = openIndex; i < response.length(); i++) {
-            char c = response.charAt(i);
-
-            if (c == '[') {
-                bracketCount++;
-            } else if (c == ']') {
-                bracketCount--;
-                if (bracketCount == 0) {
-                    return i; // Matching closing bracket found
-                }
-            }
-        }
-
-        return -1; // No matching closing bracket found
-    }
-
-    /**
-     * Parse comma-separated token array content into List<Long>
-     * Optimized for mobile/TV performance with minimal object allocation
-     */
-    private List<Long> parseTokenArray(String arrayContent, String context) {
-        // Pre-allocate ArrayList with estimated capacity to reduce memory allocations
-        List<Long> tokenList = new ArrayList<>(4); // Most tokens have 2-4 elements
-
-        // Use StringBuilder for better memory efficiency when parsing tokens
-        StringBuilder tokenBuilder = new StringBuilder(16); // Typical long is ~10-15 chars
-
-        // Parse character by character to avoid split() overhead and String[] allocation
-        for (int i = 0; i < arrayContent.length(); i++) {
-            char c = arrayContent.charAt(i);
-
-            if (c == ',') {
-                // End of token - parse accumulated token
-                parseAndAddToken(tokenBuilder, tokenList, context);
-            } else if (!Character.isWhitespace(c)) {
-                // Append non-whitespace characters (digits, etc.)
-                tokenBuilder.append(c);
-            }
-        }
-
-        // Handle the last token (after the final comma or if no commas exist)
-        parseAndAddToken(tokenBuilder, tokenList, context);
-
-        return tokenList;
-    }
-
-    /**
-     * Parse and add a single token from StringBuilder to the token list
-     * Handles the common parsing logic to eliminate duplication
-     */
-    private void parseAndAddToken(StringBuilder tokenBuilder, List<Long> tokenList, String context) {
-        if (tokenBuilder.length() > 0) {
-            String tokenStr = tokenBuilder.toString().trim();
-            if (!tokenStr.isEmpty()) {
-                try {
-                    long value = Long.parseLong(tokenStr);
-                    tokenList.add(value);
-                } catch (NumberFormatException e) {
-                    if (configuration.isDebugLoggingEnabled()) {
-                        Log.w("TokenManager", "Invalid number format in " + context + ": " + tokenStr);
-                    }
-                }
-            }
-            tokenBuilder.setLength(0); // Reset StringBuilder for reuse
         }
     }
 
     /**
      * Load cached token from SharedPreferences
-     * Enhanced error handling and validation
      */
     private void loadCachedToken() {
         try {
-            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            String tokenString = prefs.getString(KEY_APP_TOKEN, null);
+            String tokenStr = prefs.getString(KEY_APP_TOKEN, null);
             long timestamp = prefs.getLong(KEY_TOKEN_TIMESTAMP, 0);
 
-            if (tokenString != null && !tokenString.isEmpty() && timestamp > 0) {
-                // Validate timestamp is reasonable (not in future, not too old)
-                long currentTime = System.currentTimeMillis();
-                if (timestamp <= currentTime && (currentTime - timestamp) <= TOKEN_VALIDITY_MS * 2) {
-                    // Parse the cached token string back to List<Long>
-                    List<Long> parsedToken = parseTokenFromString(tokenString);
-                    if (parsedToken != null && !parsedToken.isEmpty()) {
-                        cachedToken.set(parsedToken);
-                        lastTokenTime = timestamp;
+            if (tokenStr != null && timestamp > 0) {
+                List<Long> tokens = parseStoredToken(tokenStr);
+                if (tokens != null && !tokens.isEmpty()) {
+                    cachedToken.set(tokens);
+                    lastTokenTime.set(timestamp);
+
+                    if (configuration.isDebugLoggingEnabled()) {
+                        Log.d(TAG, "Loaded cached token from storage");
                     }
-                } else if (configuration.isDebugLoggingEnabled()) {
-                    Log.w("TokenManager", "Cached token timestamp invalid, ignoring cache");
                 }
             }
         } catch (Exception e) {
-            if (configuration.isDebugLoggingEnabled()) {
-                Log.e("TokenManager", "Failed to load cached token: " + e.getMessage());
-            }
+            Log.w(TAG, "Failed to load cached token: " + e.getMessage());
+            clearCachedToken();
         }
     }
 
     /**
-     * Parse token string back to List<Long> for loading from cache
-     * Optimized with character-by-character parsing for better TV/mobile performance
+     * Cache token in SharedPreferences
      */
-    private List<Long> parseTokenFromString(String tokenString) {
+    private void cacheToken(List<Long> tokens) {
         try {
-            // Remove brackets and parse content: "[123456, 789854]" -> "123456, 789854"
-            if (tokenString.startsWith("[") && tokenString.endsWith("]")) {
-                String content = tokenString.substring(1, tokenString.length() - 1).trim();
-                if (content.isEmpty()) {
-                    return new ArrayList<>();
-                }
-
-                return parseTokenArray(content, "cached token");
+            StringBuilder tokenStr = new StringBuilder();
+            for (int i = 0; i < tokens.size(); i++) {
+                if (i > 0) tokenStr.append(",");
+                tokenStr.append(tokens.get(i));
             }
-        } catch (Exception e) {
+
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putString(KEY_APP_TOKEN, tokenStr.toString());
+            editor.putLong(KEY_TOKEN_TIMESTAMP, System.currentTimeMillis());
+            editor.apply();
+
             if (configuration.isDebugLoggingEnabled()) {
-                Log.w("TokenManager", "Failed to parse cached token: " + e.getMessage());
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Cache token persistently to SharedPreferences
-     * Enhanced with atomic commit operation
-     */
-    private void cacheToken(List<Long> token) {
-        if (token == null || token.isEmpty()) {
-            return; // Don't cache invalid tokens
-        }
-
-        try {
-            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            long currentTime = System.currentTimeMillis();
-
-            // Use commit() instead of apply() for synchronous write to ensure consistency
-            boolean success = prefs.edit()
-                .putString(KEY_APP_TOKEN, token.toString()) // Convert List<Long> to String
-                .putLong(KEY_TOKEN_TIMESTAMP, currentTime)
-                .commit();
-
-            if (!success && configuration.isDebugLoggingEnabled()) {
-                Log.w("TokenManager", "Failed to commit token to SharedPreferences");
+                Log.d(TAG, "Token cached to persistent storage");
             }
 
         } catch (Exception e) {
-            if (configuration.isDebugLoggingEnabled()) {
-                Log.e("TokenManager", "Failed to cache token: " + e.getMessage());
+            Log.e(TAG, "Failed to cache token: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Parse stored token string back to List<Long>
+     */
+    private List<Long> parseStoredToken(String tokenStr) {
+        try {
+            String[] parts = tokenStr.split(",");
+            List<Long> tokens = new ArrayList<>();
+
+            for (String part : parts) {
+                tokens.add(Long.parseLong(part.trim()));
             }
+
+            return tokens;
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to parse stored token: " + e.getMessage());
+            return null;
         }
     }
 
     /**
-     * Check if current token is valid (not expired)
+     * Clear cached token from SharedPreferences
      */
-    private boolean isTokenValid() {
-        long currentTime = System.currentTimeMillis();
-        return (currentTime - lastTokenTime) <= TOKEN_VALIDITY_MS;
-    }
-
-    /**
-     * Read InputStream to String with optimized buffer size
-     */
-    private String readInputStream(InputStream inputStream) throws IOException {
-        StringBuilder result = new StringBuilder();
-        byte[] buffer = new byte[BUFFER_SIZE]; // Increased buffer size
-        int bytesRead;
-
-        while ((bytesRead = inputStream.read(buffer)) != -1) {
-            result.append(new String(buffer, 0, bytesRead, UTF_8));
+    private void clearCachedToken() {
+        try {
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.remove(KEY_APP_TOKEN);
+            editor.remove(KEY_TOKEN_TIMESTAMP);
+            editor.apply();
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to clear cached token: " + e.getMessage());
         }
-
-        return result.toString();
-    }
-
-    /**
-     * Escape JSON string values with StringBuilder for better performance
-     */
-    private String escapeJsonString(String str) {
-        if (str == null || str.isEmpty()) {
-            return "";
-        }
-
-        // Pre-allocate StringBuilder with estimated capacity
-        StringBuilder result = new StringBuilder(str.length() + 16);
-
-        for (int i = 0; i < str.length(); i++) {
-            char c = str.charAt(i);
-            switch (c) {
-                case '\\':
-                    result.append("\\\\");
-                    break;
-                case '"':
-                    result.append("\\\"");
-                    break;
-                case '\n':
-                    result.append("\\n");
-                    break;
-                case '\r':
-                    result.append("\\r");
-                    break;
-                case '\t':
-                    result.append("\\t");
-                    break;
-                default:
-                    result.append(c);
-                    break;
-            }
-        }
-
-        return result.toString();
     }
 
 }

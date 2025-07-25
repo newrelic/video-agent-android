@@ -63,7 +63,8 @@ public class OptimizedHttpClient implements HttpClientInterface {
 
         // Set endpoint URL based on region, defaulting to US if not found
         String region = configuration.getRegion().toUpperCase();
-        this.endpointUrl = REGIONAL_ENDPOINTS.getOrDefault(region, REGIONAL_ENDPOINTS.get("DEFAULT"));
+        String regionEndpoint = REGIONAL_ENDPOINTS.get(region);
+        this.endpointUrl = regionEndpoint != null ? regionEndpoint : REGIONAL_ENDPOINTS.get("DEFAULT");
 
         if (configuration.isMemoryOptimized()) {
             connectionTimeoutMs = 6000;

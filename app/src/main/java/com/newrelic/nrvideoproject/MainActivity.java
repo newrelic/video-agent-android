@@ -3,11 +3,11 @@ package com.newrelic.nrvideoproject;
 import androidx.appcompat.app.AppCompatActivity;
 import android.content.Intent;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.widget.Switch;
 
-import com.newrelic.agent.android.NewRelic;
+import com.newrelic.videoagent.core.NRVideo;
+import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.utils.NRLog;
 
 import java.util.HashMap;
@@ -21,6 +21,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        NRVideoConfiguration config = new NRVideoConfiguration.Builder("AA3172b73aa90368104e94b38d9f4fc10edd9ce202-NRMA")
+                .autoDetectPlatform(getApplicationContext())
+                .withHarvestCycle(10)
+                .build();
+        NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
         setContentView(R.layout.activity_main);
 
         adsSwitch = findViewById(R.id.ads_switch);
@@ -33,28 +38,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             @Override
             public void onClick(View view) {
                 Map<String, Object> attr = new HashMap<>();
-                attr.put("actionName", "AGENT_TEST");
                 attr.put("kind", "counter");
                 attr.put("counter", counter++);
-                if (NewRelic.recordCustomEvent("MobileVideo", attr)) {
-                    Log.v("", "-------> AGENT_TEST sent");
-                }
-                else {
-                    Log.v("","-------> AGENT_TEST not sent");
-                }
+                NRVideo.recordCustomEvent(attr);
 
                 Map<String, Object> emptyAttr = new HashMap<>();
-                if (NewRelic.recordCustomEvent("SimpleEvent", emptyAttr)) {
-                    Log.v("", "-------> Empty event sent");
-                }
-                else {
-                    Log.v("", "-------> Empty event not sent");
-                }
+                NRVideo.recordCustomEvent(emptyAttr);
             }
         });
 
-        //WARNING: DEFINE THE APP TOKEN HERE
-        NewRelic.withApplicationToken("APP TOKEN").start(this.getApplication());
 
         NRLog.enable();
 
@@ -64,12 +56,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         attr.put("floatVal", 1.23);
         attr.put("strVal", "this is a string");
         attr.put("kind", "app start");
-        if (NewRelic.recordCustomEvent("MobileVideo", attr)) {
-            Log.v("", "-------> AGENT_TEST_INIT sent");
-        }
-        else {
-            Log.v("","-------> AGENT_TEST_INIT not sent");
-        }
+        NRVideo.recordCustomEvent(attr);
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.newrelic.videoagent.core.storage;
 
 import android.content.Context;
+import android.util.Log;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.harvest.HarvestComponentFactory;
 import com.newrelic.videoagent.core.harvest.EventBufferInterface;
@@ -13,7 +14,7 @@ import com.newrelic.videoagent.core.harvest.DeadLetterEventBuffer;
  * Drop-in replacement that adds crash safety with zero performance impact
  */
 public class CrashSafeHarvestFactory extends HarvestComponentFactory {
-
+    private static final String TAG = "NRVideo.CrashSHFactory";
     private final Context context;
     private CrashSafeEventBuffer crashSafeBuffer;
     private IntegratedDeadLetterHandler integratedHandler;
@@ -72,7 +73,7 @@ public class CrashSafeHarvestFactory extends HarvestComponentFactory {
                 integratedHandler.emergencyBackup();
             }
         } catch (Exception e) {
-            System.err.println("[CrashSafeFactory] Emergency backup failed: " + e.getMessage());
+            Log.w(TAG, "[CrashSafeFactory] Emergency backup failed: " + e.getMessage());
         }
     }
 

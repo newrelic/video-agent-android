@@ -2,6 +2,8 @@ package com.newrelic.videoagent.exoplayer.tracker;
 
 import android.net.Uri;
 
+import androidx.annotation.NonNull;
+import androidx.media3.common.C;
 import androidx.media3.common.MediaLibraryInfo;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.PlaybackException;
@@ -16,7 +18,6 @@ import androidx.media3.exoplayer.source.MediaLoadData;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.exoplayer.BuildConfig;
-import static com.newrelic.videoagent.core.NRDef.*;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -24,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 
 import static com.newrelic.videoagent.core.NRDef.*;
-import androidx.media3.common.C;
 
 /**
  * New Relic Video tracker for ExoPlayer.
@@ -73,7 +73,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      *
      * @param action     Action being generated.
      * @param attributes Specific attributes sent along the action.
-     * @return
+     * @return Map of attributes with action-specific data.
      */
     @Override
     public Map<String, Object> getAttributes(String action, Map<String, Object> attributes) {
@@ -458,7 +458,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     }
 
     @Override
-    public void onPlayerError(PlaybackException error) {
+    public void onPlayerError(@NonNull PlaybackException error) {
         NRLog.d("onPlayerError");
         sendError(error);
     }
@@ -466,7 +466,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     // ExoPlayer AnalyticsListener
 
     @Override
-    public void onPositionDiscontinuity(Player.PositionInfo oldPosition, Player.PositionInfo newPosition, int reason) {
+    public void onPositionDiscontinuity(@NonNull Player.PositionInfo oldPosition, @NonNull Player.PositionInfo newPosition, int reason) {
         if (reason == Player.DISCONTINUITY_REASON_SEEK) {
             NRLog.d("onSeekStarted analytics");
 
@@ -477,7 +477,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     }
 
     @Override
-    public void onTracksChanged(EventTime eventTime, Tracks tracksInfo) {
+    public void onTracksChanged(@NonNull EventTime eventTime, @NonNull Tracks tracksInfo) {
         NRLog.d("onTracksChanged analytics");
 
         // Next track in the playlist
@@ -489,13 +489,13 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     }
 
     @Override
-    public void onLoadError(EventTime eventTime, LoadEventInfo loadEventInfo, MediaLoadData mediaLoadData, IOException error, boolean wasCanceled) {
+    public void onLoadError(@NonNull EventTime eventTime, @NonNull LoadEventInfo loadEventInfo, @NonNull MediaLoadData mediaLoadData, @NonNull IOException error, boolean wasCanceled) {
         NRLog.d("onLoadError analytics");
         sendError(error);
     }
 
     @Override
-    public void onLoadCompleted(EventTime eventTime, LoadEventInfo loadEventInfo, MediaLoadData mediaLoadData) {
+    public void onLoadCompleted(@NonNull EventTime eventTime, @NonNull LoadEventInfo loadEventInfo, @NonNull MediaLoadData mediaLoadData) {
         if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA
                 && mediaLoadData.trackType == C.TRACK_TYPE_VIDEO
                 && loadEventInfo.loadDurationMs > 0) {
@@ -505,14 +505,14 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     }
 
     @Override
-    public void onBandwidthEstimate(AnalyticsListener.EventTime eventTime, int totalLoadTimeMs, long totalBytesLoaded, long bitrateEstimate) {
+    public void onBandwidthEstimate(@NonNull AnalyticsListener.EventTime eventTime, int totalLoadTimeMs, long totalBytesLoaded, long bitrateEstimate) {
         NRLog.d("onBandwidthEstimate analytics");
 
         this.bitrateEstimate = bitrateEstimate;
     }
 
     @Override
-    public void onDroppedVideoFrames(AnalyticsListener.EventTime eventTime, int droppedFrames, long elapsedMs) {
+    public void onDroppedVideoFrames(@NonNull AnalyticsListener.EventTime eventTime, int droppedFrames, long elapsedMs) {
         NRLog.d("onDroppedVideoFrames analytics");
         if (!player.isPlayingAd()) {
             sendDroppedFrame(droppedFrames, (int) elapsedMs);
@@ -527,8 +527,8 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
 
         if (player.isPlayingAd()) return;
 
-        long currMul = width * height;
-        long lastMul = lastWidth * lastHeight;
+        long currMul = (long) width * height;
+        long lastMul = (long) lastWidth * lastHeight;
 
         if (lastMul != 0) {
             if (lastMul < currMul) {
@@ -544,3 +544,4 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         lastWidth = width;
     }
 }
+
