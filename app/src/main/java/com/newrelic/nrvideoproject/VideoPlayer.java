@@ -8,7 +8,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import com.newrelic.videoagent.core.NRVideo;
-import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.NRVideoPlayerConfiguration;
 
 import java.util.ArrayList;

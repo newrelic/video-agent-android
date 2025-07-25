@@ -24,7 +24,6 @@ public final class NRVideo {
     private static final Object lock = new Object();
 
     private volatile HarvestManager harvestManager;
-    private volatile boolean isInitialized = false;
     private final Map<String, Integer> trackerIds = new HashMap<>();
 
     // Private constructor for singleton
@@ -42,7 +41,7 @@ public final class NRVideo {
      * Check if NRVideo is initialized and ready for use
      */
     public static boolean isInitialized() {
-        return instance != null && instance.isInitialized;
+        return instance != null;
     }
 
     public static Integer addPlayer(NRVideoPlayerConfiguration config) {
@@ -131,7 +130,6 @@ public final class NRVideo {
     public static class Builder {
         private final Context context;
         private NRVideoConfiguration config;
-//        private ExoPlayer player;
 
         private Builder(Context context) {
             this.context = context.getApplicationContext();
@@ -159,7 +157,7 @@ public final class NRVideo {
 
             synchronized (lock) {
                 // Double-check after acquiring lock
-                if (instance != null && instance.isInitialized) {
+                if (instance != null) {
                     throw new RuntimeException("NRVideo is already initialized. Multiple initialization attempts are not allowed.");
                 }
 

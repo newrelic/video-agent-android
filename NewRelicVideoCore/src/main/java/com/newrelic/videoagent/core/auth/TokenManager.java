@@ -318,23 +318,30 @@ public final class TokenManager {
             if (colonIndex == -1) {
                 return null;
             }
-            if (responseStr.startsWith("[") && responseStr.endsWith("]")) {
-                // Extract numbers from array format
-                String[] parts = responseStr.substring(1, responseStr.length() - 1).split(",");
-                List<Long> tokens = new ArrayList<>();
 
-                for (String part : parts) {
-                    try {
-                        tokens.add(Long.parseLong(part.trim()));
-                    } catch (NumberFormatException e) {
-                        Log.w(TAG, "Failed to parse token part: " + part);
-                    }
-                }
-
-                return tokens;
+            int arrayStartIndex = responseStr.indexOf('[', colonIndex);
+            if (arrayStartIndex == -1) {
+                return null;
             }
 
-            return null;
+            // Find the matching closing bracket, not just the first ']'
+            int arrayEndIndex = findMatchingCloseBracket(responseStr, arrayStartIndex);
+            if (arrayEndIndex == -1) {
+                return null;
+            }
+
+            // Extract the content between brackets: 123456,789854
+            String arrayContent = response.substring(arrayStartIndex + 1, arrayEndIndex).trim();
+
+            List<Long> tokens = new ArrayList<>();
+            for (String part: arrayContent.split(",")) {
+                try {
+                    tokens.add(Long.parseLong(part));
+                } catch (NumberFormatException e) {
+                    return null;
+                }
+            }
+            return tokens;
 
         } catch (Exception e) {
             if (configuration.isDebugLoggingEnabled()) {
@@ -342,6 +349,29 @@ public final class TokenManager {
             }
             return null;
         }
+    }
+
+    /**
+     * Find the index of the matching closing bracket for a given opening bracket index
+     * Handles nested brackets and different data formats more robustly
+     */
+    private int findMatchingCloseBracket(String response, int openIndex) {
+        int bracketCount = 0;
+
+        for (int i = openIndex; i < response.length(); i++) {
+            char c = response.charAt(i);
+
+            if (c == '[') {
+                bracketCount++;
+            } else if (c == ']') {
+                bracketCount--;
+                if (bracketCount == 0) {
+                    return i; // Matching closing bracket found
+                }
+            }
+        }
+
+        return -1; // No matching closing bracket found
     }
 
     /**
