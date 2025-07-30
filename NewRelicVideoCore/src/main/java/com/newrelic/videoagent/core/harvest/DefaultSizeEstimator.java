@@ -1,12 +1,13 @@
 package com.newrelic.videoagent.core.harvest;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 public class DefaultSizeEstimator implements SizeEstimator {
     // Cache for repeated string size calculations (mobile optimization)
     private static final int MAX_CACHE_SIZE = 100;
-    private final java.util.LinkedHashMap<String, Integer> sizeCache = new java.util.LinkedHashMap<String, Integer>(16, 0.75f, true) {
+    private final LinkedHashMap<String, Integer> sizeCache = new LinkedHashMap<String, Integer>(16, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<String, Integer> eldest) {
             return size() > MAX_CACHE_SIZE;

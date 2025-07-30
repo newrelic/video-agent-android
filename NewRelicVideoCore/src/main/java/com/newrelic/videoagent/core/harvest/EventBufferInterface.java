@@ -35,15 +35,6 @@ public interface EventBufferInterface {
      */
     void cleanup();
 
-    /**
-     * Get maximum capacity of this buffer
-     */
-    int getMaxCapacity();
-
-    /**
-     * Check if buffer has reached capacity threshold (for scheduler startup)
-     */
-    boolean hasReachedCapacityThreshold(double threshold);
 
     /**
      * Set overflow callback for buffers that support overflow prevention

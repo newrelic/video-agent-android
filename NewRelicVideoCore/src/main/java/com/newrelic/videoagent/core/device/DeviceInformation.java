@@ -4,8 +4,8 @@ import android.app.ActivityManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
-import android.util.Log;
 import com.newrelic.videoagent.core.BuildConfig;
+import com.newrelic.videoagent.core.utils.NRLog;
 
 import java.util.UUID;
 import java.util.Locale;
@@ -17,7 +17,6 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public final class DeviceInformation {
 
-    private static final String TAG = "NRVideo.DeviceInfo";
     private static final AtomicReference<DeviceInformation> instance = new AtomicReference<>();
 
     // Immutable device information fields
@@ -75,7 +74,7 @@ public final class DeviceInformation {
                         current = new DeviceInformation(context);
                         instance.set(current);
                     } catch (Exception e) {
-                        Log.e(TAG, "Failed to initialize DeviceInformation: " + e.getMessage(), e);
+                        NRLog.e("Failed to initialize DeviceInformation: " + e.getMessage(), e);
                         throw new RuntimeException("DeviceInformation initialization failed", e);
                     }
                 }
@@ -95,7 +94,7 @@ public final class DeviceInformation {
                 return fingerprint.trim();
             }
         } catch (Exception e) {
-            Log.w(TAG, "Failed to get device fingerprint: " + e.getMessage());
+            NRLog.w("Failed to get device fingerprint: " + e.getMessage());
         }
 
         try {
@@ -103,7 +102,7 @@ public final class DeviceInformation {
             String deviceIdentifier = Build.BRAND + "_" + Build.DEVICE + "_" + Build.MODEL;
             return deviceIdentifier.replaceAll("\\s+", "_");
         } catch (Exception e) {
-            Log.w(TAG, "Failed to create device identifier: " + e.getMessage());
+            NRLog.w("Failed to create device identifier: " + e.getMessage());
         }
 
         // Final fallback to random UUID
@@ -118,7 +117,7 @@ public final class DeviceInformation {
             String arch = System.getProperty("os.arch");
             return arch != null ? arch : "unknown";
         } catch (Exception e) {
-            Log.w(TAG, "Failed to get system architecture: " + e.getMessage());
+            NRLog.w("Failed to get system architecture: " + e.getMessage());
             return "unknown";
         }
     }
@@ -131,7 +130,7 @@ public final class DeviceInformation {
             String vmVersion = System.getProperty("java.vm.version");
             return vmVersion != null ? vmVersion : "unknown";
         } catch (Exception e) {
-            Log.w(TAG, "Failed to get Java VM version: " + e.getMessage());
+            NRLog.w("Failed to get Java VM version: " + e.getMessage());
             return "unknown";
         }
     }
@@ -162,7 +161,7 @@ public final class DeviceInformation {
 
             return false;
         } catch (Exception e) {
-            Log.w(TAG, "Failed to detect TV platform: " + e.getMessage());
+            NRLog.w("Failed to detect TV platform: " + e.getMessage());
             return false;
         }
     }
@@ -194,7 +193,7 @@ public final class DeviceInformation {
             return memoryInfo.availMem < 512 * 1024 * 1024 || memoryInfo.lowMemory;
 
         } catch (Exception e) {
-            Log.w(TAG, "Failed to detect low memory device: " + e.getMessage());
+            NRLog.w("Failed to detect low memory device: " + e.getMessage());
             return false;
         }
     }
@@ -207,7 +206,7 @@ public final class DeviceInformation {
             DeviceForm deviceForm = getDeviceForm(context);
             return deviceForm.name().toLowerCase(Locale.US);
         } catch (Exception e) {
-            Log.w(TAG, "Failed to determine device form: " + e.getMessage());
+            NRLog.w("Failed to determine device form: " + e.getMessage());
             return DeviceForm.UNKNOWN.name().toLowerCase(Locale.US);
         }
     }
@@ -241,7 +240,7 @@ public final class DeviceInformation {
                     return DeviceForm.NORMAL;
             }
         } catch (Exception e) {
-            Log.w(TAG, "Failed to get device form: " + e.getMessage());
+            NRLog.w("Failed to get device form: " + e.getMessage());
             return DeviceForm.UNKNOWN;
         }
     }
@@ -264,7 +263,7 @@ public final class DeviceInformation {
                 return "Native Android";
             }
         } catch (Exception e) {
-            Log.w(TAG, "Failed to determine application framework: " + e.getMessage());
+            NRLog.w("Failed to determine application framework: " + e.getMessage());
             return "Unknown";
         }
     }
@@ -321,7 +320,7 @@ public final class DeviceInformation {
                 agentName, agentVersion, osVersion, manufacturer, model,
                 isTV ? "; TV" : isLowMemoryDevice ? "; LowMem" : "");
         } catch (Exception e) {
-            Log.w(TAG, "Failed to create user agent: " + e.getMessage());
+            NRLog.w("Failed to create user agent: " + e.getMessage());
             return String.format(Locale.US, "%s/%s", agentName, agentVersion);
         }
     }

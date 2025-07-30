@@ -9,7 +9,7 @@ public class NRVideoPlayerConfiguration {
     private String playerName;
     private ExoPlayer player;
     private Map<String, Object> customAttributes;
-    private boolean isAdEnabled = Boolean.FALSE;
+    private boolean isAdEnabled = false;
 
     public NRVideoPlayerConfiguration(String playerName, ExoPlayer player, boolean isAdEnabled, Map<String, Object> customAttributes) {
         this.playerName = playerName;

@@ -2,12 +2,12 @@ package com.newrelic.videoagent.core.storage;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.util.Log;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.NRVideoConstants;
 import com.newrelic.videoagent.core.harvest.EventBufferInterface;
 import com.newrelic.videoagent.core.harvest.PriorityEventBuffer;
 import com.newrelic.videoagent.core.harvest.SizeEstimator;
+import com.newrelic.videoagent.core.utils.NRLog;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,8 +27,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class CrashSafeEventBuffer implements EventBufferInterface {
 
-    private static final String TAG = "NRVideo.CrashSafe";
-
     private final PriorityEventBuffer memoryBuffer;
     private final VideoEventStorage storage;
     private final SharedPreferences crashPrefs;
@@ -36,8 +34,6 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
 
     // TV vs Mobile optimization
     private final int emergencyBackupThreshold;
-    private final int recoveryBatchSize;
-    private final int maxCapacity;
 
     // Crash detection
     private static final String CRASH_PREF_NAME = "nr_video_crash_detection";
@@ -50,7 +46,7 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
     private final AtomicInteger lastEventCount = new AtomicInteger(0);
 
     public CrashSafeEventBuffer(Context context, NRVideoConfiguration configuration, VideoEventStorage videoEventStorage) {
-        this.memoryBuffer = new PriorityEventBuffer();
+        this.memoryBuffer = new PriorityEventBuffer(configuration.isTV());
         this.storage = videoEventStorage; // Use injected storage instead of singleton
         this.crashPrefs = context.getSharedPreferences(CRASH_PREF_NAME, Context.MODE_PRIVATE);
 
@@ -59,8 +55,6 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
 
         // TV optimization: larger thresholds for better performance
         this.emergencyBackupThreshold = isTVDevice ? 200 : 100;
-        this.recoveryBatchSize = isTVDevice ? 50 : 20;
-        this.maxCapacity = isTVDevice ? 2000 : 1000;
 
         // Check for crash recovery on startup
         checkCrashRecovery();
@@ -75,16 +69,6 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
     @Override
     public void setCapacityCallback(CapacityCallback callback) {
         memoryBuffer.setCapacityCallback(callback);
-    }
-
-    @Override
-    public int getMaxCapacity() {
-        return maxCapacity;
-    }
-
-    @Override
-    public boolean hasReachedCapacityThreshold(double threshold) {
-        return memoryBuffer.hasReachedCapacityThreshold(threshold);
     }
 
     @Override
@@ -150,10 +134,10 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
 
             if (!liveEvents.isEmpty() || !ondemandEvents.isEmpty()) {
                 storage.backupEvents(liveEvents, ondemandEvents);
-                Log.d(TAG, "Emergency backup: " + (liveEvents.size() + ondemandEvents.size()) + " events saved");
+                NRLog.d("Emergency backup: " + (liveEvents.size() + ondemandEvents.size()) + " events saved");
             }
         } catch (Exception e) {
-            Log.e(TAG, "Emergency backup failed: " + e.getMessage(), e);
+            NRLog.e("Emergency backup failed: " + e.getMessage(), e);
         }
     }
 
@@ -166,10 +150,10 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
                 storage.backupFailedEvents(failedEvents);
                 if (!isRecovering) {
                     isRecovering = true;
-                    Log.d(TAG, "Recovery mode enabled for " + failedEvents.size() + " failed events");
+                    NRLog.d("Recovery mode enabled for " + failedEvents.size() + " failed events");
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Failed to backup events: " + e.getMessage(), e);
+                NRLog.e("Failed to backup events: " + e.getMessage(), e);
             }
         }
     }
@@ -184,16 +168,9 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
             // Previous session didn't end cleanly - likely a crash
             if (storage.hasBackupData()) {
                 hasPendingRecovery = true; // Set pending instead of immediate recovery
-                Log.w(TAG, "Crash detected - recovery will start after first successful harvest");
+                NRLog.w("Crash detected - recovery will start after first successful harvest");
             }
         }
-    }
-
-    /**
-     * Poll recovery events in small batches
-     */
-    private List<Map<String, Object>> pollRecoveryEvents(String priority) {
-        return pollRecoveryEvents(priority, recoveryBatchSize);
     }
 
     /**
@@ -204,18 +181,18 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
             List<Map<String, Object>> recoveryEvents = storage.pollEvents(priority, maxSize);
 
             if (!recoveryEvents.isEmpty()) {
-                Log.d(TAG, "Recovered " + recoveryEvents.size() + " events (" + priority + ")");
+                NRLog.d("Recovered " + recoveryEvents.size() + " events (" + priority + ")");
 
                 // Check if recovery is complete
                 if (storage.isEmpty()) {
                     isRecovering = false;
-                    Log.i(TAG, "Recovery complete");
+                    NRLog.i("Recovery complete");
                 }
             }
 
             return recoveryEvents;
         } catch (Exception e) {
-            Log.e(TAG, "Recovery polling failed: " + e.getMessage(), e);
+            NRLog.e("Recovery polling failed: " + e.getMessage(), e);
             return new ArrayList<>();
         }
     }
@@ -271,18 +248,18 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
         if (hasPendingRecovery && !isRecovering) {
             hasPendingRecovery = false;
             shouldStartRecovery = true;
-            Log.i(TAG, "Starting crash recovery after successful harvest - scheduler is now active");
+            NRLog.i("Starting crash recovery after successful harvest - scheduler is now active");
         }
 
         // Case 2: Check if there's SQLite data to recover (even without pending flag)
         if (!isRecovering && storage.hasBackupData()) {
             shouldStartRecovery = true;
-            Log.i(TAG, "Starting SQLite recovery after successful harvest - backup data detected");
+            NRLog.i("Starting SQLite recovery after successful harvest - backup data detected");
         }
 
         if (shouldStartRecovery) {
             isRecovering = true;
-            Log.i(TAG, "Recovery mode activated - SQLite events will be included in future harvests");
+            NRLog.i("Recovery mode activated - SQLite events will be included in future harvests");
         }
     }
 

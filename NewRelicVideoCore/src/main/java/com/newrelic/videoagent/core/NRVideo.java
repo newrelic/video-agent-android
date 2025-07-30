@@ -4,12 +4,11 @@ import java.util.HashMap;
 import java.util.Map;
 import android.app.Application;
 import android.content.Context;
-import android.util.Log;
 import com.newrelic.videoagent.core.harvest.HarvestManager;
 import com.newrelic.videoagent.core.lifecycle.NRVideoLifecycleObserver;
-import com.newrelic.videoagent.core.storage.CrashSafeHarvestFactory;
 import com.newrelic.videoagent.core.tracker.NRTracker;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
+import com.newrelic.videoagent.core.utils.NRLog;
 
 /**
  * New Relic Video Agent - Android Mobile & TV Optimized
@@ -17,7 +16,6 @@ import com.newrelic.videoagent.core.tracker.NRVideoTracker;
  * Supports ExoPlayer and IMA with automatic device detection
  */
 public final class NRVideo {
-    private static final String TAG = "NRVideo";
 
     // Singleton instance
     private static volatile NRVideo instance;
@@ -46,7 +44,7 @@ public final class NRVideo {
 
     public static Integer addPlayer(NRVideoPlayerConfiguration config) {
         if (!isInitialized()) {
-            Log.w(TAG, "NRVideo not initialized - cannot add player");
+            NRLog.w("NRVideo not initialized - cannot add player");
             throw new IllegalStateException("NRVideo is not initialized. Call NRVideo.newBuilder(context).withConfiguration(config).build() first.");
         }
 
@@ -60,11 +58,11 @@ public final class NRVideo {
 
         // Now start the tracker system
         Integer trackerId = NewRelicVideoAgent.getInstance().start(contentTracker, adsTracker);
-        Log.i(TAG, "NRVideo initialization completed successfully with tracker ID: " + trackerId + " and player name:" + config.getPlayerName());
+        NRLog.i("NRVideo initialization completed successfully with tracker ID: " + trackerId + " and player name:" + config.getPlayerName());
         if (config.getCustomAttributes() != null && !config.getCustomAttributes().isEmpty()) {
             for (Map.Entry<String, Object> entry : config.getCustomAttributes().entrySet()) {
                 NRVideo.setAttribute(trackerId, entry.getKey(), entry.getValue());
-                Log.d(TAG, "Set custom attribute for tracker " + trackerId + ": " + entry.getKey() + " = " + entry.getValue());
+                NRLog.d("Set custom attribute for tracker " + trackerId + ": " + entry.getKey() + " = " + entry.getValue());
             }
         }
         NRVideo.getInstance().trackerIds.put(config.getPlayerName(),  trackerId);
@@ -73,23 +71,23 @@ public final class NRVideo {
 
     public static void releaseTracker(Integer trackerId) {
         if (!isInitialized()) {
-            Log.w(TAG, "NRVideo not initialized - cannot release tracker");
+            NRLog.w("NRVideo not initialized - cannot release tracker");
             throw new IllegalStateException("NRVideo is not initialized. Call NRVideo.newBuilder(context).withConfiguration(config).build() first.");
         }
         NewRelicVideoAgent.getInstance().releaseTracker(trackerId);
-        Log.i(TAG, "Released tracker with ID: " + trackerId);
+        NRLog.i("Released tracker with ID: " + trackerId);
     }
 
     public static void releaseTracker(String playerName) {
         if (!isInitialized()) {
-            Log.w(TAG, "NRVideo not initialized - cannot release tracker");
+            NRLog.w("NRVideo not initialized - cannot release tracker");
             throw new IllegalStateException("NRVideo is not initialized. Call NRVideo.newBuilder(context).withConfiguration(config).build() first.");
         }
         Integer trackerId = NRVideo.getInstance().trackerIds.get(playerName);
         if (trackerId != null) {
             NewRelicVideoAgent.getInstance().releaseTracker(trackerId);
         }
-        Log.i(TAG, "Released tracker with ID: " + trackerId);
+        NRLog.i("Released tracker with ID: " + trackerId);
     }
 
     /**
@@ -109,9 +107,9 @@ public final class NRVideo {
      */
     public static void recordEvent(String eventType, Map<String, Object> attributes) {
         if (isInitialized()) {
-            instance.harvestManager.recordCustomEvent(eventType, attributes);
+            instance.harvestManager.recordEvent(eventType, attributes);
         } else {
-            Log.w(TAG, "recordEvent called before NRVideo is fully initialized - event dropped");
+            NRLog.w("recordEvent called before NRVideo is fully initialized - event dropped");
         }
     }
 
@@ -172,27 +170,21 @@ public final class NRVideo {
             Context applicationContext = context.getApplicationContext();
 
             // Always use crash-safe storage - it's now the default behavior
-            CrashSafeHarvestFactory factory = new CrashSafeHarvestFactory(config, applicationContext);
-            harvestManager = new HarvestManager(factory);
+            harvestManager = new HarvestManager(config, applicationContext);
 
             // Create and register lifecycle observer with crash-safe factory
             if (applicationContext instanceof Application) {
                 Application app = (Application) applicationContext;
                 NRVideoLifecycleObserver lifecycleObserver =
-                    new NRVideoLifecycleObserver(
-                        applicationContext,
-                        config,
-                        harvestManager,
-                        factory.createScheduler(harvestManager::harvestOnDemand, harvestManager::harvestLive),
-                        factory
-                    );
+                    new NRVideoLifecycleObserver(harvestManager.getFactory());
 
                 // Register with application
                 app.registerActivityLifecycleCallbacks(lifecycleObserver);
 
-                if (config.isDebugLoggingEnabled()) {
-                    Log.d(TAG, "Lifecycle observer created and registered with crash-safe storage");
-                }
+                NRLog.d("Lifecycle observer created and registered with crash-safe storage");
+            }
+            if (config.isDebugLoggingEnabled()) {
+                NRLog.enable();
             }
             return this;
         } catch (Exception e) {

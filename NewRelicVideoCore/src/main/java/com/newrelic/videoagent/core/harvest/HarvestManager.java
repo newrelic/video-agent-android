@@ -4,10 +4,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Locale;
-import android.util.Log;
+
+import android.content.Context;
+import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.storage.CrashSafeHarvestFactory;
-import com.newrelic.videoagent.core.storage.IntegratedDeadLetterHandler;
 import com.newrelic.videoagent.core.NRVideoConstants;
+import com.newrelic.videoagent.core.utils.NRLog;
 
 /**
  * Enhanced HarvestManager with integrated crash-safe storage
@@ -19,39 +21,11 @@ import com.newrelic.videoagent.core.NRVideoConstants;
  */
 public class HarvestManager implements EventBufferInterface.CapacityCallback {
 
-    private static final String TAG = "NRVideo.HarvestManager";
-
-    private final EventBufferInterface eventBuffer;
-    private final SchedulerInterface scheduler;
-    private final HttpClientInterface httpClient;
-    private final IntegratedDeadLetterHandler deadLetterHandler;
     private final CrashSafeHarvestFactory factory;
 
-    public HarvestManager(CrashSafeHarvestFactory factory) {
-        this.factory = factory;
-
-        // Always use crash-safe components
-        this.eventBuffer = factory.createEventBuffer();
-        this.httpClient = factory.createHttpClient();
-
-        // Use factory method to create IntegratedDeadLetterHandler for proper integration
-        this.deadLetterHandler = factory.createIntegratedDeadLetterHandler(httpClient);
-
-        this.scheduler = factory.createScheduler(this::harvestOnDemand, this::harvestLive);
-
-        // Set up event buffer monitoring for 60% threshold scheduler startup
-        setupEventBufferMonitoring();
-    }
-
-    /**
-     * Set up event buffer monitoring for 60% capacity threshold
-     */
-    private void setupEventBufferMonitoring() {
-        // Set overflow callback for immediate harvest when buffer is getting full
-        eventBuffer.setOverflowCallback(this::harvestNow);
-
-        // Set capacity callback for 60% threshold scheduler startup
-        eventBuffer.setCapacityCallback(this);
+    public HarvestManager(NRVideoConfiguration configuration,
+                          Context context) {
+        this.factory = new CrashSafeHarvestFactory(configuration, context, this::harvestNow, this, this::harvestOnDemand, this::harvestLive);
     }
 
     /**
@@ -59,26 +33,24 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
      */
     @Override
     public void onCapacityThresholdReached(double currentCapacity, String bufferType) {
-        scheduler.start(bufferType);
+        factory.getScheduler().start(bufferType);
 
-        if (factory.getConfiguration().isDebugLoggingEnabled()) {
-            Log.d(TAG, "Capacity threshold reached for " + bufferType + ": " +
-                String.format(Locale.US, "%.1f%%", currentCapacity * 100) +
-                " - Attempting to start scheduler.");
-        }
+        NRLog.d("Capacity threshold reached for " + bufferType + ": " +
+            String.format(Locale.US, "%.1f%%", currentCapacity * 100) +
+            " - Attempting to start scheduler.");
     }
 
     /**
      * Records a custom event with lazy scheduler initialization
      */
-    public void recordCustomEvent(String eventType, Map<String, Object> attributes) {
+    public void recordEvent(String eventType, Map<String, Object> attributes) {
         if (eventType != null && !eventType.trim().isEmpty()) {
             Map<String, Object> event = new HashMap<>(attributes != null ? attributes : new HashMap<>());
             event.put("eventType", eventType);
             event.put("timestamp", System.currentTimeMillis());
 
             // Add to event buffer - this will trigger capacity monitoring
-            eventBuffer.addEvent(event);
+            factory.getEventBuffer().addEvent(event);
         }
     }
 
@@ -89,7 +61,7 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
     public void harvestOnDemand() {
         // Use configuration-defined batch size - no more hardcoded values
         int batchSizeBytes = factory.getConfiguration().getRegularBatchSizeBytes();
-        harvest(batchSizeBytes, NRVideoConstants.EVENT_TYPE_ONDEMAND, NRVideoConstants.EVENT_TYPE_ONDEMAND, true);
+        harvest(batchSizeBytes, NRVideoConstants.EVENT_TYPE_ONDEMAND, NRVideoConstants.EVENT_TYPE_ONDEMAND);
     }
 
     /**
@@ -99,7 +71,7 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
     public void harvestLive() {
         // Use configuration-defined batch size - no more hardcoded values
         int batchSizeBytes = factory.getConfiguration().getLiveBatchSizeBytes();
-        harvest(batchSizeBytes, NRVideoConstants.EVENT_TYPE_LIVE, NRVideoConstants.EVENT_TYPE_LIVE, false);
+        harvest(batchSizeBytes, NRVideoConstants.EVENT_TYPE_LIVE, NRVideoConstants.EVENT_TYPE_LIVE);
     }
 
     /**
@@ -113,7 +85,7 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
             harvestOnDemand();
         } else {
             // STRICT: Log error for invalid buffer type - this should never happen
-            Log.e(TAG, "Invalid buffer type for immediate harvest: " + bufferType +
+            NRLog.e("Invalid buffer type for immediate harvest: " + bufferType +
                      ". Sessions must be either 'live' or 'ondemand', not both.");
 
             // Do nothing - force the caller to provide correct buffer type
@@ -127,54 +99,38 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
      * @param batchSizeBytes Maximum batch size in bytes (optimized for 2KB events)
      * @param priorityFilter Priority level to filter ("ondemand", "live")
      * @param harvestType HTTP endpoint type ("regular", "live")
-     * @param retryFailures Whether to retry failed events after harvest
      */
-    private void harvest(int batchSizeBytes, String priorityFilter, String harvestType, boolean retryFailures) {
+    private void harvest(int batchSizeBytes, String priorityFilter, String harvestType) {
         try {
             SizeEstimator sizeEstimator = new DefaultSizeEstimator();
-            List<Map<String, Object>> events = eventBuffer.pollBatchByPriority(
+            List<Map<String, Object>> events = factory.getEventBuffer().pollBatchByPriority(
                 batchSizeBytes,
                 sizeEstimator,
                 priorityFilter
             );
 
             if (!events.isEmpty()) {
-                boolean success = httpClient.sendEvents(events, harvestType);
+                boolean success = factory.getHttpClient().sendEvents(events, harvestType);
                 if (!success) {
-                    deadLetterHandler.handleFailedEvents(events, harvestType);
+                    factory.getDeadLetterHandler().handleFailedEvents(events, harvestType);
                 } else {
                     // Notify event buffer about successful harvest to trigger any pending recovery
-                    eventBuffer.onSuccessfulHarvest();
+                    factory.getEventBuffer().onSuccessfulHarvest();
                 }
 
                 // Debug logging for optimization monitoring
                 if (factory.getConfiguration().isDebugLoggingEnabled()) {
-                    Log.d(TAG, harvestType + " harvest: " +
+                    NRLog.d(harvestType + " harvest: " +
                         events.size() + " events, ~" + (events.size() * 2) + "KB");
                 }
             }
 
-            // Retry failed events if requested (typically only for regular harvest)
-            if (retryFailures) {
-                deadLetterHandler.retryFailedEvents();
-            }
-
         } catch (Exception e) {
-            Log.e(TAG, harvestType + " harvest failed: " + e.getMessage(), e);
+            NRLog.e(harvestType + " harvest failed: " + e.getMessage(), e);
         }
     }
 
-    /**
-     * Get recovery statistics
-     */
-    public String getRecoveryStats() {
-        return factory.getRecoveryStats();
-    }
-
-    /**
-     * Check if currently recovering from crash
-     */
-    public boolean isRecovering() {
-        return factory.isRecovering();
+    public HarvestComponentFactory getFactory() {
+        return factory;
     }
 }

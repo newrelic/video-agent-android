@@ -2,11 +2,8 @@ package com.newrelic.videoagent.core;
 
 import android.app.ActivityManager;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageManager;
-import android.os.BatteryManager;
-import android.util.Log;
+import com.newrelic.videoagent.core.utils.NRLog;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -15,7 +12,6 @@ import java.util.Map;
  * Thread-safe, immutable configuration with Android Mobile & TV optimizations
  */
 public final class NRVideoConfiguration {
-    private static final String TAG = "NRVideo.Configuration";
 
     // Thread-safe region mappings - immutable after initialization
     private static final Map<String, String> REGION_MAPPINGS;
@@ -48,15 +44,15 @@ public final class NRVideoConfiguration {
     private final boolean isTV;
 
     // Performance optimization constants
-    private static final int DEFAULT_HARVEST_CYCLE_SECONDS = 30;
-    private static final int DEFAULT_LIVE_HARVEST_CYCLE_SECONDS = 5;
+    private static final int DEFAULT_HARVEST_CYCLE_SECONDS = 5 * 60; // 5 minutes
+    private static final int DEFAULT_LIVE_HARVEST_CYCLE_SECONDS = 30; // 30 seconds
     private static final int DEFAULT_REGULAR_BATCH_SIZE_BYTES = 64 * 1024; // 64KB
     private static final int DEFAULT_LIVE_BATCH_SIZE_BYTES = 32 * 1024;    // 32KB
     private static final int DEFAULT_MAX_DEAD_LETTER_SIZE = 100;
 
     // TV-specific optimizations
-    private static final int TV_HARVEST_CYCLE_SECONDS = 60;
-    private static final int TV_LIVE_HARVEST_CYCLE_SECONDS = 10;
+    private static final int TV_HARVEST_CYCLE_SECONDS = 3 * 60; // 3 minutes
+    private static final int TV_LIVE_HARVEST_CYCLE_SECONDS = 10; // 10 seconds
     private static final int TV_REGULAR_BATCH_SIZE_BYTES = 128 * 1024; // 128KB
     private static final int TV_LIVE_BATCH_SIZE_BYTES = 64 * 1024;     // 64KB
 
@@ -159,7 +155,7 @@ public final class NRVideoConfiguration {
         private int regularBatchSizeBytes = DEFAULT_REGULAR_BATCH_SIZE_BYTES;
         private int liveBatchSizeBytes = DEFAULT_LIVE_BATCH_SIZE_BYTES;
         private int maxDeadLetterSize = DEFAULT_MAX_DEAD_LETTER_SIZE;
-        private boolean memoryOptimized = false;
+        private boolean memoryOptimized = true;
         private boolean debugLoggingEnabled = false;
         private boolean isTV = false;
 
@@ -234,8 +230,8 @@ public final class NRVideoConfiguration {
             return this;
         }
 
-        public Builder withDebugLogging(boolean enabled) {
-            this.debugLoggingEnabled = enabled;
+        public Builder enableLogging() {
+            this.debugLoggingEnabled = true;
             return this;
         }
 
@@ -283,7 +279,7 @@ public final class NRVideoConfiguration {
                    == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION;
 
         } catch (Exception e) {
-            Log.w(TAG, "Failed to detect TV platform: " + e.getMessage());
+            NRLog.w("Failed to detect TV platform: " + e.getMessage());
             return false;
         }
     }
@@ -314,7 +310,7 @@ public final class NRVideoConfiguration {
             return memoryInfo.availMem < 512 * 1024 * 1024 || memoryInfo.lowMemory;
 
         } catch (Exception e) {
-            Log.w(TAG, "Failed to detect memory conditions: " + e.getMessage());
+            NRLog.w("Failed to detect memory conditions: " + e.getMessage());
             return false;
         }
     }

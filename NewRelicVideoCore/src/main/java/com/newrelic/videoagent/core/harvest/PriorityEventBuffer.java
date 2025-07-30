@@ -34,18 +34,15 @@ public class PriorityEventBuffer implements EventBufferInterface {
     private final int MAX_LIVE_EVENTS;
     private final int MAX_ONDEMAND_EVENTS;
     private final boolean isAndroidTVDevice;
+    private final boolean isRunningInLowMemory;
 
     // Enhanced callback support
     private OverflowCallback overflowCallback;
     private CapacityCallback capacityCallback;
 
-    public PriorityEventBuffer() {
-        // Default constructor - assume mobile device
-        this(false);
-    }
-
     public PriorityEventBuffer(boolean isTV) {
         this.isAndroidTVDevice = isTV;
+        this.isRunningInLowMemory = !isAndroidTVDevice && Runtime.getRuntime().freeMemory() < Runtime.getRuntime().totalMemory() * 0.15; // <15% free memory
 
         if (isAndroidTVDevice) {
             // Android TV: More memory available, longer content sessions
@@ -163,10 +160,6 @@ public class PriorityEventBuffer implements EventBufferInterface {
                 }
             }
 
-            // Mobile optimization: Early break if memory pressure is high
-            boolean isLowMemory = !isAndroidTVDevice &&
-                Runtime.getRuntime().freeMemory() < Runtime.getRuntime().totalMemory() * 0.15; // <15% free memory
-
             for (int i = 0; i < maxEvents && !targetQueue.isEmpty(); i++) {
                 Map<String, Object> event = targetQueue.poll();
                 if (event == null) break;
@@ -186,9 +179,9 @@ public class PriorityEventBuffer implements EventBufferInterface {
                     targetQueue.offer(event);
                     break;
                 }
-
+                // Mobile optimization: Early break if memory pressure is high
                 // Mobile: Break early if low memory and we have some events
-                if (isLowMemory && batch.size() >= 8 && !batch.isEmpty()) {
+                if (isRunningInLowMemory && batch.size() >= 8) {
                     targetQueue.offer(event); // Put back for next harvest
                     break;
                 }
@@ -240,25 +233,13 @@ public class PriorityEventBuffer implements EventBufferInterface {
      */
     private boolean isLiveStreamingEvent(Map<String, Object> event) {
         // Check for explicit live content marker
-        Boolean isLive = (Boolean) event.get("isLive");
+        Boolean isLive = (Boolean) event.get("contentIsLive");
         if (isLive != null) {
             return isLive;
         }
 
         // Default to on-demand if not explicitly marked as live
         return false;
-    }
-
-    @Override
-    public int getMaxCapacity() {
-        return MAX_LIVE_EVENTS + MAX_ONDEMAND_EVENTS;
-    }
-
-    @Override
-    public boolean hasReachedCapacityThreshold(double threshold) {
-        int totalEvents = liveEvents.size() + ondemandEvents.size();
-        double currentCapacity = (double) totalEvents / getMaxCapacity();
-        return currentCapacity >= threshold;
     }
 
     @Override

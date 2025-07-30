@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import com.newrelic.videoagent.core.NRVideoConstants;
 
 /**
  * Specialized event buffer for dead letter queue - retry events only
@@ -74,17 +73,6 @@ public class DeadLetterEventBuffer implements EventBufferInterface {
     @Override
     public void cleanup() {
         retryEvents.clear();
-    }
-
-    @Override
-    public int getMaxCapacity() {
-        return maxCapacity;
-    }
-
-    @Override
-    public boolean hasReachedCapacityThreshold(double threshold) {
-        double currentCapacity = (double) retryEvents.size() / maxCapacity;
-        return currentCapacity >= threshold;
     }
 
     // Dead letter queues don't need callbacks - they're just retry storage

@@ -6,6 +6,7 @@ import android.util.Log;
  * `NRLog` contains methods for logging.
  */
 public class NRLog {
+    private static final String TAG = "NRVideo";
     private static boolean logging = false;
 
     /**
@@ -15,7 +16,18 @@ public class NRLog {
      */
     public static void d(String s) {
         if (logging) {
-            Log.v("NewRelicVideo", s);
+            Log.d(TAG, s);
+        }
+    }
+
+    /**
+     * Print info message.
+     *
+     * @param s Message.
+     */
+    public static void i(String s) {
+        if (logging) {
+            Log.i(TAG, s);
         }
     }
 
@@ -26,7 +38,29 @@ public class NRLog {
      */
     public static void e(String s) {
         if (logging) {
-            Log.e("NewRelicVideo", s);
+            Log.e(TAG, s);
+        }
+    }
+
+    /**
+     * Print error message.
+     *
+     * @param s Message.
+     */
+    public static void e(String s, Exception e) {
+        if (logging) {
+            Log.e(TAG, s, e);
+        }
+    }
+
+    /**
+     * Print warning message.
+     *
+     * @param s Message.
+     */
+    public static void w(String s) {
+        if (logging) {
+            Log.w(TAG, s);
         }
     }
 

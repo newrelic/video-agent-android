@@ -3,8 +3,8 @@ package com.newrelic.videoagent.core.harvest;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.auth.TokenManager;
 import com.newrelic.videoagent.core.device.DeviceInformation;
-import android.util.Log;
 import com.newrelic.videoagent.core.util.JsonStreamUtil;
+import com.newrelic.videoagent.core.utils.NRLog;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -30,8 +30,6 @@ import java.util.zip.GZIPOutputStream;
  * - Device information integration for analytics
  */
 public class OptimizedHttpClient implements HttpClientInterface {
-
-    private static final String TAG = "NRVideo.HttpClient";
 
     private final NRVideoConfiguration configuration;
     private final TokenManager tokenManager;
@@ -76,10 +74,8 @@ public class OptimizedHttpClient implements HttpClientInterface {
         System.setProperty("http.keepAliveDuration", "300000"); // 5 minutes
         System.setProperty("http.maxConnections", "5");
 
-        if (configuration.isDebugLoggingEnabled()) {
-            Log.d(TAG, "Initialized with region: " + region +
-                  ", endpoint URL: " + endpointUrl);
-        }
+        NRLog.d("Initialized with region: " + region +
+              ", endpoint URL: " + endpointUrl);
     }
 
     @Override
@@ -100,22 +96,16 @@ public class OptimizedHttpClient implements HttpClientInterface {
             try {
                 boolean result = performHttpRequest(events, endpointUrl);
                 if (result) {
-                    if (configuration.isDebugLoggingEnabled()) {
-                        Log.d(TAG, "Successfully sent " + events.size() + " events on attempt " + (attempt + 1) + " to " + endpointUrl);
-                    }
+                    NRLog.d("Successfully sent " + events.size() + " events on attempt " + (attempt + 1) + " to " + endpointUrl);
                     return true;
                 }
 
             } catch (IOException e) {
-                if (configuration.isDebugLoggingEnabled()) {
-                    Log.w(TAG, "Attempt " + (attempt + 1) + " failed: " + e.getMessage());
-                }
+                NRLog.w("Attempt " + (attempt + 1) + " failed: " + e.getMessage());
 
                 // Handle rate limiting specially - don't retry immediately
                 if (e.getMessage() != null && e.getMessage().contains("Rate limit exceeded (429)")) {
-                    if (configuration.isDebugLoggingEnabled()) {
-                        Log.w(TAG, "Rate limit hit - deferring to HarvestManager for delayed retry");
-                    }
+                    NRLog.w("Rate limit hit - deferring to HarvestManager for delayed retry");
                     return false; // Let HarvestManager handle rate limit delays
                 }
             }
@@ -127,16 +117,12 @@ public class OptimizedHttpClient implements HttpClientInterface {
             // 2. Circuit breaker pattern (switches to backup domains)
             // 3. HarvestManager's scheduled retries for application-level delays
             if (attempt < maxRetryAttempts) {
-                if (configuration.isDebugLoggingEnabled()) {
-                    Log.d(TAG, "Immediate retry " + (attempt + 1) + "/" + maxRetryAttempts + " (no delay for mobile/TV performance)");
-                }
+                NRLog.d("Immediate retry " + (attempt + 1) + "/" + maxRetryAttempts + " (no delay for mobile/TV performance)");
             }
         }
 
         // All immediate retries failed - let HarvestManager handle application-level retries
-        if (configuration.isDebugLoggingEnabled()) {
-            Log.w(TAG, "All " + maxRetryAttempts + " immediate attempts failed for " + events.size() + " events. Queuing for HarvestManager retry.");
-        }
+        NRLog.w("All " + maxRetryAttempts + " immediate attempts failed for " + events.size() + " events. Queuing for HarvestManager retry.");
         return false;
     }
 
@@ -214,28 +200,21 @@ public class OptimizedHttpClient implements HttpClientInterface {
             // Check response
             int responseCode = connection.getResponseCode();
             boolean success = responseCode >= 200 && responseCode < 300;
-
             // Handle different error scenarios
             if (responseCode == 401 || responseCode == 403) {
                 // Token might be expired, refresh and retry once
                 try {
                     tokenManager.refreshToken();
-                    if (configuration.isDebugLoggingEnabled()) {
-                        Log.d(TAG, "Token refreshed due to auth failure (response: " + responseCode + ")");
-                    }
+                    NRLog.d("Token refreshed due to auth failure (response: " + responseCode + ")");
                 } catch (IOException tokenRefreshError) {
-                    if (configuration.isDebugLoggingEnabled()) {
-                        Log.w(TAG, "Token refresh failed", tokenRefreshError);
-                    }
+                    NRLog.e("Token refresh failed", tokenRefreshError);
                 }
             } else if (responseCode == 429) {
                 // Rate limit exceeded - extract retry-after header if present
                 String retryAfter = connection.getHeaderField("Retry-After");
                 long retryAfterMs = parseRetryAfter(retryAfter);
 
-                if (configuration.isDebugLoggingEnabled()) {
-                    Log.w(TAG, "Rate limit exceeded (429). Retry after: " + retryAfterMs + "ms");
-                }
+                NRLog.w("Rate limit exceeded (429). Retry after: " + retryAfterMs + "ms");
 
                 // Don't sleep here - let caller handle the retry delay
                 // Mark this as a temporary failure by throwing a specific exception

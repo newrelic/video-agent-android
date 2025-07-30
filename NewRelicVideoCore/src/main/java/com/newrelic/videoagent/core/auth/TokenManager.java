@@ -5,10 +5,10 @@ import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.util.Log;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.device.DeviceInformation;
 import com.newrelic.videoagent.core.util.JsonStreamUtil;
+import com.newrelic.videoagent.core.utils.NRLog;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -34,8 +34,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * - Comprehensive error handling and fallback strategies
  */
 public final class TokenManager {
-
-    private static final String TAG = "NRVideo.TokenManager";
 
     // Constants optimized for mobile/TV performance
     private static final String PREFS_NAME = "nr_video_tokens";
@@ -135,10 +133,7 @@ public final class TokenManager {
                 cachedToken.set(null);
                 lastTokenTime.set(0);
                 clearCachedToken();
-
-                if (configuration.isDebugLoggingEnabled()) {
-                    Log.d(TAG, "Token cache cleared, forcing refresh");
-                }
+                NRLog.d("Token cache cleared, forcing refresh");
             } finally {
                 tokenLock.writeLock().unlock();
             }
@@ -216,16 +211,12 @@ public final class TokenManager {
                 }
             } else {
                 String errorMessage = "Token generation failed with response code: " + responseCode;
-                if (configuration.isDebugLoggingEnabled()) {
-                    Log.e(TAG, errorMessage);
-                }
+                NRLog.e(errorMessage);
                 return null;
             }
 
         } catch (Exception e) {
-            if (configuration.isDebugLoggingEnabled()) {
-                Log.e(TAG, "Failed to generate app token: " + e.getMessage(), e);
-            }
+            NRLog.e("Failed to generate app token: " + e.getMessage(), e);
             return null;
         } finally {
             if (connection != null) {
@@ -250,9 +241,7 @@ public final class TokenManager {
             appname = pm.getApplicationLabel(appInfo).toString();
             applicationVersion = packageInfo.versionName;
         } catch (PackageManager.NameNotFoundException e) {
-            if (configuration.isDebugLoggingEnabled()) {
-                Log.w(TAG, "Failed to get package info: " + e.getMessage());
-            }
+            NRLog.w("Failed to get package info: " + e.getMessage());
         }
         List<Object> payload = new ArrayList<>();
         // First array: App information [appName, appVersion, packageName]
@@ -307,9 +296,7 @@ public final class TokenManager {
             int dataTokenIndex = responseStr.indexOf(dataTokenKey);
 
             if (dataTokenIndex == -1) {
-                if (configuration.isDebugLoggingEnabled()) {
-                    Log.w("TokenManager", "data_token field not found in response");
-                }
+                NRLog.w("data_token field not found in response");
                 return null;
             }
 
@@ -344,9 +331,7 @@ public final class TokenManager {
             return tokens;
 
         } catch (Exception e) {
-            if (configuration.isDebugLoggingEnabled()) {
-                Log.w(TAG, "Error parsing data_token array in response " + e.getMessage());
-            }
+            NRLog.w("Error parsing data_token array in response " + e.getMessage());
             return null;
         }
     }
@@ -388,13 +373,11 @@ public final class TokenManager {
                     cachedToken.set(tokens);
                     lastTokenTime.set(timestamp);
 
-                    if (configuration.isDebugLoggingEnabled()) {
-                        Log.d(TAG, "Loaded cached token from storage");
-                    }
+                    NRLog.d("Loaded cached token from storage");
                 }
             }
         } catch (Exception e) {
-            Log.w(TAG, "Failed to load cached token: " + e.getMessage());
+            NRLog.w("Failed to load cached token: " + e.getMessage());
             clearCachedToken();
         }
     }
@@ -415,12 +398,10 @@ public final class TokenManager {
             editor.putLong(KEY_TOKEN_TIMESTAMP, System.currentTimeMillis());
             editor.apply();
 
-            if (configuration.isDebugLoggingEnabled()) {
-                Log.d(TAG, "Token cached to persistent storage");
-            }
+            NRLog.d("Token cached to persistent storage");
 
         } catch (Exception e) {
-            Log.e(TAG, "Failed to cache token: " + e.getMessage(), e);
+            NRLog.e("Failed to cache token: " + e.getMessage(), e);
         }
     }
 
@@ -438,7 +419,7 @@ public final class TokenManager {
 
             return tokens;
         } catch (Exception e) {
-            Log.w(TAG, "Failed to parse stored token: " + e.getMessage());
+            NRLog.w("Failed to parse stored token: " + e.getMessage());
             return null;
         }
     }
@@ -453,7 +434,7 @@ public final class TokenManager {
             editor.remove(KEY_TOKEN_TIMESTAMP);
             editor.apply();
         } catch (Exception e) {
-            Log.w(TAG, "Failed to clear cached token: " + e.getMessage());
+            NRLog.w("Failed to clear cached token: " + e.getMessage());
         }
     }
 

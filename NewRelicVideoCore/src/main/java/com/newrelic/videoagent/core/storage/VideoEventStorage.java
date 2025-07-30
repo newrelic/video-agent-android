@@ -8,6 +8,7 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -34,13 +35,13 @@ public class VideoEventStorage extends SQLiteOpenHelper {
 
     @Override
     public void onCreate(SQLiteDatabase db) {
-        db.execSQL("CREATE TABLE " + TABLE_BACKUP + " (" +
+        db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_BACKUP + " (" +
                    COL_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
                    COL_DATA + " TEXT NOT NULL, " +
                    COL_PRIORITY + " TEXT NOT NULL, " +
                    COL_TIMESTAMP + " INTEGER NOT NULL)");
 
-        db.execSQL("CREATE INDEX idx_priority_time ON " + TABLE_BACKUP +
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_priority_time ON " + TABLE_BACKUP +
                    "(" + COL_PRIORITY + ", " + COL_TIMESTAMP + ")");
     }
 
@@ -182,7 +183,7 @@ public class VideoEventStorage extends SQLiteOpenHelper {
             JSONObject json = new JSONObject(jsonString);
             Map<String, Object> map = new HashMap<>();
 
-            java.util.Iterator<String> keys = json.keys();
+            Iterator<String> keys = json.keys();
             while (keys.hasNext()) {
                 String key = keys.next();
                 map.put(key, json.get(key));

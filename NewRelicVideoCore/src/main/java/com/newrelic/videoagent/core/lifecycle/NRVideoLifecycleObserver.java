@@ -2,13 +2,9 @@ package com.newrelic.videoagent.core.lifecycle;
 
 import android.app.Activity;
 import android.app.Application;
-import android.content.Context;
 import android.os.Bundle;
-import android.util.Log;
-import com.newrelic.videoagent.core.harvest.HarvestManager;
-import com.newrelic.videoagent.core.harvest.SchedulerInterface;
-import com.newrelic.videoagent.core.storage.CrashSafeHarvestFactory;
-import com.newrelic.videoagent.core.NRVideoConfiguration;
+import com.newrelic.videoagent.core.harvest.HarvestComponentFactory;
+import com.newrelic.videoagent.core.utils.NRLog;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -25,32 +21,21 @@ public class NRVideoLifecycleObserver implements Application.ActivityLifecycleCa
 
     private final AtomicInteger activeActivities = new AtomicInteger(0);
     private final AtomicBoolean isAppInBackground = new AtomicBoolean(false);
-    private final NRVideoConfiguration configuration;
     private final boolean isAndroidTV;
 
     // Core integration components - required dependencies
-    private final HarvestManager harvestManager;
-    private final SchedulerInterface harvestScheduler;
-    private final CrashSafeHarvestFactory crashSafeFactory; // For emergency storage operations
+    private final HarvestComponentFactory crashSafeFactory; // For emergency storage operations
 
     // Emergency backup protection
     private final AtomicBoolean emergencyBackupInProgress = new AtomicBoolean(false);
 
-    public NRVideoLifecycleObserver(Context context, NRVideoConfiguration configuration,
-                                  HarvestManager harvestManager, SchedulerInterface harvestScheduler,
-                                  CrashSafeHarvestFactory crashSafeFactory) {
-        this.configuration = configuration;
-        this.isAndroidTV = configuration.isTV();
-        this.harvestManager = harvestManager;
-        this.harvestScheduler = harvestScheduler;
+    public NRVideoLifecycleObserver(HarvestComponentFactory crashSafeFactory) {
         this.crashSafeFactory = crashSafeFactory;
+        this.isAndroidTV = crashSafeFactory.getConfiguration().isTV();
 
         setupCrashDetection();
 
-        if (configuration.isDebugLoggingEnabled()) {
-            Log.d("LifecycleObserver", "Initialized for " +
-                (isAndroidTV ? "Android TV" : "Mobile"));
-        }
+        NRLog.d("Initialized for " + (isAndroidTV ? "Android TV" : "Mobile"));
     }
 
     @Override
@@ -77,17 +62,14 @@ public class NRVideoLifecycleObserver implements Application.ActivityLifecycleCa
             performEmergencyHarvest("APP_BACKGROUNDED");
 
             // Control scheduler directly using interface methods
-            harvestScheduler.pause();
+            crashSafeFactory.getScheduler().pause();
             // For TV: resume with extended intervals, Mobile: stay paused
-            harvestScheduler.resume(isAndroidTV);
+            crashSafeFactory.getScheduler().resume(isAndroidTV);
 
             // Device-specific background handling
-            if (configuration.isDebugLoggingEnabled()) {
-                Log.d("LifecycleObserver", (isAndroidTV ? "TV" : "Mobile") +
-                    " backgrounded - immediate harvest triggered");
-            }
+            NRLog.d((isAndroidTV ? "TV" : "Mobile") + " backgrounded - immediate harvest triggered");
         } catch (Exception e) {
-            Log.e("LifecycleObserver", "Background handling error: " + e.getMessage());
+            NRLog.e("Background handling error: " + e.getMessage());
         }
     }
 
@@ -97,19 +79,14 @@ public class NRVideoLifecycleObserver implements Application.ActivityLifecycleCa
     private void handleAppForegrounded() {
         try {
             // Resume normal scheduler behavior using interface method
-            harvestScheduler.resume(false); // Normal intervals
+            crashSafeFactory.getScheduler().resume(false); // Normal intervals
 
             // Check for recovery data
-            if (harvestManager.isRecovering()) {
-                Log.d("LifecycleObserver", "Recovery detected: " + harvestManager.getRecoveryStats());
-            }
+            NRLog.d("Recovery detected: " + crashSafeFactory.getRecoveryStats());
 
-            if (configuration.isDebugLoggingEnabled()) {
-                Log.d("LifecycleObserver", (isAndroidTV ? "TV" : "Mobile") +
-                    " foregrounded - normal operation resumed");
-            }
+            NRLog.d((isAndroidTV ? "TV" : "Mobile") + " foregrounded - normal operation resumed");
         } catch (Exception e) {
-            Log.e("LifecycleObserver", "Foreground handling error: " + e.getMessage());
+            NRLog.e("Foreground handling error: " + e.getMessage());
         }
     }
 
@@ -129,13 +106,9 @@ public class NRVideoLifecycleObserver implements Application.ActivityLifecycleCa
             // Always perform emergency backup to SQLite (reliable)
             crashSafeFactory.performEmergencyBackup();
 
-            if (configuration.isDebugLoggingEnabled()) {
-                Log.d("LifecycleObserver", "Emergency backup to SQLite completed - " +
-                    (isAndroidTV ? "TV" : "Mobile") + " - Reason: " + reason +
-                    " (network harvest skipped for reliability)");
-            }
+            NRLog.d("Emergency backup to SQLite completed - " + (isAndroidTV ? "TV" : "Mobile") + " - Reason: " + reason + " (network harvest skipped for reliability)");
         } catch (Exception e) {
-            Log.e("LifecycleObserver", "Emergency backup failed: " + e.getMessage());
+            NRLog.e("Emergency backup failed: " + e.getMessage());
         } finally {
             emergencyBackupInProgress.set(false);
         }
@@ -172,6 +145,7 @@ public class NRVideoLifecycleObserver implements Application.ActivityLifecycleCa
     public void onActivityDestroyed(Activity activity) {
         if (activeActivities.get() == 0) {
             performEmergencyHarvest("APP_TERMINATING");
+            crashSafeFactory.cleanup();
         }
     }
 

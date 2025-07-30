@@ -24,6 +24,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         NRVideoConfiguration config = new NRVideoConfiguration.Builder("AA3172b73aa90368104e94b38d9f4fc10edd9ce202-NRMA")
                 .autoDetectPlatform(getApplicationContext())
                 .withHarvestCycle(10)
+                .enableLogging()
                 .build();
         NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
         setContentView(R.layout.activity_main);
@@ -46,9 +47,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 NRVideo.recordCustomEvent(emptyAttr);
             }
         });
-
-
-        NRLog.enable();
 
         Map<String, Object> attr = new HashMap<>();
         attr.put("actionName", "AGENT_TEST");
