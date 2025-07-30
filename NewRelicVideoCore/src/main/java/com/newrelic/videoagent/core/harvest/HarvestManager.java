@@ -119,10 +119,8 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
                 }
 
                 // Debug logging for optimization monitoring
-                if (factory.getConfiguration().isDebugLoggingEnabled()) {
-                    NRLog.d(harvestType + " harvest: " +
-                        events.size() + " events, ~" + (events.size() * 2) + "KB");
-                }
+                NRLog.d(harvestType + " harvest: " +
+                    events.size() + " events, ~" + (events.size() * 2) + "KB");
             }
 
         } catch (Exception e) {

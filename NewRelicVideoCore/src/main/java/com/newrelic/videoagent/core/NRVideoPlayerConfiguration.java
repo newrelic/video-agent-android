@@ -5,7 +5,6 @@ import androidx.media3.exoplayer.ExoPlayer;
 import java.util.Map;
 
 public class NRVideoPlayerConfiguration {
-    private static final String TAG = "NRVideo.PlayerConfiguration";
     private String playerName;
     private ExoPlayer player;
     private Map<String, Object> customAttributes;

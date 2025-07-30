@@ -2,10 +2,19 @@ plugins {
     id 'com.android.application'
 }
 
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { stream ->
+        localProperties.load(stream)
+    }
+}
+def applicationToken = localProperties.getProperty('nr.applicationToken', "")
+
 android {
     compileSdkVersion 33
-
     defaultConfig {
+        buildConfigField "String", "NR_APPLICATION_TOKEN", "\"${applicationToken}\""
         applicationId "com.newrelic.nrvideoproject"
         minSdkVersion 16
         targetSdkVersion 33

@@ -8,7 +8,6 @@ import android.widget.Switch;
 
 import com.newrelic.videoagent.core.NRVideo;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
-import com.newrelic.videoagent.core.utils.NRLog;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -21,9 +20,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        NRVideoConfiguration config = new NRVideoConfiguration.Builder("AA3172b73aa90368104e94b38d9f4fc10edd9ce202-NRMA")
+        NRVideoConfiguration config = new NRVideoConfiguration.Builder(BuildConfig.NR_APPLICATION_TOKEN)
                 .autoDetectPlatform(getApplicationContext())
-                .withHarvestCycle(10)
+                .withHarvestCycle(60)
                 .enableLogging()
                 .build();
         NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();

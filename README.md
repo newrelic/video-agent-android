@@ -49,13 +49,13 @@ dependencies {
     ...
 
     // Add this to install the NewRelicVideoCore (required)
-    implementation 'com.github.newrelic.video-agent-android:NewRelicVideoCore:v3.0.2'
+    implementation 'com.github.newrelic.video-agent-android:NewRelicVideoCore:v4.0.0'
     
     // Add this to install the ExoPlayer tracker
-    implementation 'com.github.newrelic.video-agent-android:NRExoPlayerTracker:v3.0.2'
+    implementation 'com.github.newrelic.video-agent-android:NRExoPlayerTracker:v4.0.0'
     
     // Add this to install the Google IMA library tracker
-    implementation 'com.github.newrelic.video-agent-android:NRIMATracker:v3.0.2'
+    implementation 'com.github.newrelic.video-agent-android:NRIMATracker:v4.0.0'
 }
 ```
 
@@ -106,17 +106,27 @@ To start the video agent with ExoPlayer tracker only:
 <p>
 
 ```Java
+// Step 1: Initialize the NRVideo at main activity. i.e MainActivity.java
+NRVideoConfiguration config = new NRVideoConfiguration.Builder("application-token")
+        .autoDetectPlatform(getApplicationContext())
+        .withHarvestCycle(5*60) //This is in seconds, for ondemand video, please use minimum 5 minutes
+        .build();
+NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
+
+//Step 2: Initialize the player(it could have n number of players in your application). i.e VideoPlayer.java
+player = new ExoPlayer.Builder(this).build();
+NRVideoPlayerConfiguration playerConfiguration = new NRVideoPlayerConfiguration("test-player", player, true, customAttr);
+Integer trackerId = NRVideo.addPlayer(playerConfiguration);
+
 Integer trackerId = NewRelicVideoAgent.getInstance().start(new NRTrackerExoPlayer(player));
-```
 
-</p>
-</details>
-<details>
-<summary>Kotlin</summary>
-<p>
-
-```Kotlin
-val trackerId = NewRelicVideoAgent.getInstance().start(NRTrackerExoPlayer(player))
+// Step 4(Optional): Destroy the player on your player activity close. i.e VideoPlayer.java
+// New Relic auto detects the player close, but its advisable to release tracker for a better control.
+@Override
+void onDestroy() {
+    NRVideo.releaseTracker(trackerId);
+    player.stop();
+}
 ```
 
 </p>
@@ -129,21 +139,39 @@ To start the video agent with ExoPlayer and IMA trackers:
 <p>
 
 ```Java
-Integer trackerId = NewRelicVideoAgent.getInstance().start(new NRTrackerExoPlayer(player), new NRTrackerIMA());
+
+//Step 2: Initialize the player(it could have n number of players in your application). i.e VideoPlayer.java
+ImaAdsLoader.Builder builder = new ImaAdsLoader.Builder(this);
+//... more details on configuring the ads loader
+player = new SimpleExoPlayer.Builder(this).setMediaSourceFactory(mediaSourceFactory).build();
+
+NRVideoPlayerConfiguration playerConfiguration = new NRVideoPlayerConfiguration("test-player-something-else", player, true, null);
+Integer trackerId = NRVideo.addPlayer(playerConfiguration);
 ```
 
 </p>
 </details>
-<details>
-<summary>Kotlin</summary>
-<p>
 
-```Kotlin
-val trackerId = NewRelicVideoAgent.getInstance().start(NRTrackerExoPlayer(player), NRTrackerIMA())
-```
+### Configuration Fields
+**`NRVideoConfiguration.java`**
 
-</p>
-</details>
+- **`applicationToken`**  
+  Unique identifier for your application\. Used for authentication and region detection\. Must be a non\-empty string\.
+
+- **`harvestCycleSeconds`**  
+  Interval \(in seconds\) between regular data harvests\. Controls how often data is sent to the New Relic\. Typical values range from 300 to 600 seconds\.
+
+- **`liveHarvestCycleSeconds`**  
+  Interval \(in seconds\) for live stream data harvests\. Used for real\-time or near\-real\-time data transmission\. Valid range is 30 to 60 seconds\.
+
+**`NRVideoPlayerConfiguration.java`**
+
+- **`playerName`**  
+  Unique identifier for the video player\. Used to distinguish between multiple players in the same application\. Must be a non\-empty string\.
+- **`player`**  
+  The video player instance to be tracked\. Must implement the `Player` interface from ExoPlayer\.
+- **`isAdEnabled`**  
+  Indicates whether the video player has Ad compatibility\. Set to `true` for player having ads loader capability else `false`.
 
 ## Documentation
 
