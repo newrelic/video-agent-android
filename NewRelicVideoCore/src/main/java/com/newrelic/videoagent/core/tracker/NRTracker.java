@@ -7,6 +7,7 @@ import com.newrelic.videoagent.core.model.NRTimeSince;
 import com.newrelic.videoagent.core.model.NRTimeSinceTable;
 import com.newrelic.videoagent.core.utils.NRLog;
 
+import java.util.Iterator;
 import java.util.Map;
 import static com.newrelic.videoagent.core.NRDef.*;
 
@@ -141,17 +142,20 @@ public class NRTracker {
         attributes = getAttributes(action, attributes);
         timeSinceTable.applyAttributes(action, attributes);
 
-        NRLog.d("SEND EVENT " + action + " , attr = " + attributes);
-
         attributes.put("agentSession", getAgentSession());
         attributes.put("instrumentation.provider", "newrelic");
         attributes.put("instrumentation.name", getInstrumentationName());
         attributes.put("instrumentation.version", getCoreVersion());
 
         // Remove null and empty values
-        while (attributes.values().remove(null));
-        while (attributes.values().remove(""));
-
+        Iterator<Object> it = attributes.values().iterator();
+        while (it.hasNext()) {
+            Object v = it.next();
+            if (v == null || "".equals(v)) {
+                it.remove();
+            }
+        }
+        NRLog.d("SEND EVENT " + action + " , attr = " + attributes);
         if (preSend(action, attributes)) {
             attributes.put("actionName", action);
             NRVideo.recordEvent(eventType, attributes);

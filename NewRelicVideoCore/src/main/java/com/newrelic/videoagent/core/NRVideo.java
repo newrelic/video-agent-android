@@ -53,11 +53,12 @@ public final class NRVideo {
         NRTracker adsTracker = null;
         if (config.isAdEnabled()) {
             adsTracker = createAdTracker();
+            NRLog.d("add tracker is added");
         }
-        ((NRVideoTracker) contentTracker).setPlayer(config.getPlayer());
 
         // Now start the tracker system
         Integer trackerId = NewRelicVideoAgent.getInstance().start(contentTracker, adsTracker);
+        ((NRVideoTracker) contentTracker).setPlayer(config.getPlayer());
         NRLog.i("NRVideo initialization completed successfully with tracker ID: " + trackerId + " and player name:" + config.getPlayerName());
         if (config.getCustomAttributes() != null && !config.getCustomAttributes().isEmpty()) {
             for (Map.Entry<String, Object> entry : config.getCustomAttributes().entrySet()) {
