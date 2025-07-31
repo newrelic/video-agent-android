@@ -192,7 +192,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     public Long getDuration() {
         if (player == null) return null;
 
-        return player.getDuration();
+        return Math.max(player.getDuration() , 0);
     }
 
     /**

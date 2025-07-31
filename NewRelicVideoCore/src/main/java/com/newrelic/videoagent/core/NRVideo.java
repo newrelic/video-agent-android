@@ -186,6 +186,9 @@ public final class NRVideo {
             if (config.isDebugLoggingEnabled()) {
                 NRLog.enable();
             }
+            if (config.isTV()) {
+                NewRelicVideoAgent.getInstance().setTv();
+            }
             return this;
         } catch (Exception e) {
             // Clean up on failure

@@ -263,13 +263,6 @@ public class CrashSafeEventBuffer implements EventBufferInterface {
         }
     }
 
-    /**
-     * Check if recovery is pending (for debugging/monitoring)
-     */
-    public boolean isRecoveryPending() {
-        return hasPendingRecovery;
-    }
-
     public static class RecoveryStats {
         public final boolean isRecovering;
         public final int backupEvents;

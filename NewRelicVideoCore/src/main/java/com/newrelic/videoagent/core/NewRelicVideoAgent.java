@@ -7,6 +7,7 @@ import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * `NewRelicVideoAgent` contains the methods to start the Video Agent and access tracker instances.
@@ -18,6 +19,7 @@ public class NewRelicVideoAgent {
     private Map<Integer, NRTrackerPair> trackerPairs;
     private Integer trackerIdIndex;
     private String uuid;
+    private final AtomicBoolean isTV = new AtomicBoolean(false);
 
     /**
      * Get shared instance.
@@ -45,6 +47,14 @@ public class NewRelicVideoAgent {
      */
     public String getSessionId() {
         return uuid;
+    }
+
+    public void setTv() {
+        isTV.set(true);
+    }
+
+    public boolean isTV() {
+        return isTV.get();
     }
 
     /**

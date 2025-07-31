@@ -98,7 +98,7 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
         bitrate = (long)ad.getVastMediaBitrate();
         renditionHeight = (long)ad.getVastMediaHeight();
         renditionWidth = (long)ad.getVastMediaWidth();
-        duration = (long)ad.getDuration();
+        duration = Math.max((long)ad.getDuration(), 0L);
     }
 
     /**
