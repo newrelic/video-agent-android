@@ -141,12 +141,18 @@ To start the video agent with ExoPlayer and IMA trackers:
 ```Java
 
 //Step 2: Initialize the player(it could have n number of players in your application). i.e VideoPlayer.java
-ImaAdsLoader.Builder builder = new ImaAdsLoader.Builder(this);
 //... more details on configuring the ads loader
 player = new SimpleExoPlayer.Builder(this).setMediaSourceFactory(mediaSourceFactory).build();
 
 NRVideoPlayerConfiguration playerConfiguration = new NRVideoPlayerConfiguration("test-player-something-else", player, true, null);
 Integer trackerId = NRVideo.addPlayer(playerConfiguration);
+// Get the ads tracker
+adTracker = (NRTrackerIMA) NewRelicVideoAgent.getInstance().getAdTracker(trackerId);
+
+//While building ads loader pass the listeners
+ImaAdsLoader.Builder builder = new ImaAdsLoader.Builder(this);
+builder.setAdErrorListener(adTracker.getAdErrorListener());
+builder.setAdEventListener(adTracker.getAdEventListener());
 ```
 
 </p>
