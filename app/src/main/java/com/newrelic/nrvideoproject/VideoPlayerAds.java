@@ -4,10 +4,8 @@ import android.net.Uri;
 import android.os.Bundle;
 import com.google.ads.interactivemedia.v3.api.AdErrorEvent;
 import com.google.ads.interactivemedia.v3.api.AdEvent;
-import com.newrelic.videoagent.core.NewRelicVideoAgent;
-import com.newrelic.videoagent.core.tracker.NRVideoTracker;
-import com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer;
-import com.newrelic.videoagent.ima.tracker.NRTrackerIMA;
+import com.newrelic.videoagent.core.NRVideo;
+import com.newrelic.videoagent.core.NRVideoPlayerConfiguration;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.util.Util;
@@ -19,6 +17,8 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.ui.PlayerView;
 
 import android.util.Log;
+import com.newrelic.videoagent.core.NewRelicVideoAgent;
+import com.newrelic.videoagent.ima.tracker.NRTrackerIMA;
 
 public class VideoPlayerAds extends AppCompatActivity implements AdErrorEvent.AdErrorListener, AdEvent.AdEventListener {
 
@@ -26,6 +26,7 @@ public class VideoPlayerAds extends AppCompatActivity implements AdErrorEvent.Ad
     private Integer trackerId;
     private ImaAdsLoader adsLoader;
     private PlayerView playerView;
+    private com.newrelic.videoagent.ima.tracker.NRTrackerIMA adTracker;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,23 +61,11 @@ public class VideoPlayerAds extends AppCompatActivity implements AdErrorEvent.Ad
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        ((NRVideoTracker) NewRelicVideoAgent.getInstance().getContentTracker(trackerId)).sendEnd();
-        NewRelicVideoAgent.getInstance().releaseTracker(trackerId);
+        NRVideo.releaseTracker(trackerId);
         player.stop();
     }
 
     private void playVideo(String videoUrl) {
-        // Init trackers
-        NRTrackerExoPlayer tracker = new NRTrackerExoPlayer();
-        NRTrackerIMA adsTracker = new NRTrackerIMA();
-        trackerId = NewRelicVideoAgent.getInstance().start(tracker, adsTracker);
-
-        ImaAdsLoader.Builder builder = new ImaAdsLoader.Builder(this);
-        // NOTE: The NRTrackerIMA instance can be used as a listener for both AdErrorEvent and AdEvent.
-        builder.setAdErrorListener(this);
-        builder.setAdEventListener(this);
-        adsLoader = builder.build();
-
         // Set up the factory for media sources, passing the ads loader and ad view providers.
         DataSource.Factory dataSourceFactory =
                 new DefaultDataSourceFactory(this, Util.getUserAgent(this, getString(R.string.app_name)));
@@ -84,22 +73,26 @@ public class VideoPlayerAds extends AppCompatActivity implements AdErrorEvent.Ad
         mediaSourceFactory.setAdsLoaderProvider(unusedAdTagUri -> adsLoader);
         mediaSourceFactory.setAdViewProvider(playerView);
 
-        // Create a SimpleExoPlayer and set it as the player for content and ads.
         player = new SimpleExoPlayer.Builder(this).setMediaSourceFactory(mediaSourceFactory).build();
+        NRVideoPlayerConfiguration playerConfiguration = new NRVideoPlayerConfiguration("test-player-something-else", player, true, null);
+        trackerId = NRVideo.addPlayer(playerConfiguration);
+        adTracker = (NRTrackerIMA) NewRelicVideoAgent.getInstance().getAdTracker(trackerId);
+        // Get the ad tracker before building the loader
+        // Set ad event and error listeners on the builder
+        ImaAdsLoader.Builder builder = new ImaAdsLoader.Builder(this);
+        builder.setAdErrorListener(this);
+        builder.setAdEventListener(this);
+//          OR
+//        builder.setAdErrorListener(adTracker.getAdErrorListener());
+//        builder.setAdEventListener(adTracker.getAdEventListener());
+        adsLoader = builder.build();
         playerView.setPlayer(player);
         adsLoader.setPlayer(player);
-
-        // Set the user ID
-        NewRelicVideoAgent.getInstance().setUserId("your_user_id");
-
-        // Pass the player to the content tracker
-        tracker.setPlayer(player);
 
         // Create the MediaItem to play, specifying the content URI and ad tag URI.
         Uri contentUri = Uri.parse(videoUrl);
         Uri adTagUri = Uri.parse(getString(R.string.ad_tag_url));
         MediaItem mediaItem = new MediaItem.Builder().setUri(contentUri).setAdTagUri(adTagUri).build();
-
         // Prepare the content and ad to be played with the SimpleExoPlayer.
         player.setMediaItem(mediaItem);
         // Set PlayWhenReady. If true, content and ads will autoplay.
@@ -107,11 +100,10 @@ public class VideoPlayerAds extends AppCompatActivity implements AdErrorEvent.Ad
         player.prepare();
     }
 
-    //AdErrorEvent.AdErrorListener
     @Override
     public void onAdError(AdErrorEvent adErrorEvent) {
         if (NewRelicVideoAgent.getInstance().getAdTracker(trackerId) != null) {
-            ((NRTrackerIMA) NewRelicVideoAgent.getInstance().getAdTracker(trackerId)).onAdError(adErrorEvent);
+            ((NRTrackerIMA) NewRelicVideoAgent.getInstance().getAdTracker(trackerId)).handleAdError(adErrorEvent);
         }
     }
 
@@ -119,7 +111,7 @@ public class VideoPlayerAds extends AppCompatActivity implements AdErrorEvent.Ad
     @Override
     public void onAdEvent(AdEvent adEvent) {
         if (NewRelicVideoAgent.getInstance().getAdTracker(trackerId) != null) {
-            ((NRTrackerIMA) NewRelicVideoAgent.getInstance().getAdTracker(trackerId)).onAdEvent(adEvent);
+            ((NRTrackerIMA) NewRelicVideoAgent.getInstance().getAdTracker(trackerId)).handleAdEvent(adEvent);
         }
     }
 }

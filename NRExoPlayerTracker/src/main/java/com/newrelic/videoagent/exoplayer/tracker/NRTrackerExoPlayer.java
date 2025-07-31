@@ -2,6 +2,8 @@ package com.newrelic.videoagent.exoplayer.tracker;
 
 import android.net.Uri;
 
+import androidx.annotation.NonNull;
+import androidx.media3.common.C;
 import androidx.media3.common.MediaLibraryInfo;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.PlaybackException;
@@ -16,15 +18,15 @@ import androidx.media3.exoplayer.source.MediaLoadData;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.exoplayer.BuildConfig;
-import static com.newrelic.videoagent.core.NRDef.*;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.newrelic.videoagent.core.NRDef.*;
-import androidx.media3.common.C;
 
 /**
  * New Relic Video tracker for ExoPlayer.
@@ -73,7 +75,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      *
      * @param action     Action being generated.
      * @param attributes Specific attributes sent along the action.
-     * @return
+     * @return Map of attributes with action-specific data.
      */
     @Override
     public Map<String, Object> getAttributes(String action, Map<String, Object> attributes) {
@@ -192,7 +194,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     public Long getDuration() {
         if (player == null) return null;
 
-        return player.getDuration();
+        return Math.max(player.getDuration() , 0);
     }
 
     /**
@@ -212,19 +214,21 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      * @return Attribute.
      */
     public String getSrc() {
-        if (player == null) return null;
-
+        // Prefer direct MediaItem URI if available
+        if (player == null || player.getCurrentMediaItem() == null) return null;
+        if (player.getCurrentMediaItem().localConfiguration != null) {
+            return player.getCurrentMediaItem().localConfiguration.uri.toString();
+        }
+        // Fallback to playlist if available
         if (getPlaylist() != null) {
-            NRLog.d("Current window index = " + player.getCurrentMediaItemIndex());
             try {
                 Uri src = getPlaylist().get(player.getCurrentMediaItemIndex());
                 return src.toString();
-            }catch(Exception e) {
+            } catch(Exception e) {
                 return null;
             }
-        } else {
-            return null;
         }
+        return null;
     }
 
     /**
@@ -273,15 +277,31 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      * @return String of the current title
      */
     public String getTitle() {
-        String contentTitle = "Unknown";
-        if (player != null && player.getCurrentMediaItem() != null && player.getCurrentMediaItem().mediaMetadata.title != null) {
+        // Try to get title from MediaItem metadata
+        if (player != null && player.getCurrentMediaItem() != null) {
             MediaMetadata mm = player.getCurrentMediaItem().mediaMetadata;
-            contentTitle = mm.title.toString();
-            if (mm.subtitle != null) {
-                contentTitle += ": " + mm.subtitle; // Usually the episode title is available in subtitle
+            if (mm != null && mm.title != null) {
+                String contentTitle = mm.title.toString();
+                if (mm.subtitle != null) {
+                    contentTitle += ": " + mm.subtitle;
+                }
+                return contentTitle;
+            }
+            // Fallback: use URI if title is not set
+            if (player.getCurrentMediaItem().localConfiguration != null) {
+                return player.getCurrentMediaItem().localConfiguration.uri.getLastPathSegment();
             }
         }
-        return contentTitle;
+        // Fallback: use playlist URI if available
+        if (getPlaylist() != null && player != null) {
+            try {
+                Uri src = getPlaylist().get(player.getCurrentMediaItemIndex());
+                return src.getLastPathSegment();
+            } catch(Exception e) {
+                // ignore
+            }
+        }
+        return "Unknown";
     }
 
     /**
@@ -458,7 +478,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     }
 
     @Override
-    public void onPlayerError(PlaybackException error) {
+    public void onPlayerError(@NonNull PlaybackException error) {
         NRLog.d("onPlayerError");
         sendError(error);
     }
@@ -466,7 +486,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     // ExoPlayer AnalyticsListener
 
     @Override
-    public void onPositionDiscontinuity(Player.PositionInfo oldPosition, Player.PositionInfo newPosition, int reason) {
+    public void onPositionDiscontinuity(@NonNull Player.PositionInfo oldPosition, @NonNull Player.PositionInfo newPosition, int reason) {
         if (reason == Player.DISCONTINUITY_REASON_SEEK) {
             NRLog.d("onSeekStarted analytics");
 
@@ -477,7 +497,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     }
 
     @Override
-    public void onTracksChanged(EventTime eventTime, Tracks tracksInfo) {
+    public void onTracksChanged(@NonNull EventTime eventTime, @NonNull Tracks tracksInfo) {
         NRLog.d("onTracksChanged analytics");
 
         // Next track in the playlist
@@ -489,13 +509,13 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     }
 
     @Override
-    public void onLoadError(EventTime eventTime, LoadEventInfo loadEventInfo, MediaLoadData mediaLoadData, IOException error, boolean wasCanceled) {
+    public void onLoadError(@NonNull EventTime eventTime, @NonNull LoadEventInfo loadEventInfo, @NonNull MediaLoadData mediaLoadData, @NonNull IOException error, boolean wasCanceled) {
         NRLog.d("onLoadError analytics");
         sendError(error);
     }
 
     @Override
-    public void onLoadCompleted(EventTime eventTime, LoadEventInfo loadEventInfo, MediaLoadData mediaLoadData) {
+    public void onLoadCompleted(@NonNull EventTime eventTime, @NonNull LoadEventInfo loadEventInfo, @NonNull MediaLoadData mediaLoadData) {
         if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA
                 && mediaLoadData.trackType == C.TRACK_TYPE_VIDEO
                 && loadEventInfo.loadDurationMs > 0) {
@@ -505,14 +525,14 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     }
 
     @Override
-    public void onBandwidthEstimate(AnalyticsListener.EventTime eventTime, int totalLoadTimeMs, long totalBytesLoaded, long bitrateEstimate) {
+    public void onBandwidthEstimate(@NonNull AnalyticsListener.EventTime eventTime, int totalLoadTimeMs, long totalBytesLoaded, long bitrateEstimate) {
         NRLog.d("onBandwidthEstimate analytics");
 
         this.bitrateEstimate = bitrateEstimate;
     }
 
     @Override
-    public void onDroppedVideoFrames(AnalyticsListener.EventTime eventTime, int droppedFrames, long elapsedMs) {
+    public void onDroppedVideoFrames(@NonNull AnalyticsListener.EventTime eventTime, int droppedFrames, long elapsedMs) {
         NRLog.d("onDroppedVideoFrames analytics");
         if (!player.isPlayingAd()) {
             sendDroppedFrame(droppedFrames, (int) elapsedMs);
@@ -527,8 +547,8 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
 
         if (player.isPlayingAd()) return;
 
-        long currMul = width * height;
-        long lastMul = lastWidth * lastHeight;
+        long currMul = (long) width * height;
+        long lastMul = (long) lastWidth * lastHeight;
 
         if (lastMul != 0) {
             if (lastMul < currMul) {
@@ -543,4 +563,54 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         lastHeight = height;
         lastWidth = width;
     }
+
+    @Override
+    public String getLanguage() {
+        if (player != null && player.getCurrentMediaItem() != null) {
+            // 1. Try to get language from URI query param
+            if (player.getCurrentMediaItem().localConfiguration != null) {
+                Uri uri = player.getCurrentMediaItem().localConfiguration.uri;
+                String lang = uri.getQueryParameter("lang");
+                if (lang != null) return lang;
+                // 2. Try to get language from any path segment
+                for (String segment : uri.getPathSegments()) {
+                    if (segment.matches("[a-zA-Z]{2,5}")) return segment;
+                }
+                // 3. Try to get language from last path segment
+                String lastSegment = uri.getLastPathSegment();
+                if (lastSegment != null && lastSegment.matches("[a-zA-Z]{2,5}")) return lastSegment;
+            }
+            // 4. Try to get language from MediaMetadata title or description
+            MediaMetadata mm = player.getCurrentMediaItem().mediaMetadata;
+            if (mm != null) {
+                String[] fields = { mm.title != null ? mm.title.toString() : null, mm.description != null ? mm.description.toString() : null };
+                for (String field : fields) {
+                    if (field == null) continue;
+                    // Look for patterns like (en), [en], en:
+                    Matcher m = Pattern.compile("(?:\\(|\\[)?([a-zA-Z]{2,5})(?:\\)|\\])?|([a-zA-Z]{2,5}):").matcher(field);
+                    if (m.find()) {
+                        if (m.group(1) != null) return m.group(1);
+                        if (m.group(2) != null) return m.group(2);
+                    }
+                }
+            }
+        }
+        // 5. Fallback: try playlist URI
+        if (getPlaylist() != null && player != null) {
+            try {
+                Uri src = getPlaylist().get(player.getCurrentMediaItemIndex());
+                String lang = src.getQueryParameter("lang");
+                if (lang != null) return lang;
+                for (String segment : src.getPathSegments()) {
+                    if (segment.matches("[a-zA-Z]{2,5}")) return segment;
+                }
+                String lastSegment = src.getLastPathSegment();
+                if (lastSegment != null && lastSegment.matches("[a-zA-Z]{2,5}")) return lastSegment;
+            } catch(Exception e) {
+                // ignore
+            }
+        }
+        return null;
+    }
+
 }

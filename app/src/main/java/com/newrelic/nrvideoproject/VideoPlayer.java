@@ -7,9 +7,9 @@ import androidx.media3.ui.PlayerView;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
-import com.newrelic.videoagent.core.NewRelicVideoAgent;
-import com.newrelic.videoagent.core.tracker.NRVideoTracker;
-import com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer;
+import com.newrelic.videoagent.core.NRVideo;
+import com.newrelic.videoagent.core.NRVideoPlayerConfiguration;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -51,42 +51,25 @@ public class VideoPlayer extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        ((NRVideoTracker)NewRelicVideoAgent.getInstance().getContentTracker(trackerId)).sendEnd();
-        NewRelicVideoAgent.getInstance().releaseTracker(trackerId);
+        NRVideo.releaseTracker(trackerId);
+        player.stop();
     }
 
     private void playVideo(String videoUrl) {
         player = new ExoPlayer.Builder(this).build();
-
-        NRTrackerExoPlayer tracker = new NRTrackerExoPlayer();
-
-        tracker.setAttribute("customAttr", 12345, "CUSTOM_ACTION");
-
-        tracker.setAttribute("contentTitle", "This is my test title", "CONTENT_START");
-        tracker.setAttribute("contentIsLive", true, "CONTENT_START");
-        tracker.setAttribute("myCustomAttr", "any value", "CONTENT_START");
-
-        trackerId = NewRelicVideoAgent.getInstance().start(tracker);
-
-        // Set the user ID
-        NewRelicVideoAgent.getInstance().setUserId("your_user_id");
-
-        Map<String, Object> attr = new HashMap<>();
-        attr.put("myAttrStr", "Hello");
-        attr.put("myAttrInt", 101);
-        tracker.sendEvent("CUSTOM_ACTION", attr);
-        tracker.sendEvent("CUSTOM_ACTION_2", attr);
+        Map<String, Object> customAttr = new HashMap<>();
+        customAttr.put("something", "This is my test title");
+        customAttr.put("myAttrStr", "Hello");
+        customAttr.put("myAttrInt", 101);
+        customAttr.put("name", "nr-video-agent-android-01-24JUL-john-starc");
+        NRVideoPlayerConfiguration playerConfiguration = new NRVideoPlayerConfiguration("test-player", player, true, customAttr);
+        trackerId = NRVideo.addPlayer(playerConfiguration);
 
         PlayerView playerView = findViewById(R.id.player);
         playerView.setPlayer(player);
-
-        tracker.setPlayer(player);
-
         // Set the playlist URIs
         List<Uri> uris = new ArrayList<>();
         uris.add(Uri.parse(videoUrl));
-        tracker.setSrc(uris);
-
         player.setMediaItem(MediaItem.fromUri(videoUrl));
         // Prepare the player.
         player.setPlayWhenReady(true);
