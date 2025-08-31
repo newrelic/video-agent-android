@@ -39,6 +39,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             public void onClick(View view) {
                 Map<String, Object> attr = new HashMap<>();
                 attr.put("kind", "counter");
+                attr.put("actionName", "CLICK");
                 attr.put("counter", counter++);
                 NRVideo.recordCustomEvent(attr);
 
