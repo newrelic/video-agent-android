@@ -62,8 +62,14 @@ public class VideoPlayer extends AppCompatActivity {
         customAttr.put("myAttrStr", "Hello");
         customAttr.put("myAttrInt", 101);
         customAttr.put("name", "nr-video-agent-android-01-24JUL-john-starc");
-        NRVideoPlayerConfiguration playerConfiguration = new NRVideoPlayerConfiguration("test-player", player, true, customAttr);
+        NRVideoPlayerConfiguration playerConfiguration = new NRVideoPlayerConfiguration("test-player", player, false, customAttr);
         trackerId = NRVideo.addPlayer(playerConfiguration);
+
+        Map<String, Object> attributes = new HashMap<>();
+        attributes.put("actionName", "VIDEO_STARTED");
+        attributes.put("videoUrl", videoUrl);
+        attributes.put("playerType", "ExoPlayer");
+        NRVideo.recordCustomEvent(attributes, trackerId);
 
         PlayerView playerView = findViewById(R.id.player);
         playerView.setPlayer(player);

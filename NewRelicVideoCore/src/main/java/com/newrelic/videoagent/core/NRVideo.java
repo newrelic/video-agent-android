@@ -115,12 +115,59 @@ public final class NRVideo {
     }
 
     /**
-     * Static convenience method for recording custom video events
+     * Static convenience method for recording custom video events to all active trackers
      *
-     * @param attributes A map of attributes for the event.
+     * @param attributes A map of attributes for the event. Must contain an "actionName" key.
      */
     public static void recordCustomEvent(Map<String, Object> attributes) {
-        recordEvent("VideoCustomAction", attributes);
+        recordCustomEvent(attributes, null);
+    }
+
+    /**
+     * Static convenience method for recording custom video events with tracker ID support
+     *
+     * @param attributes A map of attributes for the event. Must contain an "action" key.
+     * @param trackerId The tracker ID to send the event to. If null, event is sent to all active trackers.
+     */
+    public static void recordCustomEvent(Map<String, Object> attributes, Integer trackerId) {
+        if (!isInitialized()) {
+            NRLog.w("recordCustomEvent called before NRVideo is fully initialized - event dropped");
+            return;
+        }
+
+        if (attributes == null || attributes.isEmpty()) {
+            NRLog.w("Attributes parameter is mandatory for custom events");
+            return;
+        }
+
+        // Extract and validate action from attributes
+        Object actionObj = attributes.get("actionName");
+        if (actionObj == null || actionObj.toString().isEmpty()) {
+            NRLog.w("Action attribute is mandatory for custom events - must be included in attributes map with key 'actionName'");
+            return;
+        }
+        String action = actionObj.toString();
+
+        if (trackerId != null) {
+            NRTracker contentTracker = NewRelicVideoAgent.getInstance().getContentTracker(trackerId);
+            if (contentTracker != null) {
+                contentTracker.sendEvent(action, attributes);
+            } 
+        } else {
+            // Global event - send to all trackers
+            NRVideo videoInstance = getInstance();
+            if (videoInstance == null || videoInstance.trackerIds.isEmpty()) {
+                return;
+            }
+
+            // Send to all trackers
+            for (Integer currentTrackerId : videoInstance.trackerIds.values()) {
+                NRTracker contentTracker = NewRelicVideoAgent.getInstance().getContentTracker(currentTrackerId);
+                if (contentTracker != null) {
+                    contentTracker.sendEvent(action, attributes);
+                }
+            }
+        }
     }
 
     /**
