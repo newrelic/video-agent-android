@@ -1,6 +1,8 @@
 package com.newrelic.videoagent.exoplayer.tracker;
 
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.NonNull;
 import androidx.media3.common.C;
@@ -42,6 +44,19 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     protected int lastWindow;
     protected String renditionChangeShift;
     protected long actualBitrate;
+    // Aggregation configuration
+    private static final long DEFAULT_AGGREGATION_WINDOW_MS = 5000; // 5 seconds
+    private static final int MAX_EVENTS_PER_AGGREGATE = 50;
+    private boolean droppedFrameAggregationEnabled = true;
+
+    // Aggregation state
+    private final Object aggregationLock = new Object();
+    private Map<String, Object> pendingDroppedFrameEvent = null;
+    private long firstDropTimestamp = 0;
+    private long lastDropTimestamp = 0;
+    private int aggregatedEventCount = 0;
+    private Handler aggregationHandler;
+    private Runnable flushPendingEvent;
 
     /**
      * Init a new ExoPlayer tracker.
@@ -375,6 +390,8 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
 
     @Override
     public void sendEnd() {
+        // Flush any pending dropped frame events before ending
+        flushPendingDroppedFrameEvent();
         super.sendEnd();
         resetState();
     }
@@ -386,15 +403,113 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      * @param elapsed Time elapsed.
      */
     public void sendDroppedFrame(int count, int elapsed) {
+        if (!droppedFrameAggregationEnabled) {
+            // Fallback to original behavior
+            sendDroppedFrameImmediate(count, elapsed);
+            return;
+        }
+
+        synchronized (aggregationLock) {
+            long currentTime = System.currentTimeMillis();
+
+            // Check if we should start a new aggregation window
+            boolean shouldStartNewWindow = pendingDroppedFrameEvent == null ||
+                    (currentTime - firstDropTimestamp) > DEFAULT_AGGREGATION_WINDOW_MS ||
+                    aggregatedEventCount >= MAX_EVENTS_PER_AGGREGATE;
+
+            if (shouldStartNewWindow) {
+                flushPendingDroppedFrameEvent();
+                startNewAggregation(count, elapsed, currentTime);
+            } else {
+                addToExistingAggregation(count, elapsed, currentTime);
+            }
+
+            // Schedule delayed flush if not already scheduled
+            scheduleDelayedFlush();
+        }
+    }
+    private void startNewAggregation(int count, int elapsed, long timestamp) {
         Map<String, Object> attr = new HashMap<>();
         attr.put("lostFrames", count);
         attr.put("lostFramesDuration", elapsed);
-//        generatePlayElapsedTime();
+        attr.put("eventCount", 1);
+        attr.put("aggregationWindowMs", DEFAULT_AGGREGATION_WINDOW_MS);
+        attr.put("firstDropTimestamp", timestamp);
+
+        pendingDroppedFrameEvent = attr;
+        firstDropTimestamp = timestamp;
+        lastDropTimestamp = timestamp;
+        aggregatedEventCount = 1;
+    }
+    private void addToExistingAggregation(int count, int elapsed, long timestamp) {
+        if (pendingDroppedFrameEvent != null) {
+            int existingFrames = (Integer) pendingDroppedFrameEvent.get("lostFrames");
+            int existingDuration = (Integer) pendingDroppedFrameEvent.get("lostFramesDuration");
+            int existingCount = (Integer) pendingDroppedFrameEvent.get("eventCount");
+
+            pendingDroppedFrameEvent.put("lostFrames", existingFrames + count);
+            pendingDroppedFrameEvent.put("lostFramesDuration", existingDuration + elapsed);
+            pendingDroppedFrameEvent.put("eventCount", existingCount + 1);
+            pendingDroppedFrameEvent.put("lastDropTimestamp", timestamp);
+
+            lastDropTimestamp = timestamp;
+            aggregatedEventCount++;
+        }
+    }
+
+    private void scheduleDelayedFlush() {
+        if (aggregationHandler == null) {
+            aggregationHandler = new Handler(Looper.getMainLooper());
+        }
+
+        if (flushPendingEvent != null) {
+            aggregationHandler.removeCallbacks(flushPendingEvent);
+        }
+
+        flushPendingEvent = this::flushPendingDroppedFrameEvent;
+        aggregationHandler.postDelayed(flushPendingEvent, DEFAULT_AGGREGATION_WINDOW_MS);
+    }
+    private void flushPendingDroppedFrameEvent() {
+        synchronized (aggregationLock) {
+            if (pendingDroppedFrameEvent != null) {
+                // Add final timing information
+                pendingDroppedFrameEvent.put("actualAggregationDurationMs",
+                        lastDropTimestamp - firstDropTimestamp);
+
+                if (getState().isAd) {
+                    sendVideoAdEvent("AD_DROPPED_FRAMES", pendingDroppedFrameEvent);
+                } else {
+                    sendVideoEvent("CONTENT_DROPPED_FRAMES", pendingDroppedFrameEvent);
+                }
+
+                // Reset aggregation state
+                pendingDroppedFrameEvent = null;
+                firstDropTimestamp = 0;
+                lastDropTimestamp = 0;
+                aggregatedEventCount = 0;
+            }
+        }
+    }
+
+    private void sendDroppedFrameImmediate(int count, int elapsed) {
+        // Original implementation for backward compatibility
+        Map<String, Object> attr = new HashMap<>();
+        attr.put("lostFrames", count);
+        attr.put("lostFramesDuration", elapsed);
+
         if (getState().isAd) {
             sendVideoAdEvent("AD_DROPPED_FRAMES", attr);
-        }
-        else {
+        } else {
             sendVideoEvent("CONTENT_DROPPED_FRAMES", attr);
+        }
+    }
+    public void setDroppedFrameAggregationEnabled(boolean enabled) {
+        synchronized (aggregationLock) {
+            if (!enabled && droppedFrameAggregationEnabled) {
+                // Flush any pending events before disabling
+                flushPendingDroppedFrameEvent();
+            }
+            this.droppedFrameAggregationEnabled = enabled;
         }
     }
 

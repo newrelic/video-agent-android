@@ -13,6 +13,9 @@ import android.view.View;
 import android.widget.Button;
 import com.newrelic.videoagent.core.NRVideo;
 import com.newrelic.videoagent.core.NRVideoPlayerConfiguration;
+import com.newrelic.videoagent.core.NewRelicVideoAgent;
+import com.newrelic.videoagent.core.tracker.NRTracker;
+import com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -89,6 +92,13 @@ public class VideoPlayer extends AppCompatActivity {
         customAttr.put("name", "nr-video-agent-android-01-24JUL-john-starc");
         NRVideoPlayerConfiguration playerConfiguration = new NRVideoPlayerConfiguration("test-player", player, false, customAttr);
         trackerId = NRVideo.addPlayer(playerConfiguration);
+        // Get the content tracker and configure aggregation
+        NRTracker tracker = NewRelicVideoAgent.getInstance().getContentTracker(trackerId);
+        if (tracker instanceof NRTrackerExoPlayer) {
+            Boolean aggregationEnabled = true;
+            ((NRTrackerExoPlayer) tracker).setDroppedFrameAggregationEnabled(aggregationEnabled); // true for testing
+            Log.d("VideoPlayer", "CONTENT_DROPPED_FRAMES events aggregation enabled: " + aggregationEnabled);
+        }
 
         Map<String, Object> attributes = new HashMap<>();
         attributes.put("actionName", "VIDEO_STARTED");
