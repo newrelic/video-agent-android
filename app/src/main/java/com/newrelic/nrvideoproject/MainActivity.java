@@ -20,7 +20,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        NRVideoConfiguration config = new NRVideoConfiguration.Builder(BuildConfig.NR_APPLICATION_TOKEN)
+        NRVideoConfiguration config = new NRVideoConfiguration.Builder("AA89bd55fcd6b93884c7ea1acad63fba5a41845428-NRMA")
                 .autoDetectPlatform(getApplicationContext())
                 .withHarvestCycle(60)
                 .enableLogging()
