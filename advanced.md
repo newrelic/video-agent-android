@@ -176,7 +176,30 @@ tracker.sendEvent("MY_TEST_ACTION", att);
 </p>
 </details>
 
-We can alse set custom attributes for all events:
+We can also set userId attributes for all events:
+
+<details>
+<summary>iOS</summary>
+<p>
+
+```Objective-C
+[[NewRelicVideoAgent sharedInstance] setUserId:@"TEST_USER"];
+```
+
+</p>
+</details>
+<details>
+<summary>Android</summary>
+<p>
+
+```Java
+NewRelicVideoAgent.getInstance().setUserId("your_user_id");
+```
+
+</p>
+</details>
+
+We can also set custom attributes for all events:
 
 <details>
 <summary>iOS</summary>
@@ -199,7 +222,7 @@ tracker.setAttribute("myAttr", "myVal");
 </p>
 </details>
 
-Or only for specific events, specifiying a regexp filter for the action:
+Or only for specific events, specifying a regexp filter for the action:
 
 <details>
 <summary>iOS</summary>

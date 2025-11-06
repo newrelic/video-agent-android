@@ -6,6 +6,9 @@ import com.google.ads.interactivemedia.v3.api.AdEvent;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.ima.BuildConfig;
+
+import java.lang.reflect.Method;
+
 import static com.newrelic.videoagent.core.NRDef.*;
 
 public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdErrorListener, AdEvent.AdEventListener {
@@ -50,6 +53,7 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
                 sendStart();
                 break;
             case COMPLETED:
+            case SKIPPED:
                 sendEnd();
                 quartile = null;
                 break;
@@ -97,7 +101,7 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
         bitrate = (long)ad.getVastMediaBitrate();
         renditionHeight = (long)ad.getVastMediaHeight();
         renditionWidth = (long)ad.getVastMediaWidth();
-        duration = (long)ad.getDuration();
+        duration = Math.max((long)ad.getDuration(), 0L);
     }
 
     /**
@@ -214,5 +218,56 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     @Override
     public Long getDuration() {
         return duration;
+    }
+
+    /**
+     * Register this tracker as an AdEventListener and AdErrorListener with any IMA SDK object that supports it.
+     */
+    public void registerListeners(Object imaSdkObject) {
+        if (imaSdkObject == null) return;
+        // Skip ExoPlayer's ImaAdsLoader, which does not support these methods
+        if (imaSdkObject.getClass().getName().contains("ImaAdsLoader")) return;
+        try {
+            Method addAdEventListener = imaSdkObject.getClass().getMethod("addAdEventListener", AdEvent.AdEventListener.class);
+            addAdEventListener.invoke(imaSdkObject, this);
+            Method addAdErrorListener = imaSdkObject.getClass().getMethod("addAdErrorListener", AdErrorEvent.AdErrorListener.class);
+            addAdErrorListener.invoke(imaSdkObject, this);
+        } catch (Exception e) {
+            NRLog.d("NRTrackerIMA: Failed to register ad listeners: " + e);
+        }
+    }
+
+    /**
+     * Unregister this tracker as an AdEventListener and AdErrorListener from any IMA SDK object that supports it.
+     */
+    public void unregisterListeners(Object imaSdkObject) {
+        if (imaSdkObject == null) return;
+        if (imaSdkObject.getClass().getName().contains("ImaAdsLoader")) return;
+        try {
+            Method removeAdEventListener = imaSdkObject.getClass().getMethod("removeAdEventListener", AdEvent.AdEventListener.class);
+            removeAdEventListener.invoke(imaSdkObject, this);
+            Method removeAdErrorListener = imaSdkObject.getClass().getMethod("removeAdErrorListener", AdErrorEvent.AdErrorListener.class);
+            removeAdErrorListener.invoke(imaSdkObject, this);
+        } catch (Exception e) {
+            NRLog.d("NRTrackerIMA: Failed to unregister ad listeners: " + e);
+        }
+    }
+
+    // Allow for
+    // warding from user-defined listeners
+
+    public void handleAdEvent(AdEvent adEvent) {
+        onAdEvent(adEvent);
+    }
+    public void handleAdError(AdErrorEvent adErrorEvent) {
+        onAdError(adErrorEvent);
+    }
+
+    // Provide accessors for listeners so user can register them easily
+    public AdEvent.AdEventListener getAdEventListener() {
+        return this;
+    }
+    public AdErrorEvent.AdErrorListener getAdErrorListener() {
+        return this;
     }
 }
