@@ -22,6 +22,7 @@ import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.exoplayer.BuildConfig;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -482,7 +483,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         long firstTime = firstDropTimestamp.get();
         long lastTime = lastDropTimestamp.get();
 
-        Map<String, Object> eventAttributes = new ConcurrentHashMap<>();
+        Map<String, Object> eventAttributes = new HashMap<>();
         eventAttributes.put("lostFrames", lostFrames);
         eventAttributes.put("lostFramesDuration", lostDuration);
         eventAttributes.put("eventCount", count);
@@ -540,7 +541,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         long firstTime = firstDropTimestamp.get();
         long lastTime = lastDropTimestamp.get();
 
-        Map<String, Object> status = new ConcurrentHashMap<>();
+        Map<String, Object> status = new HashMap<>();
         status.put("hasActiveAggregation", hasAggregation);
         status.put("totalLostFrames", lostFrames);
         status.put("totalLostFramesDuration", lostDuration);
@@ -548,7 +549,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         status.put("firstDropTimestamp", firstTime);
         status.put("lastDropTimestamp", lastTime);
 
-        return status;
+        return Collections.unmodifiableMap(status);
     }
     public boolean isDroppedFrameAggregationEnabled() {
         return droppedFrameAggregationEnabled;

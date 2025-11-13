@@ -13,7 +13,6 @@ import android.content.Context;
 import org.robolectric.RuntimeEnvironment;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Comprehensive unit tests for NRTrackerExoPlayer frame drop aggregation functionality.
@@ -46,7 +45,7 @@ public class NRTrackerExoPlayerFrameDropAggregationTest {
     public void testSingleFrameDropEvent() {
         tracker.sendDroppedFrame(5, 100);
 
-        ConcurrentHashMap<String, Object> lastTrackData = tracker.getLastTrackData();
+        Map<String, Object> lastTrackData = tracker.getLastTrackData();
 
         assertEquals("Last frame drop count should match", 5, lastTrackData.get("lastFrameDropCount"));
         assertEquals("Last frame drop duration should match", 100, lastTrackData.get("lastFrameDropDuration"));
@@ -72,7 +71,7 @@ public class NRTrackerExoPlayerFrameDropAggregationTest {
         assertEquals("Total duration should be sum", 175, status.get("totalLostFramesDuration")); // 100+50+25
         assertEquals("Event count should be 3", 3, status.get("eventCount"));
 
-        ConcurrentHashMap<String, Object> lastTrack = tracker.getLastTrackData();
+        Map<String, Object> lastTrack = tracker.getLastTrackData();
         assertEquals("Last event count should be latest", 2, lastTrack.get("lastFrameDropCount"));
         assertEquals("Last event duration should be latest", 25, lastTrack.get("lastFrameDropDuration"));
         assertEquals("Aggregated total should be maintained", 10, lastTrack.get("currentTotalFrames"));
@@ -118,34 +117,34 @@ public class NRTrackerExoPlayerFrameDropAggregationTest {
     public void testLastTrackAlwaysAccessible() {
         tracker.sendDroppedFrame(10, 200);
 
-        ConcurrentHashMap<String, Object> data1 = tracker.getLastTrackData();
+        Map<String, Object> data1 = tracker.getLastTrackData();
         assertNotNull("Data should never be null", data1);
         assertEquals("Should contain latest frame drop count", 10, data1.get("lastFrameDropCount"));
 
         tracker.sendDroppedFrame(5, 100);
 
-        ConcurrentHashMap<String, Object> data2 = tracker.getLastTrackData();
+        Map<String, Object> data2 = tracker.getLastTrackData();
         assertEquals("Should update to latest frame drop", 5, data2.get("lastFrameDropCount"));
         assertEquals("Should maintain aggregated total", 15, data2.get("currentTotalFrames"));
-        assertSame("Should return same ConcurrentHashMap instance", data1, data2);
+        assertSame("Should return same underlying map instance", data1, data2);
     }
 
     @Test
     public void testDataPreservationAcrossStates() {
         tracker.sendDroppedFrame(7, 140);
 
-        ConcurrentHashMap<String, Object> beforeDisable = tracker.getLastTrackData();
+        Map<String, Object> beforeDisable = tracker.getLastTrackData();
         assertEquals("Should have data before disable", 7, beforeDisable.get("lastFrameDropCount"));
 
         tracker.setDroppedFrameAggregationEnabled(false);
 
-        ConcurrentHashMap<String, Object> afterDisable = tracker.getLastTrackData();
+        Map<String, Object> afterDisable = tracker.getLastTrackData();
         assertNotNull("Data should be preserved after disable", afterDisable);
         assertEquals("Frame drop count should be preserved", 7, afterDisable.get("lastFrameDropCount"));
 
         tracker.setDroppedFrameAggregationEnabled(true);
 
-        ConcurrentHashMap<String, Object> afterEnable = tracker.getLastTrackData();
+        Map<String, Object> afterEnable = tracker.getLastTrackData();
         assertEquals("Data should persist after re-enable", 7, afterEnable.get("lastFrameDropCount"));
     }
 
@@ -219,7 +218,7 @@ public class NRTrackerExoPlayerFrameDropAggregationTest {
         assertEquals("Should reset event count", 0, status.get("eventCount"));
         assertEquals("Should reset timestamps", 0L, status.get("firstDropTimestamp"));
 
-        ConcurrentHashMap<String, Object> lastTrack = tracker.getLastTrackData();
+        Map<String, Object> lastTrack = tracker.getLastTrackData();
         assertEquals("Should preserve last frame drop count", 5, lastTrack.get("lastFrameDropCount"));
     }
 
@@ -227,7 +226,7 @@ public class NRTrackerExoPlayerFrameDropAggregationTest {
     public void testBasicConcurrentAccess() {
         tracker.sendDroppedFrame(5, 100);
 
-        ConcurrentHashMap<String, Object> data = tracker.getLastTrackData();
+        Map<String, Object> data = tracker.getLastTrackData();
         assertNotNull("Data should always be accessible", data);
 
         Map<String, Object> status = tracker.getCurrentAggregationStatus();
@@ -243,7 +242,7 @@ public class NRTrackerExoPlayerFrameDropAggregationTest {
         tracker.sendDroppedFrame(3, 60);
 
         Map<String, Object> status = tracker.getCurrentAggregationStatus();
-        ConcurrentHashMap<String, Object> lastTrack = tracker.getLastTrackData();
+        Map<String, Object> lastTrack = tracker.getLastTrackData();
 
         assertEquals("Status should show total frames", 11, status.get("totalLostFrames"));
         assertEquals("Last track should show current total", 11, lastTrack.get("currentTotalFrames"));
