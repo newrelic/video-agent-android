@@ -10,7 +10,6 @@ import java.util.regex.Pattern;
 public class NREventAttributes {
 
     private Map<String, Map<String, Object>> attributeBuckets;
-    private String userId;
 
     /**
      * Ïnit a new event attributes model.
@@ -38,16 +37,6 @@ public class NREventAttributes {
         }
 
         attributeBuckets.get(filter).put(key, value);
-    }
-
-    /**
-     * Set userId.
-     *
-     * @param userId User Id.
-     */
-    public void setUserId(String userId) {
-        this.userId = userId;
-        setAttribute("enduser.id", userId, null);
     }
 
     /**

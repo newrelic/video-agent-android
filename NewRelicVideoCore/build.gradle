@@ -8,12 +8,10 @@ android {
         minSdkVersion 16
         targetSdkVersion 33
         versionCode 9
-        versionName "3.0.0"
-
+        versionName "4.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
     }
-
     buildTypes {
         debug {
             minifyEnabled false
@@ -34,14 +32,22 @@ android {
     }
     namespace 'com.newrelic.videoagent.core'
 }
-
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation 'com.google.android.material:material:1.1.0'
-    implementation 'com.newrelic.agent.android:android-agent:7.0.0'
-    testImplementation 'junit:junit:4.+'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.1'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
+    implementation 'com.newrelic.agent.android:android-agent:7.6.3'
+    implementation 'androidx.media3:media3-exoplayer:1.1.0'
+    implementation 'androidx.media3:media3-exoplayer-ima:1.1.0'
+
+    // Add androidx.leanback for accurate Android TV detection
+//    implementation 'androidx.leanback:leanback:1.0.0'
+
+    testImplementation 'junit:junit:4.13.2'
+    // Updated AndroidX Test dependencies that are compatible with Android 12+
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    androidTestImplementation 'androidx.test:runner:1.5.2'
+    androidTestImplementation 'androidx.test:rules:1.5.0'
 }
 afterEvaluate {
     publishing {

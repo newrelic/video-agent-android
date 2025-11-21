@@ -41,6 +41,9 @@ public class NRTrackerState {
      */
     public boolean isAdBreak;
 
+    public NRChrono chrono;
+    public Long accumulatedVideoWatchTime;
+
     /**
      * Create a new tracker state instance.
      */
@@ -61,6 +64,8 @@ public class NRTrackerState {
         isBuffering = false;
         isAd = false;
         isAdBreak = false;
+        chrono = new NRChrono();
+        accumulatedVideoWatchTime = 0L;
     }
 
     /**

@@ -1,13 +1,13 @@
 package com.newrelic.videoagent.core.tracker;
 
-import com.newrelic.agent.android.NewRelic;
+import com.newrelic.videoagent.core.NRVideo;
 import com.newrelic.videoagent.core.NewRelicVideoAgent;
 import com.newrelic.videoagent.core.model.NREventAttributes;
 import com.newrelic.videoagent.core.model.NRTimeSince;
 import com.newrelic.videoagent.core.model.NRTimeSinceTable;
 import com.newrelic.videoagent.core.utils.NRLog;
 
-import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import static com.newrelic.videoagent.core.NRDef.*;
 
@@ -37,15 +37,6 @@ public class NRTracker {
      */
     public void trackerReady() {
         sendVideoEvent(TRACKER_READY);
-    }
-
-    /**
-     * Set userId.
-     *
-     * @param userId User Id.
-     */
-    public void setUserId(String userId) {
-        eventAttributes.setUserId(userId);
     }
 
     /**
@@ -148,14 +139,8 @@ public class NRTracker {
      * @param attributes Event Type attributes for this action.
      */
     public void sendEvent(String eventType, String action, Map<String, Object> attributes) {
-        if (attributes == null) {
-            attributes = new HashMap<>();
-        }
-
         attributes = getAttributes(action, attributes);
         timeSinceTable.applyAttributes(action, attributes);
-
-        NRLog.d("SEND EVENT " + action + " , attr = " + attributes);
 
         attributes.put("agentSession", getAgentSession());
         attributes.put("instrumentation.provider", "newrelic");
@@ -163,14 +148,17 @@ public class NRTracker {
         attributes.put("instrumentation.version", getCoreVersion());
 
         // Remove null and empty values
-        while (attributes.values().remove(null));
-        while (attributes.values().remove(""));
-
+        Iterator<Object> it = attributes.values().iterator();
+        while (it.hasNext()) {
+            Object v = it.next();
+            if (v == null || "".equals(v)) {
+                it.remove();
+            }
+        }
+        NRLog.d("SEND EVENT " + action + " , attr = " + attributes);
         if (preSend(action, attributes)) {
             attributes.put("actionName", action);
-            if (!NewRelic.recordCustomEvent(eventType, attributes)) {
-                NRLog.e("⚠️ Failed to recordCustomEvent. Maybe the NewRelicAgent is not initialized or the attribute list contains invalid/empty values. ⚠️");
-            }
+            NRVideo.recordEvent(eventType, attributes);
         }
     }
 
@@ -197,9 +185,10 @@ public class NRTracker {
      * Send event with attributes.
      *
      * @param action Action name.
+     * @param attributes Event attributes.
      */
-    public void sendVideoAdEvent(String action) {
-        sendVideoAdEvent(action, null);
+    public void sendVideoEvent(String action, Map<String, Object> attributes) {
+        sendEvent(NR_VIDEO_EVENT, action, attributes);
     }
 
     /**
@@ -208,8 +197,8 @@ public class NRTracker {
      * @param action Action name.
      * @param attributes Event attributes.
      */
-    public void sendVideoEvent(String action, Map<String, Object> attributes) {
-        sendEvent(NR_VIDEO_EVENT, action, attributes);
+    public void sendVideoAdEvent(String action) {
+        sendVideoAdEvent(action, null);
     }
 
     /**
@@ -258,4 +247,5 @@ public class NRTracker {
     public String getAgentSession() {
         return NewRelicVideoAgent.getInstance().getSessionId();
     }
+
 }
