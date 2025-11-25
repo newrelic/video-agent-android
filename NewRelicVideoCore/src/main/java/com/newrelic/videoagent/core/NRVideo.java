@@ -1,11 +1,17 @@
 package com.newrelic.videoagent.core;
 
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import android.app.Application;
 import android.content.Context;
 import com.newrelic.videoagent.core.harvest.HarvestManager;
 import com.newrelic.videoagent.core.lifecycle.NRVideoLifecycleObserver;
+import com.newrelic.videoagent.core.mediatailor.MediaTailorSessionManager;
+import com.newrelic.videoagent.core.mediatailor.model.MediaTailorAdBreak;
+import com.newrelic.videoagent.core.mediatailor.model.MediaTailorSession;
 import com.newrelic.videoagent.core.tracker.NRTracker;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.core.utils.NRLog;
@@ -67,7 +73,39 @@ public final class NRVideo {
             }
         }
         NRVideo.getInstance().trackerIds.put(config.getPlayerName(),  trackerId);
+        MediaTailorSessionManager mediaTailorSessionManager = new MediaTailorSessionManager();
+        String sessionEndpoint = "https://2d271f758c9940e882092aed7e4451c4.mediatailor.ap-southeast-2.amazonaws.com/v1/session/54ad5836d26bc9938d9793caa9fe55e611da7d60/my-playback-config/master.m3u8";
+        mediaTailorSessionManager.initializeSessionAsync(sessionEndpoint, (session) -> {
+            URL url = null;
+            try {
+                url = new URL(sessionEndpoint);
+            } catch (MalformedURLException e) {
+                throw new RuntimeException(e);
+            }
+            NRLog.i("NRVideo media tailor initialised: " + session);
+            if(session == null) {
+                NRLog.i("NRVideo failed to initialise media tailor session");
+                return;
+            }
+            String trackingUrl = getOriginFromUrl(url) + session.getTrackingUrl();
+            NRLog.i("NRVideo tracking url : " + trackingUrl);
+            mediaTailorSessionManager.fetchTrackingDataAsync(trackingUrl, (mediaTailorAdBreaks) -> {
+                NRLog.i("NRVideo media tailor tracking data " + mediaTailorAdBreaks.size() + " " + mediaTailorAdBreaks);
+            });
+        });
         return trackerId;
+    }
+
+    public static String getOriginFromUrl(URL url) {
+        // .getPort() returns -1 if no port is specified
+        // .getDefaultPort() returns the default protocol port (e.g., 80 for http)
+        int port = url.getPort();
+        int defaultPort = url.getDefaultPort();
+
+        boolean isDefaultPort = (port == -1) || (port == defaultPort);
+
+        // Construct the origin: scheme + :// + host + (optional port)
+        return url.getProtocol() + "://" + url.getHost() + (isDefaultPort ? "" : ":" + port);
     }
 
     public static void releaseTracker(Integer trackerId) {
