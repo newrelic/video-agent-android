@@ -1,6 +1,8 @@
 package com.newrelic.videoagent.exoplayer.tracker;
 
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.NonNull;
 import androidx.media3.common.C;
@@ -20,9 +22,14 @@ import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.exoplayer.BuildConfig;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,6 +49,19 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     protected int lastWindow;
     protected String renditionChangeShift;
     protected long actualBitrate;
+    private static final long DEFAULT_AGGREGATION_WINDOW_MS = 5000; // 5 seconds
+    private static final int MAX_EVENTS_PER_AGGREGATE = 50;
+    private volatile boolean droppedFrameAggregationEnabled = true;
+
+    private final ConcurrentHashMap<String, Object> lastTrackData = new ConcurrentHashMap<>();
+    private final AtomicInteger totalLostFrames = new AtomicInteger(0);
+    private final AtomicInteger totalLostFramesDuration = new AtomicInteger(0);
+    private final AtomicInteger eventCount = new AtomicInteger(0);
+    private final AtomicLong firstDropTimestamp = new AtomicLong(0);
+    private final AtomicLong lastDropTimestamp = new AtomicLong(0);
+    private final AtomicBoolean hasActiveAggregation = new AtomicBoolean(false);
+    private volatile Handler aggregationHandler;
+    private volatile Runnable flushPendingEvent;
 
     /**
      * Init a new ExoPlayer tracker.
@@ -375,6 +395,8 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
 
     @Override
     public void sendEnd() {
+        // Flush any pending dropped frame events before ending
+        flushPendingDroppedFrameEvent();
         super.sendEnd();
         resetState();
     }
@@ -386,16 +408,151 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      * @param elapsed Time elapsed.
      */
     public void sendDroppedFrame(int count, int elapsed) {
+        if (!droppedFrameAggregationEnabled) {
+            // Fallback to original behavior
+            sendDroppedFrameImmediate(count, elapsed);
+            return;
+        }
+        long currentTime = System.currentTimeMillis();
+        boolean shouldFlush = hasActiveAggregation.get() &&
+                (isAggregationExpired(currentTime) || isMaxEventsReached());
+
+        if (shouldFlush) {
+            flushCurrentAggregation();
+            startNewAggregation(count, elapsed, currentTime);
+        } else if (hasActiveAggregation.get()) {
+            addToCurrentAggregation(count, elapsed, currentTime);
+        } else {
+            startNewAggregation(count, elapsed, currentTime);
+        }
+        updateLastFrameDropSnapshot(count, elapsed, currentTime);
+        scheduleDelayedFlush();
+    }
+    private void startNewAggregation(int count, int elapsed, long timestamp) {
+        totalLostFrames.set(count);
+        totalLostFramesDuration.set(elapsed);
+        eventCount.set(1);
+        firstDropTimestamp.set(timestamp);
+        lastDropTimestamp.set(timestamp);
+        hasActiveAggregation.set(true);
+    }
+    private void addToCurrentAggregation(int count, int elapsed, long timestamp) {
+        totalLostFrames.addAndGet(count);
+        totalLostFramesDuration.addAndGet(elapsed);
+        eventCount.incrementAndGet();
+        lastDropTimestamp.set(timestamp);
+    }
+    private void updateLastFrameDropSnapshot(int count, int elapsed, long timestamp) {
+        lastTrackData.put("lastFrameDropCount", count);
+        lastTrackData.put("lastFrameDropDuration", elapsed);
+        lastTrackData.put("lastFrameDropTime", timestamp);
+        lastTrackData.put("lastUpdateTime", System.currentTimeMillis());
+
+        lastTrackData.put("currentTotalFrames", totalLostFrames.get());
+        lastTrackData.put("currentTotalDuration", totalLostFramesDuration.get());
+        lastTrackData.put("currentEventCount", eventCount.get());
+    }
+    private boolean isAggregationExpired(long currentTime) {
+        long firstTime = firstDropTimestamp.get();
+        return firstTime > 0 && (currentTime - firstTime) > DEFAULT_AGGREGATION_WINDOW_MS;
+    }
+    private boolean isMaxEventsReached() {
+        return eventCount.get() >= MAX_EVENTS_PER_AGGREGATE;
+    }
+
+    protected void scheduleDelayedFlush() {
+        if (aggregationHandler == null) {
+            aggregationHandler = new Handler(Looper.getMainLooper());
+        }
+
+        if (flushPendingEvent != null) {
+            aggregationHandler.removeCallbacks(flushPendingEvent);
+        }
+
+        flushPendingEvent = this::flushPendingDroppedFrameEvent;
+        aggregationHandler.postDelayed(flushPendingEvent, DEFAULT_AGGREGATION_WINDOW_MS);
+    }
+    protected void flushCurrentAggregation() {
+        if (!hasActiveAggregation.get()) {
+            return;
+        }
+
+        int lostFrames = totalLostFrames.get();
+        int lostDuration = totalLostFramesDuration.get();
+        int count = eventCount.get();
+        long firstTime = firstDropTimestamp.get();
+        long lastTime = lastDropTimestamp.get();
+
+        Map<String, Object> eventAttributes = new HashMap<>();
+        eventAttributes.put("lostFrames", lostFrames);
+        eventAttributes.put("lostFramesDuration", lostDuration);
+        eventAttributes.put("eventCount", count);
+        eventAttributes.put("aggregationWindowMs", DEFAULT_AGGREGATION_WINDOW_MS);
+        eventAttributes.put("firstDropTimestamp", firstTime);
+        eventAttributes.put("lastDropTimestamp", lastTime);
+        eventAttributes.put("actualAggregationDurationMs", lastTime - firstTime);
+
+        if (getState().isAd) {
+            sendVideoAdEvent("AD_DROPPED_FRAMES", eventAttributes);
+        } else {
+            sendVideoEvent("CONTENT_DROPPED_FRAMES", eventAttributes);
+        }
+        resetAggregationState();
+    }
+    private void flushPendingDroppedFrameEvent() {
+        flushCurrentAggregation();
+    }
+    protected void resetAggregationState() {
+        hasActiveAggregation.set(false);
+        totalLostFrames.set(0);
+        totalLostFramesDuration.set(0);
+        eventCount.set(0);
+        firstDropTimestamp.set(0);
+        lastDropTimestamp.set(0);
+    }
+
+    private void sendDroppedFrameImmediate(int count, int elapsed) {
+        // Original implementation for backward compatibility
         Map<String, Object> attr = new HashMap<>();
         attr.put("lostFrames", count);
         attr.put("lostFramesDuration", elapsed);
-//        generatePlayElapsedTime();
+
         if (getState().isAd) {
             sendVideoAdEvent("AD_DROPPED_FRAMES", attr);
-        }
-        else {
+        } else {
             sendVideoEvent("CONTENT_DROPPED_FRAMES", attr);
         }
+    }
+    public void setDroppedFrameAggregationEnabled(boolean enabled) {
+        if (!enabled && droppedFrameAggregationEnabled) {
+            // Flush any pending events before disabling
+            flushCurrentAggregation();
+        }
+        this.droppedFrameAggregationEnabled = enabled;
+    }
+    public ConcurrentHashMap<String, Object> getLastTrackData() {
+        return lastTrackData;
+    }
+    public Map<String, Object> getCurrentAggregationStatus() {
+        boolean hasAggregation = hasActiveAggregation.get();
+        int lostFrames = totalLostFrames.get();
+        int lostDuration = totalLostFramesDuration.get();
+        int count = eventCount.get();
+        long firstTime = firstDropTimestamp.get();
+        long lastTime = lastDropTimestamp.get();
+
+        Map<String, Object> status = new HashMap<>();
+        status.put("hasActiveAggregation", hasAggregation);
+        status.put("totalLostFrames", lostFrames);
+        status.put("totalLostFramesDuration", lostDuration);
+        status.put("eventCount", count);
+        status.put("firstDropTimestamp", firstTime);
+        status.put("lastDropTimestamp", lastTime);
+
+        return Collections.unmodifiableMap(status);
+    }
+    public boolean isDroppedFrameAggregationEnabled() {
+        return droppedFrameAggregationEnabled;
     }
 
     // ExoPlayer Player.EventListener
