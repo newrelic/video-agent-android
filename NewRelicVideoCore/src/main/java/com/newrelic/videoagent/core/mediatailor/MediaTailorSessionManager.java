@@ -36,7 +36,7 @@ public class MediaTailorSessionManager {
     private static final String TAG = "MediaTailor.Session";
     private static final int CONNECTION_TIMEOUT_MS = 30000; // 30 seconds
     private static final int READ_TIMEOUT_MS = 30000; // 30 seconds
-    private static final int TRACKING_FETCH_DELAY_MS = 500; // 500ms delay before fetching tracking data
+    private static final int TRACKING_FETCH_DELAY_MS = 3000; // 500ms delay before fetching tracking data
 
     private final DefaultAdsMapper adsMapper;
     private final Handler handler;
@@ -149,11 +149,14 @@ public class MediaTailorSessionManager {
 
         executor.execute(() -> {
             try {
+                Log.i(TAG, "wait start");
                 // Wait 500ms as per MediaTailor requirement
                 Thread.sleep(TRACKING_FETCH_DELAY_MS);
+                Log.i(TAG, "wait end");
 
                 // Network operation runs on background thread
-                List<MediaTailorAdBreak> adBreaks = fetchTrackingDataSync(trackingUrl);
+                List<MediaTailorAdBreak> adBreaks = fetchTrackingDataSync("https://2d271f758c9940e882092aed7e4451c4.mediatailor.ap-southeast-2.amazonaws.com/v1/tracking/54ad5836d26bc9938d9793caa9fe55e611da7d60/my-playback-config/5c565a6f-410a-4d7e-8031-3f986e3104f4?t=1764137423710");
+//                List<MediaTailorAdBreak> adBreaks = fetchTrackingDataSync(trackingUrl);
 
                 // Post result back to main thread
                 handler.post(() -> callback.onTrackingDataReceived(adBreaks));
@@ -186,6 +189,10 @@ public class MediaTailorSessionManager {
             connection.setRequestMethod("GET");
             connection.setConnectTimeout(CONNECTION_TIMEOUT_MS);
             connection.setReadTimeout(READ_TIMEOUT_MS);
+
+            // Add headers to match MediaTailor API requirements
+            connection.setRequestProperty("Accept", "*/*");
+            connection.setRequestProperty("User-Agent", "NewRelic-VideoAgent-Android/1.0");
 
             // Read response
             int responseCode = connection.getResponseCode();
