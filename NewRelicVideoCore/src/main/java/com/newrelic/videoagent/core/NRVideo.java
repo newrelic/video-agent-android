@@ -9,6 +9,8 @@ import android.app.Application;
 import android.content.Context;
 import com.newrelic.videoagent.core.harvest.HarvestManager;
 import com.newrelic.videoagent.core.lifecycle.NRVideoLifecycleObserver;
+import com.newrelic.videoagent.core.mediatailor.MediaTailorAdPlaybackTracker;
+import com.newrelic.videoagent.core.mediatailor.MediaTailorEventEmitter;
 import com.newrelic.videoagent.core.mediatailor.MediaTailorSessionManager;
 import com.newrelic.videoagent.core.mediatailor.model.MediaTailorAdBreak;
 import com.newrelic.videoagent.core.mediatailor.model.MediaTailorSession;
@@ -91,6 +93,10 @@ public final class NRVideo {
             NRLog.i("NRVideo tracking url : " + trackingUrl);
             mediaTailorSessionManager.fetchTrackingDataAsync(trackingUrl, (mediaTailorAdBreaks) -> {
                 NRLog.i("NRVideo media tailor tracking data " + mediaTailorAdBreaks.size() + " " + mediaTailorAdBreaks);
+                MediaTailorAdPlaybackTracker mediaTailorAdPlaybackTracker = new MediaTailorAdPlaybackTracker(config.getPlayer(), mediaTailorAdBreaks);
+                MediaTailorEventEmitter mediaTailorEventEmitter = new MediaTailorEventEmitter(mediaTailorAdPlaybackTracker);
+                mediaTailorAdPlaybackTracker.start();
+                mediaTailorEventEmitter.start();
             });
         });
         return trackerId;
