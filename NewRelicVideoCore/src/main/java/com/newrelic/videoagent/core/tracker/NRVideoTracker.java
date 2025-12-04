@@ -40,6 +40,18 @@ public class NRVideoTracker extends NRTracker {
     private String bufferType;
     private NRTimeSince lastAdTimeSince;
 
+    // QoE (Quality of Experience) tracking fields
+    private Long qoeStartupTimeStart;
+    private Long qoeStartupTime;
+    private Long qoePeakBitrate;
+    private Boolean qoeHadStartupFailure;
+    private Boolean qoeHadPlaybackFailure;
+    private Long qoeTotalRebufferingTime;
+    private Long qoeRebufferingStartTime;
+    private Long qoeTotalContentPlaytime;
+    private Long qoeBitrateSum;
+    private Long qoeBitrateCount;
+
     /**
      * Create a new NRVideoTracker.
      */
@@ -57,6 +69,18 @@ public class NRVideoTracker extends NRTracker {
         playtimeSinceLastEvent = 0L;
         bufferType = null;
         isHeartbeatRunning = false;
+
+        // Initialize QoE tracking fields
+        qoeStartupTimeStart = null;
+        qoeStartupTime = null;
+        qoePeakBitrate = 0L;
+        qoeHadStartupFailure = false;
+        qoeHadPlaybackFailure = false;
+        qoeTotalRebufferingTime = 0L;
+        qoeRebufferingStartTime = null;
+        qoeTotalContentPlaytime = 0L;
+        qoeBitrateSum = 0L;
+        qoeBitrateCount = 0L;
         heartbeatHandler = new Handler();
         heartbeatRunnable = new Runnable() {
             @Override
@@ -237,6 +261,8 @@ public class NRVideoTracker extends NRTracker {
             if (state.isAd) {
                 sendVideoAdEvent(AD_REQUEST);
             } else {
+                // QoE: Start tracking startup time for content
+                qoeStartupTimeStart = System.currentTimeMillis();
                 sendVideoEvent(CONTENT_REQUEST);
             }
         }
@@ -261,6 +287,12 @@ public class NRVideoTracker extends NRTracker {
                     totalAdPlaytime = ((NRVideoTracker)linkedTracker).getTotalAdPlaytime();
                 }
                 numberOfVideos++;
+
+                // QoE: Calculate startup time for content
+                if (qoeStartupTimeStart != null) {
+                    qoeStartupTime = System.currentTimeMillis() - qoeStartupTimeStart;
+                }
+
                 sendVideoEvent(CONTENT_START);
             }
             playtimeSinceLastEventTimestamp = System.currentTimeMillis();
@@ -371,6 +403,10 @@ public class NRVideoTracker extends NRTracker {
             if (state.isAd) {
                 sendVideoAdEvent(AD_BUFFER_START);
             } else {
+                // QoE: Start tracking rebuffering time (excludes initial buffering)
+                if (!calculateBufferType().equals("initial")) {
+                    qoeRebufferingStartTime = System.currentTimeMillis();
+                }
                 sendVideoEvent(CONTENT_BUFFER_START);
             }
             playtimeSinceLastEventTimestamp = 0L;
@@ -391,6 +427,11 @@ public class NRVideoTracker extends NRTracker {
             if (state.isAd) {
                 sendVideoAdEvent(AD_BUFFER_END);
             } else {
+                // QoE: Calculate rebuffering time (excludes initial buffering)
+                if (qoeRebufferingStartTime != null) {
+                    qoeTotalRebufferingTime += System.currentTimeMillis() - qoeRebufferingStartTime;
+                    qoeRebufferingStartTime = null;
+                }
                 sendVideoEvent(CONTENT_BUFFER_END);
             }
             if (!state.isSeeking && !state.isPaused) {
@@ -416,11 +457,13 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_HEARTBEAT,eventData);
             } else {
                 sendVideoEvent(CONTENT_HEARTBEAT, eventData);
+                sendQoeAggregate();
             }
         }
         state.chrono.start();
         state.accumulatedVideoWatchTime = 0L;
     }
+
 
     /**
      * Send rendition change event.
@@ -429,8 +472,77 @@ public class NRVideoTracker extends NRTracker {
         if (state.isAd) {
             sendVideoAdEvent(AD_RENDITION_CHANGE);
         } else {
+            // QoE: Track bitrate changes for peak and average calculations
+            Long currentBitrate = getActualBitrate();
+            if (currentBitrate != null && currentBitrate > 0) {
+                if (currentBitrate > qoePeakBitrate) {
+                    qoePeakBitrate = currentBitrate;
+                }
+                qoeBitrateSum += currentBitrate;
+                qoeBitrateCount++;
+            }
             sendVideoEvent(CONTENT_RENDITION_CHANGE);
         }
+    }
+
+    /**
+     * Send QOE aggregate event with calculated KPI attributes.
+     * This method sends quality of experience metrics aggregated during each harvest cycle.
+     */
+    public void sendQoeAggregate() {
+        if (!state.isAd) { // Only send for content, not ads
+            // Update content playtime before calculating KPIs
+            qoeTotalContentPlaytime = totalPlaytime;
+
+            Map<String, Object> kpiAttributes = calculateQoeKpiAttributes();
+            sendVideoEvent(VIEW_QOE_AGGREGATE, kpiAttributes);
+        }
+    }
+
+    /**
+     * Calculate QoE KPI attributes based on tracked metrics during playback.
+     * @return Map containing the KPI attributes
+     */
+    private Map<String, Object> calculateQoeKpiAttributes() {
+        Map<String, Object> kpiAttributes = new HashMap<>();
+
+        // kpi.startupTime - Time from CONTENT_REQUEST to CONTENT_START in milliseconds
+        if (qoeStartupTime != null) {
+            kpiAttributes.put("kpi.startupTime", qoeStartupTime);
+        }
+
+        // kpi.peakBitrate - Maximum contentBitrate observed during content playback
+        if (qoePeakBitrate > 0) {
+            kpiAttributes.put("kpi.peakBitrate", qoePeakBitrate);
+        }
+
+        // kpi.hadStartupFailure - Boolean indicating if CONTENT_ERROR occurred before CONTENT_START
+        kpiAttributes.put("kpi.hadStartupFailure", qoeHadStartupFailure);
+
+        // kpi.hadPlaybackFailure - Boolean indicating if CONTENT_ERROR occurred at any time during content playback
+        kpiAttributes.put("kpi.hadPlaybackFailure", qoeHadPlaybackFailure);
+
+        // kpi.totalRebufferingTime - Total milliseconds spent rebuffering during content playback
+        kpiAttributes.put("kpi.totalRebufferingTime", qoeTotalRebufferingTime);
+
+        // kpi.rebufferingRatio - Rebuffering time as a percentage of total playtime
+        if (qoeTotalContentPlaytime > 0) {
+            double rebufferingRatio = ((double) qoeTotalRebufferingTime / qoeTotalContentPlaytime) * 100;
+            kpiAttributes.put("kpi.rebufferingRatio", rebufferingRatio);
+        } else {
+            kpiAttributes.put("kpi.rebufferingRatio", 0.0);
+        }
+
+        // kpi.totalPlaytime - Total milliseconds user spent watching content
+        kpiAttributes.put("kpi.totalPlaytime", qoeTotalContentPlaytime);
+
+        // kpi.averageBitrate - Average bitrate across all content playback weighted by playtime
+        if (qoeBitrateCount > 0) {
+            long averageBitrate = qoeBitrateSum / qoeBitrateCount;
+            kpiAttributes.put("kpi.averageBitrate", averageBitrate);
+        }
+
+        return kpiAttributes;
     }
 
     /**
@@ -460,6 +572,14 @@ public class NRVideoTracker extends NRTracker {
         String actionName = CONTENT_ERROR;
         if (state.isAd) {
             actionName = AD_ERROR;
+        } else {
+            // QoE: Track error types for content
+            qoeHadPlaybackFailure = true;
+
+            // Check if error occurred before content start (startup failure)
+            if (qoeStartupTime == null && qoeStartupTimeStart != null) {
+                qoeHadStartupFailure = true;
+            }
         }
         sendVideoErrorEvent(actionName, errAttr);
     }
@@ -838,6 +958,8 @@ public class NRVideoTracker extends NRTracker {
 
         addTimeSinceEntry(CONTENT_RENDITION_CHANGE, "timeSinceLastRenditionChange", "^CONTENT_RENDITION_CHANGE$");
         addTimeSinceEntry(AD_RENDITION_CHANGE, "timeSinceLastAdRenditionChange", "^AD_RENDITION_CHANGE$");
+
+        addTimeSinceEntry(VIEW_QOE_AGGREGATE, "timeSinceLastQoeAggregate", "^VIEW_QOE_AGGREGATE$");
 
         addTimeSinceEntry(AD_BREAK_START, "timeSinceAdBreakBegin", "^AD_BREAK_END$");
 
