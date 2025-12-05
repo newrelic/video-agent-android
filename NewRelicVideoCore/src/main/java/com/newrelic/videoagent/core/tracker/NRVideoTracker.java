@@ -41,14 +41,9 @@ public class NRVideoTracker extends NRTracker {
     private NRTimeSince lastAdTimeSince;
 
     // QoE (Quality of Experience) tracking fields
-    private Long qoeStartupTimeStart;
-    private Long qoeStartupTime;
     private Long qoePeakBitrate;
-    private Boolean qoeHadStartupFailure;
     private Boolean qoeHadPlaybackFailure;
     private Long qoeTotalRebufferingTime;
-    private Long qoeRebufferingStartTime;
-    private Long qoeTotalContentPlaytime;
     private Long qoeBitrateSum;
     private Long qoeBitrateCount;
 
@@ -71,14 +66,9 @@ public class NRVideoTracker extends NRTracker {
         isHeartbeatRunning = false;
 
         // Initialize QoE tracking fields
-        qoeStartupTimeStart = null;
-        qoeStartupTime = null;
         qoePeakBitrate = 0L;
-        qoeHadStartupFailure = false;
         qoeHadPlaybackFailure = false;
         qoeTotalRebufferingTime = 0L;
-        qoeRebufferingStartTime = null;
-        qoeTotalContentPlaytime = 0L;
         qoeBitrateSum = 0L;
         qoeBitrateCount = 0L;
         heartbeatHandler = new Handler();
@@ -261,8 +251,6 @@ public class NRVideoTracker extends NRTracker {
             if (state.isAd) {
                 sendVideoAdEvent(AD_REQUEST);
             } else {
-                // QoE: Start tracking startup time for content
-                qoeStartupTimeStart = System.currentTimeMillis();
                 sendVideoEvent(CONTENT_REQUEST);
             }
         }
@@ -287,11 +275,6 @@ public class NRVideoTracker extends NRTracker {
                     totalAdPlaytime = ((NRVideoTracker)linkedTracker).getTotalAdPlaytime();
                 }
                 numberOfVideos++;
-
-                // QoE: Calculate startup time for content
-                if (qoeStartupTimeStart != null) {
-                    qoeStartupTime = System.currentTimeMillis() - qoeStartupTimeStart;
-                }
 
                 sendVideoEvent(CONTENT_START);
             }
@@ -403,10 +386,6 @@ public class NRVideoTracker extends NRTracker {
             if (state.isAd) {
                 sendVideoAdEvent(AD_BUFFER_START);
             } else {
-                // QoE: Start tracking rebuffering time (excludes initial buffering)
-                if (!calculateBufferType().equals("initial")) {
-                    qoeRebufferingStartTime = System.currentTimeMillis();
-                }
                 sendVideoEvent(CONTENT_BUFFER_START);
             }
             playtimeSinceLastEventTimestamp = 0L;
@@ -427,10 +406,11 @@ public class NRVideoTracker extends NRTracker {
             if (state.isAd) {
                 sendVideoAdEvent(AD_BUFFER_END);
             } else {
-                // QoE: Calculate rebuffering time (excludes initial buffering)
-                if (qoeRebufferingStartTime != null) {
-                    qoeTotalRebufferingTime += System.currentTimeMillis() - qoeRebufferingStartTime;
-                    qoeRebufferingStartTime = null;
+                // QoE: Calculate rebuffering time using timeSinceBufferBegin (excludes initial buffering)
+                Map<String, Object> attributes = getAttributes(CONTENT_BUFFER_END, null);
+                Object timeSinceBufferBegin = attributes.get("timeSinceBufferBegin");
+                if (timeSinceBufferBegin instanceof Long && !bufferType.equals("initial")) {
+                    qoeTotalRebufferingTime += (Long) timeSinceBufferBegin;
                 }
                 sendVideoEvent(CONTENT_BUFFER_END);
             }
@@ -488,12 +468,11 @@ public class NRVideoTracker extends NRTracker {
     /**
      * Send QOE aggregate event with calculated KPI attributes.
      * This method sends quality of experience metrics aggregated during each harvest cycle.
+     * Note: QoE metrics are currently limited to content-related events only, not ad events.
+     * This design choice focuses QoE measurement on the primary content viewing experience.
      */
     public void sendQoeAggregate() {
         if (!state.isAd) { // Only send for content, not ads
-            // Update content playtime before calculating KPIs
-            qoeTotalContentPlaytime = totalPlaytime;
-
             Map<String, Object> kpiAttributes = calculateQoeKpiAttributes();
             sendVideoEvent(VIEW_QOE_AGGREGATE, kpiAttributes);
         }
@@ -506,9 +485,13 @@ public class NRVideoTracker extends NRTracker {
     private Map<String, Object> calculateQoeKpiAttributes() {
         Map<String, Object> kpiAttributes = new HashMap<>();
 
+        // Get current attributes to access timeSince values
+        Map<String, Object> currentAttributes = getAttributes(VIEW_QOE_AGGREGATE, null);
+
         // kpi.startupTime - Time from CONTENT_REQUEST to CONTENT_START in milliseconds
-        if (qoeStartupTime != null) {
-            kpiAttributes.put("kpi.startupTime", qoeStartupTime);
+        Object timeSinceRequested = currentAttributes.get("timeSinceRequested");
+        if (timeSinceRequested instanceof Long) {
+            kpiAttributes.put("kpi.startupTime", timeSinceRequested);
         }
 
         // kpi.peakBitrate - Maximum contentBitrate observed during content playback
@@ -517,7 +500,10 @@ public class NRVideoTracker extends NRTracker {
         }
 
         // kpi.hadStartupFailure - Boolean indicating if CONTENT_ERROR occurred before CONTENT_START
-        kpiAttributes.put("kpi.hadStartupFailure", qoeHadStartupFailure);
+        // Note: This metric is determined by checking if timeSinceStarted is available
+        Object timeSinceStarted = currentAttributes.get("timeSinceStarted");
+        boolean hadStartupFailure = (timeSinceStarted == null);
+        kpiAttributes.put("kpi.hadStartupFailure", hadStartupFailure);
 
         // kpi.hadPlaybackFailure - Boolean indicating if CONTENT_ERROR occurred at any time during content playback
         kpiAttributes.put("kpi.hadPlaybackFailure", qoeHadPlaybackFailure);
@@ -526,15 +512,15 @@ public class NRVideoTracker extends NRTracker {
         kpiAttributes.put("kpi.totalRebufferingTime", qoeTotalRebufferingTime);
 
         // kpi.rebufferingRatio - Rebuffering time as a percentage of total playtime
-        if (qoeTotalContentPlaytime > 0) {
-            double rebufferingRatio = ((double) qoeTotalRebufferingTime / qoeTotalContentPlaytime) * 100;
+        if (totalPlaytime > 0) {
+            double rebufferingRatio = ((double) qoeTotalRebufferingTime / totalPlaytime) * 100;
             kpiAttributes.put("kpi.rebufferingRatio", rebufferingRatio);
         } else {
             kpiAttributes.put("kpi.rebufferingRatio", 0.0);
         }
 
         // kpi.totalPlaytime - Total milliseconds user spent watching content
-        kpiAttributes.put("kpi.totalPlaytime", qoeTotalContentPlaytime);
+        kpiAttributes.put("kpi.totalPlaytime", totalPlaytime);
 
         // kpi.averageBitrate - Average bitrate across all content playback weighted by playtime
         if (qoeBitrateCount > 0) {
@@ -573,13 +559,15 @@ public class NRVideoTracker extends NRTracker {
         if (state.isAd) {
             actionName = AD_ERROR;
         } else {
-            // QoE: Track error types for content
-            qoeHadPlaybackFailure = true;
-
-            // Check if error occurred before content start (startup failure)
-            if (qoeStartupTime == null && qoeStartupTimeStart != null) {
-                qoeHadStartupFailure = true;
+            // QoE: Track playback errors for content (errors after CONTENT_START)
+            Map<String, Object> currentAttributes = getAttributes(actionName, null);
+            Object timeSinceStarted = currentAttributes.get("timeSinceStarted");
+            if (timeSinceStarted != null) {
+                // Error occurred after CONTENT_START, so it's a playback failure
+                qoeHadPlaybackFailure = true;
             }
+            // Note: Startup failures cannot be reported via QoE aggregate since
+            // no heartbeat events are sent after CONTENT_ERROR before CONTENT_START
         }
         sendVideoErrorEvent(actionName, errAttr);
     }
