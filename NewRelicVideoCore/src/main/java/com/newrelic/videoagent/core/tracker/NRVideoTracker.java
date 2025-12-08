@@ -47,6 +47,12 @@ public class NRVideoTracker extends NRTracker {
     private Long qoeBitrateSum;
     private Long qoeBitrateCount;
 
+    // Time-weighted bitrate calculation fields
+    private Long qoeCurrentBitrate;
+    private Long qoeLastRenditionChangeTime;
+    private Long qoeTotalBitrateWeightedTime;
+    private Long qoeTotalActiveTime;
+
     /**
      * Create a new NRVideoTracker.
      */
@@ -71,6 +77,12 @@ public class NRVideoTracker extends NRTracker {
         qoeTotalRebufferingTime = 0L;
         qoeBitrateSum = 0L;
         qoeBitrateCount = 0L;
+
+        // Initialize time-weighted bitrate tracking
+        qoeCurrentBitrate = null;
+        qoeLastRenditionChangeTime = null;
+        qoeTotalBitrateWeightedTime = 0L;
+        qoeTotalActiveTime = 0L;
         heartbeatHandler = new Handler();
         heartbeatRunnable = new Runnable() {
             @Override
@@ -262,8 +274,9 @@ public class NRVideoTracker extends NRTracker {
     public void sendStart() {
         if (state.goStart()) {
             startHeartbeat();
-            state.chrono.start();
             if (state.isAd) {
+                // Start ad chrono for precise ad duration tracking
+                state.adChrono.start();
                 numberOfAds++;
                 ((NRVideoTracker) linkedTracker).sendPause ();
                 if (linkedTracker instanceof NRVideoTracker) {
@@ -271,6 +284,8 @@ public class NRVideoTracker extends NRTracker {
                 }
                 sendVideoAdEvent(AD_START);
             } else {
+                // Start content chrono for content watch time
+                state.chrono.start();
                 if (linkedTracker instanceof NRVideoTracker) {
                     totalAdPlaytime = ((NRVideoTracker)linkedTracker).getTotalAdPlaytime();
                 }
@@ -288,7 +303,12 @@ public class NRVideoTracker extends NRTracker {
     public void sendPause() {
         if (state.goPause()) {
             if(!state.isBuffering){
-                state.accumulatedVideoWatchTime +=state. chrono.getDeltaTime();
+                if (state.isAd) {
+                    // Accumulate ad watch time using ad chrono
+                    state.accumulatedAdWatchTime += state.adChrono.getDeltaTime();
+                } else {
+                    state.accumulatedVideoWatchTime += state.chrono.getDeltaTime();
+                }
             }
             if (state.isAd) {
                 sendVideoAdEvent(AD_PAUSE);
@@ -305,7 +325,12 @@ public class NRVideoTracker extends NRTracker {
     public void sendResume() {
         if (state.goResume()) {
             if(!state.isBuffering){
-                state.chrono.start();
+                if (state.isAd) {
+                    // Resume ad chrono for ad duration tracking
+                    state.adChrono.start();
+                } else {
+                    state.chrono.start();
+                }
             }
             if (state.isAd) {
                 sendVideoAdEvent(AD_RESUME);
@@ -341,6 +366,9 @@ public class NRVideoTracker extends NRTracker {
             playtimeSinceLastEventTimestamp = 0L;
             playtimeSinceLastEvent = 0L;
             totalPlaytime = 0L;
+
+            // Reset QoE metrics for new view session
+            resetQoeMetrics();
         }
     }
 
@@ -380,7 +408,12 @@ public class NRVideoTracker extends NRTracker {
     public void sendBufferStart() {
         if (state.goBufferStart()) {
             if(state.isPlaying){
-                state.accumulatedVideoWatchTime += state.chrono.getDeltaTime();
+                if (state.isAd) {
+                    // Accumulate ad watch time using ad chrono
+                    state.accumulatedAdWatchTime += state.adChrono.getDeltaTime();
+                } else {
+                    state.accumulatedVideoWatchTime += state.chrono.getDeltaTime();
+                }
             }
             bufferType = calculateBufferType();
             if (state.isAd) {
@@ -398,7 +431,12 @@ public class NRVideoTracker extends NRTracker {
     public void sendBufferEnd() {
         if (state.goBufferEnd()) {
             if(state.isPlaying){
-                state.chrono.start();
+                if (state.isAd) {
+                    // Resume ad chrono after buffer ends
+                    state.adChrono.start();
+                } else {
+                    state.chrono.start();
+                }
             }
             if (bufferType == null) {
                 bufferType = calculateBufferType();
@@ -455,9 +493,15 @@ public class NRVideoTracker extends NRTracker {
             // QoE: Track bitrate changes for peak and average calculations
             Long currentBitrate = getActualBitrate();
             if (currentBitrate != null && currentBitrate > 0) {
+                // Update time-weighted average calculation
+                updateTimeWeightedBitrate(currentBitrate);
+
+                // Update peak bitrate
                 if (currentBitrate > qoePeakBitrate) {
                     qoePeakBitrate = currentBitrate;
                 }
+
+                // Keep legacy simple average for backward compatibility
                 qoeBitrateSum += currentBitrate;
                 qoeBitrateCount++;
             }
@@ -522,13 +566,89 @@ public class NRVideoTracker extends NRTracker {
         // kpi.totalPlaytime - Total milliseconds user spent watching content
         kpiAttributes.put("kpi.totalPlaytime", totalPlaytime);
 
-        // kpi.averageBitrate - Average bitrate across all content playback weighted by playtime
-        if (qoeBitrateCount > 0) {
+        // kpi.averageBitrate - Time-weighted average bitrate across all content playback
+        Long timeWeightedAverage = calculateTimeWeightedAverageBitrate();
+        if (timeWeightedAverage != null) {
+            kpiAttributes.put("kpi.averageBitrate", timeWeightedAverage);
+        } else if (qoeBitrateCount > 0) {
+            // Fallback to simple average if time-weighted calculation is not available
             long averageBitrate = qoeBitrateSum / qoeBitrateCount;
             kpiAttributes.put("kpi.averageBitrate", averageBitrate);
         }
 
         return kpiAttributes;
+    }
+
+    /**
+     * Update time-weighted bitrate calculation when bitrate changes.
+     * This method accumulates the weighted time for each bitrate segment.
+     *
+     * @param newBitrate The new bitrate that just became active
+     */
+    private void updateTimeWeightedBitrate(Long newBitrate) {
+        long currentTime = System.currentTimeMillis();
+
+        // If we have a previous bitrate and timing, accumulate its weighted time
+        if (qoeCurrentBitrate != null && qoeLastRenditionChangeTime != null) {
+            long segmentDuration = currentTime - qoeLastRenditionChangeTime;
+            if (segmentDuration > 0) {
+                // Accumulate weighted bitrate-time (bitrate * duration)
+                qoeTotalBitrateWeightedTime += qoeCurrentBitrate * segmentDuration;
+                qoeTotalActiveTime += segmentDuration;
+            }
+        }
+
+        // Update current tracking values
+        qoeCurrentBitrate = newBitrate;
+        qoeLastRenditionChangeTime = currentTime;
+    }
+
+    /**
+     * Finalize time-weighted bitrate calculation by including the current segment.
+     * Called during QoE calculation to include the time since the last rendition change.
+     *
+     * @return Time-weighted average bitrate, or null if no data available
+     */
+    private Long calculateTimeWeightedAverageBitrate() {
+        // Include current segment in calculation
+        if (qoeCurrentBitrate != null && qoeLastRenditionChangeTime != null) {
+            long currentTime = System.currentTimeMillis();
+            long currentSegmentDuration = currentTime - qoeLastRenditionChangeTime;
+
+            if (currentSegmentDuration > 0 && qoeCurrentBitrate > 0) {
+                long totalWeightedTime = qoeTotalBitrateWeightedTime + (qoeCurrentBitrate * currentSegmentDuration);
+                long totalTime = qoeTotalActiveTime + currentSegmentDuration;
+
+                if (totalTime > 0) {
+                    return totalWeightedTime / totalTime;
+                }
+            }
+        }
+
+        // Fallback to accumulated data only
+        if (qoeTotalActiveTime > 0) {
+            return qoeTotalBitrateWeightedTime / qoeTotalActiveTime;
+        }
+
+        return null; // No time-weighted data available
+    }
+
+    /**
+     * Reset QoE metrics when starting a new view session.
+     * This ensures that QoE KPIs are isolated per view ID.
+     */
+    private void resetQoeMetrics() {
+        qoePeakBitrate = null;
+        qoeHadPlaybackFailure = false;
+        qoeTotalRebufferingTime = 0L;
+        qoeBitrateSum = 0L;
+        qoeBitrateCount = 0L;
+
+        // Reset time-weighted bitrate fields
+        qoeCurrentBitrate = null;
+        qoeLastRenditionChangeTime = null;
+        qoeTotalBitrateWeightedTime = 0L;
+        qoeTotalActiveTime = 0L;
     }
 
     /**
