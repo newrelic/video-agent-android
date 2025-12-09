@@ -517,7 +517,7 @@ public class NRVideoTracker extends NRTracker {
      */
     public void sendQoeAggregate() {
         if (!state.isAd) { // Only send for content, not ads
-            Map<String, Object> kpiAttributes = calculateQoeKpiAttributes();
+            Map<String, Object> kpiAttributes = calculateQOEKpiAttributes();
             sendVideoEvent(VIEW_QOE_AGGREGATE, kpiAttributes);
         }
     }
@@ -526,7 +526,7 @@ public class NRVideoTracker extends NRTracker {
      * Calculate QoE KPI attributes based on tracked metrics during playback.
      * @return Map containing the KPI attributes
      */
-    private Map<String, Object> calculateQoeKpiAttributes() {
+    private Map<String, Object> calculateQOEKpiAttributes() {
         Map<String, Object> kpiAttributes = new HashMap<>();
 
         // Get current attributes to access timeSince values
