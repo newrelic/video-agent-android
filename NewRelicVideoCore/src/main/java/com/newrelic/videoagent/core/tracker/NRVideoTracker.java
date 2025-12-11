@@ -497,7 +497,7 @@ public class NRVideoTracker extends NRTracker {
                 updateTimeWeightedBitrate(currentBitrate);
 
                 // Update peak bitrate
-                if (currentBitrate > qoePeakBitrate) {
+                if (qoePeakBitrate == null || currentBitrate > qoePeakBitrate) {
                     qoePeakBitrate = currentBitrate;
                 }
 
@@ -518,7 +518,7 @@ public class NRVideoTracker extends NRTracker {
     public void sendQoeAggregate() {
         if (!state.isAd) { // Only send for content, not ads
             Map<String, Object> kpiAttributes = calculateQOEKpiAttributes();
-            sendVideoEvent(VIEW_QOE_AGGREGATE, kpiAttributes);
+            sendVideoEvent(QOE_AGGREGATE, kpiAttributes);
         }
     }
 
@@ -530,50 +530,50 @@ public class NRVideoTracker extends NRTracker {
         Map<String, Object> kpiAttributes = new HashMap<>();
 
         // Get current attributes to access timeSince values
-        Map<String, Object> currentAttributes = getAttributes(VIEW_QOE_AGGREGATE, null);
+        Map<String, Object> currentAttributes = getAttributes(QOE_AGGREGATE, null);
 
-        // kpi.startupTime - Time from CONTENT_REQUEST to CONTENT_START in milliseconds
+        // startupTime - Time from CONTENT_REQUEST to CONTENT_START in milliseconds
         Object timeSinceRequested = currentAttributes.get("timeSinceRequested");
         if (timeSinceRequested instanceof Long) {
-            kpiAttributes.put("kpi.startupTime", timeSinceRequested);
+            kpiAttributes.put("startupTime", timeSinceRequested);
         }
 
-        // kpi.peakBitrate - Maximum contentBitrate observed during content playback
-        if (qoePeakBitrate > 0) {
-            kpiAttributes.put("kpi.peakBitrate", qoePeakBitrate);
+        // peakBitrate - Maximum contentBitrate observed during content playback
+        if (qoePeakBitrate != null && qoePeakBitrate > 0) {
+            kpiAttributes.put("peakBitrate", qoePeakBitrate);
         }
 
-        // kpi.hadStartupFailure - Boolean indicating if CONTENT_ERROR occurred before CONTENT_START
+        // hadStartupFailure - Boolean indicating if CONTENT_ERROR occurred before CONTENT_START
         // Note: This metric is determined by checking if timeSinceStarted is available
         Object timeSinceStarted = currentAttributes.get("timeSinceStarted");
         boolean hadStartupFailure = (timeSinceStarted == null);
-        kpiAttributes.put("kpi.hadStartupFailure", hadStartupFailure);
+        kpiAttributes.put("hadStartupFailure", hadStartupFailure);
 
-        // kpi.hadPlaybackFailure - Boolean indicating if CONTENT_ERROR occurred at any time during content playback
-        kpiAttributes.put("kpi.hadPlaybackFailure", qoeHadPlaybackFailure);
+        // hadPlaybackFailure - Boolean indicating if CONTENT_ERROR occurred at any time during content playback
+        kpiAttributes.put("hadPlaybackFailure", qoeHadPlaybackFailure);
 
-        // kpi.totalRebufferingTime - Total milliseconds spent rebuffering during content playback
-        kpiAttributes.put("kpi.totalRebufferingTime", qoeTotalRebufferingTime);
+        // totalRebufferingTime - Total milliseconds spent rebuffering during content playback
+        kpiAttributes.put("totalRebufferingTime", qoeTotalRebufferingTime);
 
-        // kpi.rebufferingRatio - Rebuffering time as a percentage of total playtime
+        // rebufferingRatio - Rebuffering time as a percentage of total playtime
         if (totalPlaytime > 0) {
             double rebufferingRatio = ((double) qoeTotalRebufferingTime / totalPlaytime) * 100;
-            kpiAttributes.put("kpi.rebufferingRatio", rebufferingRatio);
+            kpiAttributes.put("rebufferingRatio", rebufferingRatio);
         } else {
-            kpiAttributes.put("kpi.rebufferingRatio", 0.0);
+            kpiAttributes.put("rebufferingRatio", 0.0);
         }
 
-        // kpi.totalPlaytime - Total milliseconds user spent watching content
-        kpiAttributes.put("kpi.totalPlaytime", totalPlaytime);
+        // totalPlaytime - Total milliseconds user spent watching content
+        kpiAttributes.put("totalPlaytime", totalPlaytime);
 
-        // kpi.averageBitrate - Time-weighted average bitrate across all content playback
+        // averageBitrate - Time-weighted average bitrate across all content playback
         Long timeWeightedAverage = calculateTimeWeightedAverageBitrate();
         if (timeWeightedAverage != null) {
-            kpiAttributes.put("kpi.averageBitrate", timeWeightedAverage);
+            kpiAttributes.put("averageBitrate", timeWeightedAverage);
         } else if (qoeBitrateCount > 0) {
             // Fallback to simple average if time-weighted calculation is not available
             long averageBitrate = qoeBitrateSum / qoeBitrateCount;
-            kpiAttributes.put("kpi.averageBitrate", averageBitrate);
+            kpiAttributes.put("averageBitrate", averageBitrate);
         }
 
         return kpiAttributes;
@@ -1067,7 +1067,7 @@ public class NRVideoTracker extends NRTracker {
         addTimeSinceEntry(CONTENT_RENDITION_CHANGE, "timeSinceLastRenditionChange", "^CONTENT_RENDITION_CHANGE$");
         addTimeSinceEntry(AD_RENDITION_CHANGE, "timeSinceLastAdRenditionChange", "^AD_RENDITION_CHANGE$");
 
-        addTimeSinceEntry(VIEW_QOE_AGGREGATE, "timeSinceLastQoeAggregate", "^VIEW_QOE_AGGREGATE$");
+        addTimeSinceEntry(QOE_AGGREGATE, "timeSinceLastQoeAggregate", "^QOE_AGGREGATE$");
 
         addTimeSinceEntry(AD_BREAK_START, "timeSinceAdBreakBegin", "^AD_BREAK_END$");
 
