@@ -1,26 +1,26 @@
-name: Android Release
+name: Create Release PR
 
 on:
   push:
     branches:
-      - master
+      - test/dry-run  # <--- Change this from 'master'
+#      - master
 
 permissions:
   contents: write
-  issues: write
   pull-requests: write
 
 jobs:
-  release:
-    name: Release
-    # Prevent infinite loops: Don't run if the commit is already a release commit
-    if: "!contains(github.event.head_commit.message, 'chore(release):')"
+  create-release-pr:
+    name: Create Release PR
+    # Skip if the commit is already a release commit to prevent infinite loops
+    if: github.event_name == 'push' && !contains(github.event.head_commit.message, 'chore(release):')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Important: Fetch all history for semantic-release to analyze commits
+          fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
@@ -28,26 +28,87 @@ jobs:
         with:
           node-version: 20
 
-      - name: Setup Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+      # Clean Repo Approach: Install tools globally so we don't need package.json
+      - name: Install dependencies
+        run: npm install -g semantic-release @semantic-release/exec @semantic-release/changelog @semantic-release/git conventional-changelog-conventionalcommits
 
       - name: Make Script Executable
         run: chmod +x ./scripts/bump_version.sh
 
-      - name: Install Release Tools
+      - name: Configure Git
         run: |
-          npm install -g semantic-release \
-          @semantic-release/git \
-          @semantic-release/changelog \
-          @semantic-release/exec \
-          @semantic-release/github \
-          conventional-changelog-conventionalcommits
+          git config user.name "semantic-release-bot"
+          git config user.email "semantic-release-bot@github.com"
 
-      - name: Run Semantic Release
+      - name: Analyze commits and prepare release
+        id: prepare-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # We run 'npx semantic-release' which uses the config from .releaserc.json
-        run: npx semantic-release
+        run: |
+#           1. Run dry-run to calculate version (without modifying files yet)
+          npx semantic-release --dry-run --no-ci > dry-run.log 2>&1 || true
+          
+          # 2. Extract the new version number from the logs
+          NEW_VERSION=$(grep "The next release version is" dry-run.log | sed -n 's/.*The next release version is \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -1)
+
+          if [ -z "$NEW_VERSION" ]; then
+            echo "No release needed."
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          RELEASE_BRANCH="release/v${NEW_VERSION}"
+          
+          # 3. Check if this release branch already exists
+          if git ls-remote --exit-code --heads origin "$RELEASE_BRANCH" >/dev/null 2>&1; then
+            echo "Branch $RELEASE_BRANCH already exists."
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "release_branch=$RELEASE_BRANCH" >> $GITHUB_OUTPUT
+          echo "skip=false" >> $GITHUB_OUTPUT
+
+      - name: Create release branch and commit changes
+        if: steps.prepare-release.outputs.skip != 'true'
+        env:
+          NEW_VERSION: ${{ steps.prepare-release.outputs.new_version }}
+          RELEASE_BRANCH: ${{ steps.prepare-release.outputs.release_branch }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+#           Create the temporary release branch
+          git checkout -b "$RELEASE_BRANCH"
+
+          # Run semantic-release for real.
+          # Because of our .releaserc.json, this will:
+          # 1. Run bump_version.sh (Update Gradle files)
+          # 2. Generate CHANGELOG.md
+          npx semantic-release --no-ci
+
+          # Manually stage the changed files
+          # Manually stage the changed files
+          # We now update gradle.properties instead of build.gradle
+          git add gradle.properties CHANGELOG.md
+          # Verify there are changes
+          if git diff --staged --quiet; then
+            echo "Error: No changes generated."
+            exit 1
+          fi
+
+          # Commit and Push
+          git commit -m "chore(release): $NEW_VERSION [skip ci]"
+          git push -u origin "$RELEASE_BRANCH"
+
+      - name: Create Pull Request
+        if: steps.prepare-release.outputs.skip != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ steps.prepare-release.outputs.new_version }}
+          RELEASE_BRANCH: ${{ steps.prepare-release.outputs.release_branch }}
+        run: |
+          gh pr create \
+            --base master \
+            --head "$RELEASE_BRANCH" \
+            --title "chore(release): $NEW_VERSION" \
+            --body "Automated release PR for **v$NEW_VERSION**. Merge this PR to trigger the official release (Tag & JitPack)."
