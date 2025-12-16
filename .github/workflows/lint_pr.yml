@@ -1,4 +1,4 @@
-name: "Validate PR Title""
+name: "Validate PR Title"
 
 on:
   pull_request:
@@ -20,18 +20,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          # Configure which types are allowed (Default is Angular, same as our release config)
-          types: |
-            fix
-            feat
-            docs
-            style
-            refactor
-            perf
-            test
-            build
-            ci
-            chore
-            revert
-          # If the PR title is bad, this message will show up
+          # We use the default Angular types (fix, feat, chore, etc.) automatically.
+          # We just need to disable single commit validation to allow "Squash & Merge" workflows.
           validateSingleCommit: false
