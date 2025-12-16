@@ -3,8 +3,8 @@ name: Create Release PR
 on:
   push:
     branches:
-      - test/dry-run  # <--- Change this from 'master'
-#      - master
+      - test/dry-run  # Temporary test trigger
+      # - master      # Uncomment this later for production!
 
 permissions:
   contents: write
@@ -45,7 +45,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-#           1. Run dry-run to calculate version (without modifying files yet)
+          # 1. Run dry-run to calculate version (without modifying files yet)
           npx semantic-release --dry-run --no-ci > dry-run.log 2>&1 || true
           
           # 2. Extract the new version number from the logs
@@ -77,7 +77,7 @@ jobs:
           RELEASE_BRANCH: ${{ steps.prepare-release.outputs.release_branch }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-#           Create the temporary release branch
+          # Create the temporary release branch
           git checkout -b "$RELEASE_BRANCH"
 
           # Run semantic-release for real.
@@ -87,9 +87,9 @@ jobs:
           npx semantic-release --no-ci
 
           # Manually stage the changed files
-          # Manually stage the changed files
           # We now update gradle.properties instead of build.gradle
           git add gradle.properties CHANGELOG.md
+
           # Verify there are changes
           if git diff --staged --quiet; then
             echo "Error: No changes generated."
