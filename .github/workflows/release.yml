@@ -3,9 +3,7 @@ name: Android Release
 on:
   push:
     branches:
-      - test/dry-run  # <--- Temporary change for testing
-
-#      - master
+      - master
 
 permissions:
   contents: write
@@ -37,11 +35,9 @@ jobs:
           java-version: '17'
 
       - name: Make Script Executable
-        # This is critical because Windows/Mac file permissions often get lost in Git
         run: chmod +x ./scripts/bump_version.sh
 
       - name: Install Release Tools
-        # ⚡️ GHOST MODE: We install tools here so we don't need package.json in the repo
         run: |
           npm install -g semantic-release \
           @semantic-release/git \
@@ -54,5 +50,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # We run 'npx semantic-release' which uses the config from .releaserc.json
-        run: npx semantic-release --dry-run
-#        run: npx semantic-release
+        run: npx semantic-release
