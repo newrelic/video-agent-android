@@ -1,5 +1,5 @@
 {
-  "branches": ["master", "test/dry-run"],
+  "branches": ["master"],
   "plugins": [
     [
       "@semantic-release/commit-analyzer",
