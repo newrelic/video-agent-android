@@ -551,6 +551,16 @@ public class NRVideoTracker extends NRTracker {
             kpiAttributes.put("timeSinceStarted", contentStartTimestamp);
         }
 
+        // startupTime - Calculate once during first QOE_AGGREGATE event and cache for reuse
+        if (qoeStartupTime == null && contentRequestTimestamp != null && contentStartTimestamp != null) {
+            // Calculate startup time = CONTENT_START timestamp - CONTENT_REQUEST timestamp
+            qoeStartupTime = contentStartTimestamp - contentRequestTimestamp;
+        }
+
+        // Include cached startup time if available
+        if (qoeStartupTime != null && qoeStartupTime > 0) {
+            kpiAttributes.put("startupTime", qoeStartupTime);
+        }
 
         // peakBitrate - Maximum contentBitrate observed during content playback
         if (qoePeakBitrate != null && qoePeakBitrate > 0) {
