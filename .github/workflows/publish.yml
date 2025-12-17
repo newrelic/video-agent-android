@@ -31,11 +31,10 @@ jobs:
              exit 1
           fi
           
-          echo "✅ Detected Version: $VERSION"
+          echo "Detected Version: $VERSION"
           TAG_NAME="v$VERSION"
 
-#          Create the GitHub Release
-          # This command automatically creates the Tag AND the Release Page
+#           Create the GitHub Release
           gh release create "$TAG_NAME" \
             --title "$TAG_NAME" \
             --notes "Automated release for version $TAG_NAME. See CHANGELOG.md for details." \

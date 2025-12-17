@@ -1,9 +1,9 @@
 name: Create Release PR
 
 on:
-push:
-  branches:
-    - master
+  push:
+    branches:
+      - master
 
 permissions:
   contents: write
@@ -12,7 +12,6 @@ permissions:
 jobs:
   create-release-pr:
     name: Create Release PR
-    # Skip if the commit is already a release commit to prevent infinite loops
     if: github.event_name == 'push' && !contains(github.event.head_commit.message, 'chore(release):')
     runs-on: ubuntu-latest
     steps:
@@ -27,7 +26,6 @@ jobs:
         with:
           node-version: 20
 
-      # Clean Repo Approach: Install tools globally so we don't need package.json
       - name: Install dependencies
         run: npm install -g semantic-release @semantic-release/exec @semantic-release/changelog @semantic-release/git conventional-changelog-conventionalcommits
 
@@ -44,10 +42,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-#           1. Run dry-run to calculate version (without modifying files yet)
           npx semantic-release --dry-run --no-ci > dry-run.log 2>&1 || true
           
-          # 2. Extract the new version number from the logs
           NEW_VERSION=$(grep "The next release version is" dry-run.log | sed -n 's/.*The next release version is \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -1)
 
           if [ -z "$NEW_VERSION" ]; then
@@ -58,7 +54,6 @@ jobs:
 
           RELEASE_BRANCH="release/v${NEW_VERSION}"
           
-          # 3. Check if this release branch already exists
           if git ls-remote --exit-code --heads origin "$RELEASE_BRANCH" >/dev/null 2>&1; then
             echo "Branch $RELEASE_BRANCH already exists."
             echo "skip=true" >> $GITHUB_OUTPUT
@@ -76,24 +71,17 @@ jobs:
           RELEASE_BRANCH: ${{ steps.prepare-release.outputs.release_branch }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-#           Create the temporary release branch
           git checkout -b "$RELEASE_BRANCH"
-
-          # Run semantic-release for real.
-          # 1. Run bump_version.sh (Update Gradle files)
-          # 2. Generate CHANGELOG.md
+          
           npx semantic-release --no-ci
-
-          # We now update gradle.properties instead of build.gradle
+          
           git add gradle.properties CHANGELOG.md
 
-          # Verify there are changes
           if git diff --staged --quiet; then
             echo "Error: No changes generated."
             exit 1
           fi
 
-          # Commit and Push
           git commit -m "chore(release): $NEW_VERSION [skip ci]"
           git push -u origin "$RELEASE_BRANCH"
 
