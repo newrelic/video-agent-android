@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - master
-      - fix/staging-config
+      - staging
   workflow_dispatch:
 
 permissions:
@@ -33,7 +33,8 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-run: npm install -g semantic-release @semantic-release/exec @semantic-release/changelog @semantic-release/git conventional-changelog-conventionalcommits conventional-changelog-cli
+        run: npm install -g semantic-release @semantic-release/exec @semantic-release/changelog @semantic-release/git conventional-changelog-conventionalcommits conventional-changelog-cli
+
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
@@ -52,21 +53,15 @@ run: npm install -g semantic-release @semantic-release/exec @semantic-release/ch
         run: |
           CURRENT_VERSION="${{ steps.current_version.outputs.current_version }}"
           
-          # Run dry-run
+          # Run dry-run (Calculation ONLY, NO Tagging)
           npx semantic-release --dry-run --no-ci > semantic-output.txt 2>&1 || true
           cat semantic-output.txt 
           
           # Parse output
           NEXT_VERSION=$(grep "The next release version is" semantic-output.txt | sed -E 's/.*The next release version is ([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -1)
           
-          if [ -z "$NEXT_VERSION" ]; then
+          if [ -z "$NEXT_VERSION" ] || [ "$NEXT_VERSION" = "$CURRENT_VERSION" ]; then
             echo "::notice::No new version needed."
-            echo "should_create_pr=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          
-          if [ "$NEXT_VERSION" = "$CURRENT_VERSION" ]; then
-            echo "::notice::Version already matches."
             echo "should_create_pr=false" >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -110,10 +105,11 @@ run: npm install -g semantic-release @semantic-release/exec @semantic-release/ch
         run: |
           VERSION="${{ steps.get_version.outputs.next_version }}"
           echo "Generating changelog for version $VERSION..."
-          # Create a temporary context file to force the correct version header
+          
+          # Create context file for correct versioning
           echo '{"version":"'${VERSION}'"}' > context.json
           
-          # Generate changelog updates and save to file without tagging
+          # Generate file WITHOUT creating a git tag
           npx conventional-changelog-cli -p conventionalcommits -i CHANGELOG.md -s --context context.json
           
           rm context.json
@@ -143,7 +139,6 @@ run: npm install -g semantic-release @semantic-release/exec @semantic-release/ch
             CHANGELOG_EXCERPT="See CHANGELOG.md for details"
           fi
           
-          # We construct the body string first to avoid multiline string issues in the CLI command
           PR_BODY="Automated release PR
           
           **Version:** \`$VERSION\`
