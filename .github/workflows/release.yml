@@ -115,7 +115,7 @@ jobs:
           # Create a temporary context file to force the correct version header
           echo '{"version":"'${VERSION}'"}' > context.json
           
-          # Generate changelog updates and save to file without tagging
+          # Generate changelog updates and save to files without tagging
           npx conventional-changelog-cli -p conventionalcommits -i CHANGELOG.md -s --context context.json
           
           rm context.json
