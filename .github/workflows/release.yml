@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - master
-      - staging
+      - final-workflow-Implementation
   workflow_dispatch:
 
 permissions:
