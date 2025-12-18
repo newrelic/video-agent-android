@@ -53,7 +53,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         attr.put("intVal", 1001);
         attr.put("floatVal", 1.23);
         attr.put("strVal", "this is a string");
-        attr.put("kind", "app start");
+        attr.put("kind", "app start successfully");
         NRVideo.recordCustomEvent(attr);
     }
 
