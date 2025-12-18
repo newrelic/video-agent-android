@@ -6,6 +6,7 @@ on:
       - closed
     branches:
       - master
+      - test
 
 permissions:
   contents: write
@@ -14,23 +15,50 @@ jobs:
   publish-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/')
+    # Condition: PR must be Merged AND have the 'release' label
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release')
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Create Release and Tag
+        id: create_release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          VERSION=$(echo "$PR_TITLE" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+#           1. Extract Version from the merged gradle.properties
+          VERSION=$(grep "^GLOBAL_VERSION_NAME=" gradle.properties | cut -d'=' -f2)
+          
           if [ -z "$VERSION" ]; then
-             echo "Error: Could not detect version."
+             echo "Error: Could not detect version from gradle.properties."
              exit 1
           fi
+
+          echo "✅ Detected Version: $VERSION"
           TAG_NAME="v$VERSION"
+          
+          # Output for next steps
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # 2. Create the GitHub Release
+          # --target uses the branch we merged into (master or test)
           gh release create "$TAG_NAME" \
             --title "$TAG_NAME" \
             --notes "Automated release for version $TAG_NAME. See CHANGELOG.md for details." \
-            --target master
+            --target ${{ github.base_ref }}
+
+      - name: Delete release branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.create_release.outputs.version }}"
+          RELEASE_BRANCH="release/${VERSION}"
+
+#           Check if branch exists remotely
+          if git ls-remote --exit-code --heads origin "$RELEASE_BRANCH" >/dev/null 2>&1; then
+            echo "Deleting release branch: $RELEASE_BRANCH"
+            git push origin --delete "$RELEASE_BRANCH"
+            echo "Release branch deleted successfully"
+          else
+            echo "Release branch $RELEASE_BRANCH already deleted."
+          fi
