@@ -1,3 +1,8 @@
+## [4.0.5](https://github.com/newrelic/video-agent-android/compare/v4.0.4...v4.0.5) (2025-12-18)
+
+### Bug Fixes
+
+* triggering test release on feature branch ([a84efe6](https://github.com/newrelic/video-agent-android/commit/a84efe603c7cc916044c204529348e48224ff63a))
 ## [4.0.4](https://github.com/newrelic/video-agent-android/compare/v4.0.3...v4.0.4) (2025-12-18)
 
 ### Bug Fixes
