@@ -1,5 +1,5 @@
 {
-  "branches": ["master","fix/staging-config"],
+  "branches": ["master","feature/final-workflow-setup"],
   "plugins": [
     [
       "@semantic-release/commit-analyzer",
