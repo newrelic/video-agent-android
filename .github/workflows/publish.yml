@@ -6,7 +6,6 @@ on:
       - closed
     branches:
       - master
-      - staging
 
 permissions:
   contents: write
@@ -45,18 +44,3 @@ jobs:
             --title "$TAG_NAME" \
             --notes "Automated release for version $TAG_NAME. See CHANGELOG.md for details." \
             --target ${{ github.base_ref }}
-
-      - name: Delete release branch
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION="${{ steps.create_release.outputs.version }}"
-          RELEASE_BRANCH="release/${VERSION}"
-          
-          # Check if branch exists before deleting
-          if git ls-remote --exit-code --heads origin "$RELEASE_BRANCH" >/dev/null 2>&1; then
-            echo "Deleting release branch: $RELEASE_BRANCH"
-            git push origin --delete "$RELEASE_BRANCH"
-          else
-            echo "Release branch $RELEASE_BRANCH already deleted."
-          fi
