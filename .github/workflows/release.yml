@@ -43,7 +43,7 @@ jobs:
       - name: Extract current version
         id: current_version
         run: |
-#           Read the version from gradle.properties using grep
+          # Read version from gradle.properties
           CURRENT_VERSION=$(grep "^GLOBAL_VERSION_NAME=" gradle.properties | cut -d'=' -f2)
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $CURRENT_VERSION"
@@ -52,11 +52,11 @@ jobs:
         id: get_version
         run: |
           CURRENT_VERSION="${{ steps.current_version.outputs.current_version }}"
-
-#           Run semantic-release in dry-run mode
+          
+          # Run dry-run
           npx semantic-release --dry-run --no-ci > semantic-output.txt 2>&1 || true
           
-          # Parse the output to find the new version number
+          # Parse output
           NEXT_VERSION=$(grep "The next release version is" semantic-output.txt | sed -E 's/.*The next release version is ([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -1)
           
           if [ -z "$NEXT_VERSION" ]; then
@@ -74,7 +74,7 @@ jobs:
           echo "next_version=$NEXT_VERSION" >> $GITHUB_OUTPUT
           echo "should_create_pr=true" >> $GITHUB_OUTPUT
           echo "release_branch=release/${NEXT_VERSION}" >> $GITHUB_OUTPUT
-          echo "::notice::Bumping version: $CURRENT_VERSION → $NEXT_VERSION"
+          echo "::notice::Bumping version: $CURRENT_VERSION -> $NEXT_VERSION"
 
       - name: Check if release branch exists
         if: steps.get_version.outputs.should_create_pr == 'true'
@@ -103,7 +103,6 @@ jobs:
           chmod +x ./scripts/bump_version.sh
           ./scripts/bump_version.sh "$VERSION"
 
-#           Verify the change
           grep "^GLOBAL_VERSION_NAME=" gradle.properties
 
       - name: Generate Changelog
@@ -115,10 +114,8 @@ jobs:
         if: steps.get_version.outputs.should_create_pr == 'true' && steps.check_branch.outputs.branch_exists == 'false'
         run: |
           VERSION="${{ steps.get_version.outputs.next_version }}"
-
-#           Add the modified property file and the new changelog
+          
           git add gradle.properties CHANGELOG.md
-
           git commit -m "chore(release): prepare version ${VERSION}"
           echo "Committed version bump and changelog."
 
@@ -130,16 +127,14 @@ jobs:
           BASE_BRANCH="${{ github.ref_name }}"
           
           git push origin "$BRANCH_NAME"
-
-#           Create the PR using GitHub CLI
+          
           if [ -f CHANGELOG.md ]; then
-            # Extract relevant changes (safely)
             CHANGELOG_EXCERPT=$(sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$ d' || echo "See CHANGELOG.md")
           else
             CHANGELOG_EXCERPT="See CHANGELOG.md for details"
           fi
           
-          # Construct PR Body safely
+          # We construct the body string first to avoid multiline string issues in the CLI command
           PR_BODY="Automated release PR
           
           **Version:** \`$VERSION\`
