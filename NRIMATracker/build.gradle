@@ -9,7 +9,7 @@ android {
         minSdkVersion 16
         targetSdkVersion 33
         versionCode 6
-        versionName "4.0.3"
+        versionName GLOBAL_VERSION_NAME
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
     }

@@ -1,0 +1,158 @@
+name: Version Bump PR
+
+on:
+  push:
+    branches:
+      - master
+      - fix/staging-config
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  version-bump:
+    name: Prepare Release Branch
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install -g semantic-release @semantic-release/exec @semantic-release/changelog @semantic-release/git conventional-changelog-conventionalcommits
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Extract current version
+        id: current_version
+        run: |
+          # Read version from gradle.properties
+          CURRENT_VERSION=$(grep "^GLOBAL_VERSION_NAME=" gradle.properties | cut -d'=' -f2)
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+
+      - name: Get next version
+        id: get_version
+        run: |
+          CURRENT_VERSION="${{ steps.current_version.outputs.current_version }}"
+          
+          # Run dry-run
+          npx semantic-release --dry-run --no-ci > semantic-output.txt 2>&1 || true
+          cat semantic-output.txt 
+          
+          # Parse output
+          NEXT_VERSION=$(grep "The next release version is" semantic-output.txt | sed -E 's/.*The next release version is ([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -1)
+          
+          if [ -z "$NEXT_VERSION" ]; then
+            echo "::notice::No new version needed."
+            echo "should_create_pr=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          if [ "$NEXT_VERSION" = "$CURRENT_VERSION" ]; then
+            echo "::notice::Version already matches."
+            echo "should_create_pr=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "next_version=$NEXT_VERSION" >> $GITHUB_OUTPUT
+          echo "should_create_pr=true" >> $GITHUB_OUTPUT
+          echo "release_branch=release/${NEXT_VERSION}" >> $GITHUB_OUTPUT
+          echo "::notice::Bumping version: $CURRENT_VERSION -> $NEXT_VERSION"
+
+      - name: Check if release branch exists
+        if: steps.get_version.outputs.should_create_pr == 'true'
+        id: check_branch
+        run: |
+          RELEASE_BRANCH="${{ steps.get_version.outputs.release_branch }}"
+          if git ls-remote --exit-code --heads origin "$RELEASE_BRANCH" >/dev/null 2>&1; then
+            echo "branch_exists=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "branch_exists=false" >> $GITHUB_OUTPUT
+
+      - name: Create release branch
+        if: steps.get_version.outputs.should_create_pr == 'true' && steps.check_branch.outputs.branch_exists == 'false'
+        run: |
+          BRANCH_NAME="${{ steps.get_version.outputs.release_branch }}"
+          git checkout -b "$BRANCH_NAME"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_ENV
+
+      - name: Update Gradle version
+        if: steps.get_version.outputs.should_create_pr == 'true' && steps.check_branch.outputs.branch_exists == 'false'
+        run: |
+          VERSION="${{ steps.get_version.outputs.next_version }}"
+          
+          echo "Running bump_version.sh..."
+          chmod +x ./scripts/bump_version.sh
+          ./scripts/bump_version.sh "$VERSION"
+
+          grep "^GLOBAL_VERSION_NAME=" gradle.properties
+
+      - name: Generate Changelog
+        if: steps.get_version.outputs.should_create_pr == 'true' && steps.check_branch.outputs.branch_exists == 'false'
+        run: |
+          npx semantic-release --no-ci 2>&1 | tee release-output.txt || true
+          cat release-output.txt
+
+      - name: Commit changes
+        if: steps.get_version.outputs.should_create_pr == 'true' && steps.check_branch.outputs.branch_exists == 'false'
+        run: |
+          VERSION="${{ steps.get_version.outputs.next_version }}"
+          
+          git add gradle.properties CHANGELOG.md
+          git commit -m "chore(release): prepare version ${VERSION}"
+          echo "Committed version bump and changelog."
+
+      - name: Push and Create PR
+        if: steps.get_version.outputs.should_create_pr == 'true' && steps.check_branch.outputs.branch_exists == 'false'
+        run: |
+          VERSION="${{ steps.get_version.outputs.next_version }}"
+          BRANCH_NAME="${{ env.branch_name }}"
+          BASE_BRANCH="${{ github.ref_name }}"
+          
+          git push origin "$BRANCH_NAME"
+          
+          if [ -f CHANGELOG.md ]; then
+            CHANGELOG_EXCERPT=$(sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$ d' || echo "See CHANGELOG.md")
+          else
+            CHANGELOG_EXCERPT="See CHANGELOG.md for details"
+          fi
+          
+          # We construct the body string first to avoid multiline string issues in the CLI command
+          PR_BODY="Automated release PR
+          
+          **Version:** \`$VERSION\`
+          
+          ## Changes
+          $CHANGELOG_EXCERPT
+          
+          ---
+          *Merge this PR to publish the release.*"
+
+          gh pr create \
+            --base "$BASE_BRANCH" \
+            --head "$BRANCH_NAME" \
+            --title "chore(release): $VERSION" \
+            --body "$PR_BODY"
+          
+          # Add release label
+          PR_NUMBER=$(gh pr list --head "$BRANCH_NAME" --base "$BASE_BRANCH" --json number --jq '.[0].number')
+          gh pr edit "$PR_NUMBER" --add-label "release"
