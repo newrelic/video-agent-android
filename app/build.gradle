@@ -13,6 +13,7 @@ def applicationToken = localProperties.getProperty('nr.applicationToken', "")
 
 android {
     compileSdkVersion 33
+    buildToolsVersion "34.0.0"
     defaultConfig {
         buildConfigField "String", "NR_APPLICATION_TOKEN", "\"${applicationToken}\""
         applicationId "com.newrelic.nrvideoproject"
