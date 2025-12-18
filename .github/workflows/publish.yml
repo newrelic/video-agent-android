@@ -6,7 +6,7 @@ on:
       - closed
     branches:
       - master
-      - test
+      - staging
 
 permissions:
   contents: write

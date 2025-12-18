@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - master
-      - test
+      - staging
   workflow_dispatch:
 
 permissions:
