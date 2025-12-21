@@ -68,17 +68,34 @@ public final class NRVideo {
             throw new IllegalStateException("NRVideo is not initialized. Call NRVideo.newBuilder(context).withConfiguration(config).build() first.");
         }
 
-        // Create content tracker with ExoPlayer instance
+        // Detect MediaTailor stream
+        boolean isMediaTailor = isMediaTailorStream(config.getPlayer());
+
+        // Create content tracker (always ExoPlayer)
         NRTracker contentTracker = createContentTracker(instance.configuration);
         NRTracker adsTracker = null;
-        if (config.isAdEnabled()) {
+
+        // Create appropriate ads tracker based on stream type
+        if (isMediaTailor) {
+            // MediaTailor tracker for SSAI ad detection
+            adsTracker = createMediaTailorTracker();
+            NRLog.d("MediaTailor tracker added");
+        } else if (config.isAdEnabled()) {
+            // IMA tracker for client-side ads
             adsTracker = createAdTracker(instance.configuration);
-            NRLog.d("add tracker is added");
+            NRLog.d("IMA ads tracker added");
         }
 
         // Now start the tracker system
         Integer trackerId = NewRelicVideoAgent.getInstance().start(contentTracker, adsTracker);
         ((NRVideoTracker) contentTracker).setPlayer(config.getPlayer());
+
+        // MediaTailor tracker needs player reference for event listening and ad detection
+        // IMA tracker doesn't need it as it uses its own AdsManager
+        if (isMediaTailor && adsTracker != null) {
+            ((NRVideoTracker) adsTracker).setPlayer(config.getPlayer());
+        }
+
         NRLog.i("NRVideo initialization completed successfully with tracker ID: " + trackerId + " and player name:" + config.getPlayerName());
         if (config.getCustomAttributes() != null && !config.getCustomAttributes().isEmpty()) {
             for (Map.Entry<String, Object> entry : config.getCustomAttributes().entrySet()) {
@@ -297,6 +314,34 @@ public final class NRVideo {
             } catch (Exception fallbackException) {
                 return null;
             }
+        }
+    }
+
+    private static NRTracker createMediaTailorTracker() {
+        try {
+            // Create MediaTailor tracker
+            Class<?> mtTrackerClass = Class.forName("com.newrelic.videoagent.mediatailor.tracker.NRTrackerMediaTailor");
+            return (NRTracker) mtTrackerClass.newInstance();
+        } catch (Exception e) {
+            NRLog.w("Failed to create MediaTailor tracker, falling back to ExoPlayer tracker: " + e.getMessage());
+            // Fallback to ExoPlayer tracker
+            return createContentTracker(instance.configuration);
+        }
+    }
+
+    private static boolean isMediaTailorStream(Object player) {
+        try {
+            // Use reflection to call NRTrackerMediaTailor.isUsing()
+            Class<?> mtTrackerClass = Class.forName("com.newrelic.videoagent.mediatailor.tracker.NRTrackerMediaTailor");
+            java.lang.reflect.Method isUsingMethod = mtTrackerClass.getMethod("isUsing", androidx.media3.exoplayer.ExoPlayer.class);
+            Boolean result = (Boolean) isUsingMethod.invoke(null, player);
+            NRLog.d("MediaTailor detection result: " + result);
+            return result;
+        } catch (Exception e) {
+            // If MediaTailor tracker not available or detection fails, assume not MediaTailor
+            NRLog.w("MediaTailor detection failed: " + e.getMessage());
+            e.printStackTrace();
+            return false;
         }
     }
 
