@@ -13,6 +13,11 @@
             android:label="@string/title_activity_video_player_ads"
             android:theme="@style/Theme.NRVideoProject.NoActionBar"
             android:exported="false"></activity>
+        <activity
+            android:name=".VideoPlayerMediaTailor"
+            android:label="AWS MediaTailor Player"
+            android:theme="@style/Theme.NRVideoProject.NoActionBar"
+            android:exported="false"></activity>
         <activity android:name=".VideoPlayer" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>

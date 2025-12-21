@@ -7,6 +7,19 @@
     tools:context=".MainActivity">
 
     <Button
+        android:id="@+id/mediatailor_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="20dp"
+        android:layout_marginEnd="20dp"
+        android:text="AWS MediaTailor"
+        app:backgroundTint="#FF5722"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/video3" />
+
+    <Button
         android:id="@+id/video4"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -18,7 +31,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="1.0"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/video3" />
+        app:layout_constraintTop_toBottomOf="@+id/mediatailor_button" />
 
     <Button
         android:id="@+id/video0"
