@@ -10,6 +10,9 @@ import androidx.media3.exoplayer.hls.HlsManifest;
 import androidx.media3.exoplayer.hls.playlist.HlsMediaPlaylist;
 
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
+import com.newrelic.videoagent.mediatailor.utils.ManifestParser;
+import com.newrelic.videoagent.mediatailor.utils.MediaTailorConstants;
+import com.newrelic.videoagent.mediatailor.utils.NetworkUtils;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -40,17 +43,13 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
 
     private static final String TAG = "NRMediaTailorTracker";
 
-    // Stream types
-    private static final String STREAM_TYPE_VOD = "vod";
-    private static final String STREAM_TYPE_LIVE = "live";
-
-    // Manifest types
-    private static final String MANIFEST_TYPE_HLS = "hls";
-    private static final String MANIFEST_TYPE_DASH = "dash";
-
-    // Configuration
-    private static final long LIVE_POLL_INTERVAL_MS = 10000; // 10 seconds
-    private static final int TRACKING_TIMEOUT_MS = 5000;
+    // Import constants from utility class
+    private static final String STREAM_TYPE_VOD = MediaTailorConstants.STREAM_TYPE_VOD;
+    private static final String STREAM_TYPE_LIVE = MediaTailorConstants.STREAM_TYPE_LIVE;
+    private static final String MANIFEST_TYPE_HLS = MediaTailorConstants.MANIFEST_TYPE_HLS;
+    private static final String MANIFEST_TYPE_DASH = MediaTailorConstants.MANIFEST_TYPE_DASH;
+    private static final long LIVE_POLL_INTERVAL_MS = MediaTailorConstants.DEFAULT_LIVE_TRACKING_POLL_INTERVAL_MS;
+    private static final int TRACKING_TIMEOUT_MS = MediaTailorConstants.DEFAULT_TRACKING_API_TIMEOUT_MS;
 
     protected ExoPlayer player;
 
@@ -78,7 +77,7 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
     private Runnable timeUpdateRunnable;
 
     // Time update monitoring (equivalent to videoJS timeupdate event)
-    private static final long TIME_UPDATE_INTERVAL_MS = 250; // Check every 250ms like videoJS
+    private static final long TIME_UPDATE_INTERVAL_MS = MediaTailorConstants.DEFAULT_TIME_UPDATE_INTERVAL_MS;
 
     /**
      * Checks if tracker should be used for this player source
@@ -406,14 +405,78 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
     }
 
     /**
-     * Parse manifest for ad breaks
-     * Note: ExoPlayer Media3 doesn't expose HLS playlist directly,
-     * so we'll need to track via timeupdate and player events
+     * Parse HLS manifest for ad breaks using SCTE-35 markers
+     * Delegates to ManifestParser utility class
      */
     private void parseManifestForAds() {
-        // TODO: Implement manifest parsing
-        // For now, rely on tracking API and timeupdate detection
-        Log.d(TAG, "Manifest parsing - relying on tracking API");
+        if (!enableManifestParsing || manifestType == null || !manifestType.equals(MANIFEST_TYPE_HLS)) {
+            Log.d(TAG, "Manifest parsing disabled or not HLS");
+            return;
+        }
+
+        if (mediaTailorEndpoint == null) {
+            Log.w(TAG, "No manifest URL available for parsing");
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                Log.d(TAG, "Fetching and parsing HLS manifest: " + mediaTailorEndpoint);
+
+                // Fetch manifest using NetworkUtils
+                String manifestText = NetworkUtils.fetchText(mediaTailorEndpoint, TRACKING_TIMEOUT_MS);
+
+                if (manifestText != null) {
+                    // Check if this is a master playlist (contains variant streams)
+                    if (ManifestParser.isMasterPlaylist(manifestText)) {
+                        Log.d(TAG, "Master playlist detected - fetching variant stream for SCTE-35 markers");
+
+                        // Extract first variant stream URL
+                        String variantUrl = ManifestParser.extractFirstVariantUrl(manifestText, mediaTailorEndpoint);
+
+                        if (variantUrl != null) {
+                            // Fetch the variant playlist (contains SCTE-35 markers)
+                            String variantText = NetworkUtils.fetchText(variantUrl, TRACKING_TIMEOUT_MS);
+
+                            if (variantText != null) {
+                                // Parse the variant playlist for ads
+                                parseMediaPlaylist(variantText);
+                            } else {
+                                Log.w(TAG, "Failed to fetch variant playlist");
+                            }
+                        } else {
+                            Log.w(TAG, "Could not extract variant URL from master playlist");
+                        }
+                    } else {
+                        // This is already a media playlist - parse directly
+                        Log.d(TAG, "Media playlist detected - parsing for SCTE-35 markers");
+                        parseMediaPlaylist(manifestText);
+                    }
+                } else {
+                    Log.w(TAG, "Failed to fetch manifest");
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error parsing manifest", e);
+            }
+        }).start();
+    }
+
+    /**
+     * Parse media playlist for SCTE-35 markers
+     */
+    private void parseMediaPlaylist(String manifestText) {
+        // Parse using ManifestParser
+        List<AdBreak> manifestAdBreaks = ManifestParser.parseHLSManifest(manifestText);
+
+        if (manifestAdBreaks.size() > 0) {
+            Log.d(TAG, "Parsed " + manifestAdBreaks.size() + " ad break(s) from manifest");
+
+            // Merge with existing schedule (from tracking API)
+            adSchedule = ManifestParser.mergeAdSchedules(adSchedule, manifestAdBreaks);
+        } else {
+            Log.d(TAG, "No ad breaks found in manifest");
+        }
     }
 
     /**
@@ -519,8 +582,13 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
                     adSchedule.add(adBreak);
                 }
 
-                // Sort by start time
-                adSchedule.sort((a, b) -> Double.compare(a.startTime, b.startTime));
+                // Sort by start time (using Collections.sort for API 16+ compatibility)
+                java.util.Collections.sort(adSchedule, new java.util.Comparator<AdBreak>() {
+                    @Override
+                    public int compare(AdBreak a, AdBreak b) {
+                        return Double.compare(a.startTime, b.startTime);
+                    }
+                });
 
                 Log.d(TAG, "Ad schedule updated: " + adSchedule.size() + " ad break(s)");
 
@@ -541,18 +609,6 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
             Log.e(TAG, "Error processing tracking metadata", e);
         }
     }
-
-    /**
-     * Note: We don't use onPositionDiscontinuity for SSAI ad detection
-     *
-     * SSAI (Server-Side Ad Insertion) streams have ads seamlessly stitched into the manifest,
-     * so there are no position discontinuities. Instead, we use time-based detection:
-     * 1. Parse manifest for SCTE-35 markers (CUE-OUT/CUE-IN) to build ad schedule
-     * 2. Poll currentTime periodically (every 250ms via onTimeUpdate)
-     * 3. Compare currentTime against ad schedule to detect ad breaks
-     *
-     * This matches the videoJS MediaTailor implementation approach.
-     */
 
     /**
      * Find active ad break for current time
@@ -815,33 +871,33 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
      * Represents an ad break (avail)
      */
     public static class AdBreak {
-        String id;
-        double startTime;
-        double duration;
-        double endTime;
-        String source;
-        String adPosition;
-        boolean hasFiredStart = false;
-        boolean hasFiredEnd = false;
-        boolean hasFiredAdStart = false;
-        boolean hasFiredQ1 = false;
-        boolean hasFiredQ2 = false;
-        boolean hasFiredQ3 = false;
-        List<AdPod> pods = new ArrayList<>();
+        public String id;
+        public double startTime;
+        public double duration;
+        public double endTime;
+        public String source;
+        public String adPosition;
+        public boolean hasFiredStart = false;
+        public boolean hasFiredEnd = false;
+        public boolean hasFiredAdStart = false;
+        public boolean hasFiredQ1 = false;
+        public boolean hasFiredQ2 = false;
+        public boolean hasFiredQ3 = false;
+        public List<AdPod> pods = new ArrayList<>();
     }
 
     /**
      * Represents an individual ad within a break (pod)
      */
     public static class AdPod {
-        String title;
-        String creativeId;
-        double startTime;
-        double duration;
-        double endTime;
-        boolean hasFiredStart = false;
-        boolean hasFiredQ1 = false;
-        boolean hasFiredQ2 = false;
-        boolean hasFiredQ3 = false;
+        public String title;
+        public String creativeId;
+        public double startTime;
+        public double duration;
+        public double endTime;
+        public boolean hasFiredStart = false;
+        public boolean hasFiredQ1 = false;
+        public boolean hasFiredQ2 = false;
+        public boolean hasFiredQ3 = false;
     }
 }
