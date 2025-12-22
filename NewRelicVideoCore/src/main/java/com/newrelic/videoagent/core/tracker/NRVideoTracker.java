@@ -52,6 +52,7 @@ public class NRVideoTracker extends NRTracker {
     // Startup time calculation fields - capture actual event timestamps
     private Long contentRequestTimestamp;
     private Long contentStartTimestamp;
+    private Long startupPeriodAdTime; // Ad time that occurred during startup period
 
     // Time-weighted bitrate calculation fields
     private Long qoeCurrentBitrate;
@@ -89,6 +90,7 @@ public class NRVideoTracker extends NRTracker {
         // Initialize startup time calculation fields
         contentRequestTimestamp = null;
         contentStartTimestamp = null;
+        startupPeriodAdTime = 0L;
 
         // Initialize time-weighted bitrate tracking
         qoeCurrentBitrate = null;
@@ -311,6 +313,8 @@ public class NRVideoTracker extends NRTracker {
                 state.chrono.start();
                 if (linkedTracker instanceof NRVideoTracker) {
                     totalAdPlaytime = ((NRVideoTracker)linkedTracker).getTotalAdPlaytime();
+                    // Store ad time for startup calculation (covers pre-roll scenario)
+                    startupPeriodAdTime = totalAdPlaytime;
                 }
                 numberOfVideos++;
 
@@ -553,8 +557,16 @@ public class NRVideoTracker extends NRTracker {
 
         // startupTime - Calculate once during first QOE_AGGREGATE event and cache for reuse
         if (qoeStartupTime == null && contentRequestTimestamp != null && contentStartTimestamp != null) {
-            // Calculate startup time = CONTENT_START timestamp - CONTENT_REQUEST timestamp
-            qoeStartupTime = contentStartTimestamp - contentRequestTimestamp;
+            long rawStartupTime = contentStartTimestamp - contentRequestTimestamp;
+
+            // For content trackers only - exclude ad time from startup calculation
+            if (!state.isAd && startupPeriodAdTime != null && startupPeriodAdTime > 0) {
+                // Apply JavaScript pattern: max(rawTime - adTime, 0)
+                qoeStartupTime = Math.max(rawStartupTime - startupPeriodAdTime, 0L);
+            } else {
+                // No ads or ad tracker itself - use raw calculation
+                qoeStartupTime = rawStartupTime;
+            }
         }
 
         // Include cached startup time if available
@@ -672,6 +684,7 @@ public class NRVideoTracker extends NRTracker {
         // Reset startup time calculation fields
         contentRequestTimestamp = null;
         contentStartTimestamp = null;
+        startupPeriodAdTime = null;
 
         // Reset time-weighted bitrate fields
         qoeCurrentBitrate = null;
@@ -1253,6 +1266,5 @@ public class NRVideoTracker extends NRTracker {
         updatePlaytime();
         super.sendVideoErrorEvent(action, attributes);
     }
-
 
 }
