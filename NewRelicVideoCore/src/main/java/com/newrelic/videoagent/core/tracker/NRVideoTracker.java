@@ -52,6 +52,7 @@ public class NRVideoTracker extends NRTracker {
     // Startup time calculation fields - capture actual event timestamps
     private Long contentRequestTimestamp;
     private Long contentStartTimestamp;
+    private Long contentErrorTimestamp; // Timestamp when content error occurred (for startup failures)
     private Long startupPeriodAdTime; // Ad time that occurred during startup period
 
     // Time-weighted bitrate calculation fields
@@ -90,6 +91,7 @@ public class NRVideoTracker extends NRTracker {
         // Initialize startup time calculation fields
         contentRequestTimestamp = null;
         contentStartTimestamp = null;
+        contentErrorTimestamp = null;
         startupPeriodAdTime = 0L;
 
         // Initialize time-weighted bitrate tracking
@@ -556,16 +558,27 @@ public class NRVideoTracker extends NRTracker {
         }
 
         // startupTime - Calculate once during first QOE_AGGREGATE event and cache for reuse
-        if (qoeStartupTime == null && contentRequestTimestamp != null && contentStartTimestamp != null) {
-            long rawStartupTime = contentStartTimestamp - contentRequestTimestamp;
+        if (qoeStartupTime == null && contentRequestTimestamp != null) {
+            Long endTimestamp = null;
 
-            // For content trackers only - exclude ad time from startup calculation
-            if (!state.isAd && startupPeriodAdTime != null && startupPeriodAdTime > 0) {
-                // Apply JavaScript pattern: max(rawTime - adTime, 0)
-                qoeStartupTime = Math.max(rawStartupTime - startupPeriodAdTime, 0L);
-            } else {
-                // No ads or ad tracker itself - use raw calculation
-                qoeStartupTime = rawStartupTime;
+            // Determine end timestamp: use contentStartTimestamp (success) or contentErrorTimestamp (failure)
+            if (contentStartTimestamp != null) {
+                endTimestamp = contentStartTimestamp; // Normal startup success
+            } else if (contentErrorTimestamp != null) {
+                endTimestamp = contentErrorTimestamp; // Startup failure - time to error
+            }
+
+            if (endTimestamp != null) {
+                long rawStartupTime = endTimestamp - contentRequestTimestamp;
+
+                // For content trackers only - exclude ad time from startup calculation
+                if (!state.isAd && startupPeriodAdTime != null && startupPeriodAdTime > 0) {
+                    // Apply JavaScript pattern: max(rawTime - adTime, 0)
+                    qoeStartupTime = Math.max(rawStartupTime - startupPeriodAdTime, 0L);
+                } else {
+                    // No ads or ad tracker itself - use raw calculation
+                    qoeStartupTime = rawStartupTime > 0 ? rawStartupTime : 0L;
+                }
             }
         }
 
@@ -580,9 +593,9 @@ public class NRVideoTracker extends NRTracker {
         }
 
         // hadStartupFailure - Boolean indicating if CONTENT_ERROR occurred before CONTENT_START
-        // Note: This metric is calculated by the built-in timing system based on timing entries
-        // If timeSinceStarted is not available in the final event, it indicates startup failure
-        kpiAttributes.put("hadStartupFailure", false); // Will be overridden if no timeSinceStarted in final event
+        // True when we have contentErrorTimestamp but no contentStartTimestamp
+        boolean hadStartupFailure = (contentErrorTimestamp != null && contentStartTimestamp == null);
+        kpiAttributes.put("hadStartupFailure", hadStartupFailure);
 
         // hadPlaybackFailure - Boolean indicating if CONTENT_ERROR occurred at any time during content playback
         kpiAttributes.put("hadPlaybackFailure", qoeHadPlaybackFailure);
@@ -684,6 +697,7 @@ public class NRVideoTracker extends NRTracker {
         // Reset startup time calculation fields
         contentRequestTimestamp = null;
         contentStartTimestamp = null;
+        contentErrorTimestamp = null;
         startupPeriodAdTime = null;
 
         // Reset time-weighted bitrate fields
@@ -721,6 +735,11 @@ public class NRVideoTracker extends NRTracker {
         if (state.isAd) {
             actionName = AD_ERROR;
         } else {
+            // QoE: Capture CONTENT_ERROR timestamp for startup time calculation
+            if (contentErrorTimestamp == null) {
+                contentErrorTimestamp = System.currentTimeMillis();
+            }
+
             // QoE: Track playback errors for content (errors after CONTENT_START)
             Map<String, Object> currentAttributes = getAttributes(actionName, null);
             Object timeSinceStarted = currentAttributes.get("timeSinceStarted");
@@ -728,8 +747,6 @@ public class NRVideoTracker extends NRTracker {
                 // Error occurred after CONTENT_START, so it's a playback failure
                 qoeHadPlaybackFailure = true;
             }
-            // Note: Startup failures cannot be reported via QoE aggregate since
-            // no heartbeat events are sent after CONTENT_ERROR before CONTENT_START
         }
         sendVideoErrorEvent(actionName, errAttr);
     }
