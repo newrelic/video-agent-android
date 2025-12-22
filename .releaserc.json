@@ -1,5 +1,5 @@
 {
-  "branches": ["master","fix/staging-config"],
+  "branches": ["master"],
   "plugins": [
     [
       "@semantic-release/commit-analyzer",

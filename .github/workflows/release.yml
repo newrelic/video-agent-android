@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - fix/staging-config
   workflow_dispatch:
 
 permissions:
@@ -33,7 +32,7 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm install -g semantic-release @semantic-release/exec @semantic-release/changelog @semantic-release/git conventional-changelog-conventionalcommits
+        run: npm install -g semantic-release @semantic-release/exec @semantic-release/changelog @semantic-release/git conventional-changelog-conventionalcommits conventional-changelog-cli
 
       - name: Configure Git
         run: |
@@ -109,8 +108,18 @@ jobs:
       - name: Generate Changelog
         if: steps.get_version.outputs.should_create_pr == 'true' && steps.check_branch.outputs.branch_exists == 'false'
         run: |
-          npx semantic-release --no-ci 2>&1 | tee release-output.txt || true
-          cat release-output.txt
+          VERSION="${{ steps.get_version.outputs.next_version }}"
+          echo "Generating changelog for version $VERSION..."
+          
+          # Create a temporary context file to force the correct version header
+          echo '{"version":"'${VERSION}'"}' > context.json
+          
+          # Generate changelog updates and save to files without tagging
+          npx conventional-changelog-cli -p conventionalcommits -i CHANGELOG.md -s --context context.json
+          
+          rm context.json
+          echo "CHANGELOG.md updated successfully."
+        
 
       - name: Commit changes
         if: steps.get_version.outputs.should_create_pr == 'true' && steps.check_branch.outputs.branch_exists == 'false'
