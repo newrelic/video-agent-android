@@ -641,19 +641,28 @@ public class NRVideoTracker extends NRTracker {
     private void updateTimeWeightedBitrate(Long newBitrate) {
         long currentTime = System.currentTimeMillis();
 
+        // Safety check: ensure fields are initialized
+        if (qoeTotalBitrateWeightedTime == null) qoeTotalBitrateWeightedTime = 0L;
+        if (qoeTotalActiveTime == null) qoeTotalActiveTime = 0L;
+
         // If we have a previous bitrate and timing, accumulate its weighted time
-        if (qoeCurrentBitrate != null && qoeLastRenditionChangeTime != null) {
-            long segmentDuration = currentTime - qoeLastRenditionChangeTime;
-            if (segmentDuration > 0) {
-                // Accumulate weighted bitrate-time (bitrate * duration)
-                qoeTotalBitrateWeightedTime += qoeCurrentBitrate * segmentDuration;
-                qoeTotalActiveTime += segmentDuration;
+        if (qoeCurrentBitrate != null && qoeLastRenditionChangeTime != null && qoeCurrentBitrate > 0) {
+            // Ensure valid timestamps
+            if (qoeLastRenditionChangeTime > 0 && currentTime >= qoeLastRenditionChangeTime) {
+                long segmentDuration = currentTime - qoeLastRenditionChangeTime;
+                if (segmentDuration > 0) {
+                    // Prevent overflow in multiplication
+                    if (qoeCurrentBitrate <= Long.MAX_VALUE / segmentDuration) {
+                        qoeTotalBitrateWeightedTime += qoeCurrentBitrate * segmentDuration;
+                        qoeTotalActiveTime += segmentDuration;
+                    }
+                }
             }
         }
 
-        // Update current tracking values
+        // Update current tracking values (accept null/zero values for reset scenarios)
         qoeCurrentBitrate = newBitrate;
-        qoeLastRenditionChangeTime = currentTime;
+        qoeLastRenditionChangeTime = (currentTime > 0) ? currentTime : System.currentTimeMillis();
     }
 
     /**
@@ -663,35 +672,44 @@ public class NRVideoTracker extends NRTracker {
      * @return Time-weighted average bitrate, or null if no data available
      */
     private Long calculateTimeWeightedAverageBitrate() {
+        // Safety check: ensure required fields are properly initialized
+        if (qoeTotalBitrateWeightedTime == null) qoeTotalBitrateWeightedTime = 0L;
+        if (qoeTotalActiveTime == null) qoeTotalActiveTime = 0L;
+
         // Include current segment in calculation
         if (qoeCurrentBitrate != null && qoeLastRenditionChangeTime != null && qoeCurrentBitrate > 0) {
             long currentTime = System.currentTimeMillis();
-            long currentSegmentDuration = currentTime - qoeLastRenditionChangeTime;
 
-            // Include current segment if it has meaningful duration
-            if (currentSegmentDuration > 0) {
-                long totalWeightedTime = qoeTotalBitrateWeightedTime + (qoeCurrentBitrate * currentSegmentDuration);
-                long totalTime = qoeTotalActiveTime + currentSegmentDuration;
+            // Safety check: ensure valid timestamp
+            if (qoeLastRenditionChangeTime > 0 && currentTime >= qoeLastRenditionChangeTime) {
+                long currentSegmentDuration = currentTime - qoeLastRenditionChangeTime;
 
-                if (totalTime > 0) {
-                    return totalWeightedTime / totalTime;
+                // Include current segment if it has meaningful duration
+                if (currentSegmentDuration > 0) {
+                    // Prevent overflow in multiplication
+                    if (qoeCurrentBitrate <= Long.MAX_VALUE / currentSegmentDuration) {
+                        long totalWeightedTime = qoeTotalBitrateWeightedTime + (qoeCurrentBitrate * currentSegmentDuration);
+                        long totalTime = qoeTotalActiveTime + currentSegmentDuration;
+
+                        if (totalTime > 0) {
+                            return totalWeightedTime / totalTime;
+                        }
+                    }
                 }
-            }
-            // If current segment has zero duration, check if we have accumulated data with current bitrate
-            else if (qoeTotalActiveTime > 0) {
-                // For zero-duration edge case, use accumulated data but ensure current bitrate contributes
-                // if we have accumulated time but no current segment duration
-                return qoeTotalBitrateWeightedTime / qoeTotalActiveTime;
-            }
-            // If we have current bitrate but no accumulated time and zero segment duration,
-            // return current bitrate as the average (single point average)
-            else if (qoeTotalActiveTime == 0 && currentSegmentDuration == 0) {
-                return qoeCurrentBitrate;
+                // If current segment has zero duration, check if we have accumulated data
+                else if (qoeTotalActiveTime > 0) {
+                    return qoeTotalBitrateWeightedTime / qoeTotalActiveTime;
+                }
+                // If we have current bitrate but no accumulated time and zero segment duration,
+                // return current bitrate as the average (single point average)
+                else if (qoeTotalActiveTime == 0 && currentSegmentDuration == 0) {
+                    return qoeCurrentBitrate;
+                }
             }
         }
 
         // Fallback to accumulated data only
-        if (qoeTotalActiveTime > 0) {
+        if (qoeTotalActiveTime != null && qoeTotalActiveTime > 0 && qoeTotalBitrateWeightedTime != null) {
             return qoeTotalBitrateWeightedTime / qoeTotalActiveTime;
         }
 
@@ -1174,10 +1192,14 @@ public class NRVideoTracker extends NRTracker {
             return "pause";
         }
 
-        // Classify as "initial" only if content hasn't started yet AND playhead is very early
+        // Enhanced initial buffer classification: combine content start state with playhead position
         // This prevents misclassifying early connection issues as initial buffering
-        if (!hasContentStarted && playhead < 100) {
-            return "initial";
+        if (playhead < 100) {
+            // If content hasn't started yet, this is likely initial buffering
+            // If content has started, use stricter criteria (very early playhead)
+            if (!hasContentStarted || playhead < 10) {
+                return "initial";
+            }
         }
 
         // If none of the above is true, it is a connection buffering
