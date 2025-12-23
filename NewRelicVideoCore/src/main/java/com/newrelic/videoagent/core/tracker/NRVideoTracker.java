@@ -629,6 +629,9 @@ public class NRVideoTracker extends NRTracker {
             kpiAttributes.put("averageBitrate", averageBitrate);
         }
 
+        // qoeAggregateVersion - Version identifier for QOE calculation algorithm
+        kpiAttributes.put("qoeAggregateVersion", "1.0.0");
+
         return kpiAttributes;
     }
 
