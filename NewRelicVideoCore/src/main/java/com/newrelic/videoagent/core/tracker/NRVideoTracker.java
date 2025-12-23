@@ -54,6 +54,7 @@ public class NRVideoTracker extends NRTracker {
     private Long contentStartTimestamp;
     private Long contentErrorTimestamp; // Timestamp when content error occurred (for startup failures)
     private Long startupPeriodAdTime; // Ad time that occurred during startup period
+    private boolean hasContentStarted; // Tracks whether content has successfully started (for buffer classification)
 
     // Time-weighted bitrate calculation fields
     private Long qoeCurrentBitrate;
@@ -93,6 +94,7 @@ public class NRVideoTracker extends NRTracker {
         contentStartTimestamp = null;
         contentErrorTimestamp = null;
         startupPeriodAdTime = 0L;
+        hasContentStarted = false;
 
         // Initialize time-weighted bitrate tracking
         qoeCurrentBitrate = null;
@@ -324,6 +326,9 @@ public class NRVideoTracker extends NRTracker {
                 if (contentStartTimestamp == null) {
                     contentStartTimestamp = System.currentTimeMillis();
                 }
+
+                // QoE: Mark that content has successfully started (for buffer type classification)
+                hasContentStarted = true;
 
                 sendVideoEvent(CONTENT_START);
             }
@@ -582,8 +587,8 @@ public class NRVideoTracker extends NRTracker {
             }
         }
 
-        // Include cached startup time if available
-        if (qoeStartupTime != null && qoeStartupTime > 0) {
+        // Include cached startup time if available (including zero for instant startup)
+        if (qoeStartupTime != null && qoeStartupTime >= 0) {
             kpiAttributes.put("startupTime", qoeStartupTime);
         }
 
@@ -659,17 +664,29 @@ public class NRVideoTracker extends NRTracker {
      */
     private Long calculateTimeWeightedAverageBitrate() {
         // Include current segment in calculation
-        if (qoeCurrentBitrate != null && qoeLastRenditionChangeTime != null) {
+        if (qoeCurrentBitrate != null && qoeLastRenditionChangeTime != null && qoeCurrentBitrate > 0) {
             long currentTime = System.currentTimeMillis();
             long currentSegmentDuration = currentTime - qoeLastRenditionChangeTime;
 
-            if (currentSegmentDuration > 0 && qoeCurrentBitrate > 0) {
+            // Include current segment if it has meaningful duration
+            if (currentSegmentDuration > 0) {
                 long totalWeightedTime = qoeTotalBitrateWeightedTime + (qoeCurrentBitrate * currentSegmentDuration);
                 long totalTime = qoeTotalActiveTime + currentSegmentDuration;
 
                 if (totalTime > 0) {
                     return totalWeightedTime / totalTime;
                 }
+            }
+            // If current segment has zero duration, check if we have accumulated data with current bitrate
+            else if (qoeTotalActiveTime > 0) {
+                // For zero-duration edge case, use accumulated data but ensure current bitrate contributes
+                // if we have accumulated time but no current segment duration
+                return qoeTotalBitrateWeightedTime / qoeTotalActiveTime;
+            }
+            // If we have current bitrate but no accumulated time and zero segment duration,
+            // return current bitrate as the average (single point average)
+            else if (qoeTotalActiveTime == 0 && currentSegmentDuration == 0) {
+                return qoeCurrentBitrate;
             }
         }
 
@@ -699,6 +716,7 @@ public class NRVideoTracker extends NRTracker {
         contentStartTimestamp = null;
         contentErrorTimestamp = null;
         startupPeriodAdTime = null;
+        hasContentStarted = false;
 
         // Reset time-weighted bitrate fields
         qoeCurrentBitrate = null;
@@ -1156,8 +1174,9 @@ public class NRVideoTracker extends NRTracker {
             return "pause";
         }
 
-        //NOTE: the player starts counting contentPlayhead after buffering ends, and by the time we calculate BUFFER_END, playhead can be a bit higher than zero (few milliseconds).
-        if (playhead < 10) {
+        // Classify as "initial" only if content hasn't started yet AND playhead is very early
+        // This prevents misclassifying early connection issues as initial buffering
+        if (!hasContentStarted && playhead < 100) {
             return "initial";
         }
 
