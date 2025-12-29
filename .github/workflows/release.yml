@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - master
-      - feature-test
+      - testing-feature
   workflow_dispatch:
 
 permissions:
