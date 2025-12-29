@@ -6,7 +6,7 @@ on:
       - closed
     branches:
       - master
-      - staging
+      - testing-feature
 
 permissions:
   contents: write
@@ -37,26 +37,25 @@ jobs:
           echo "Detected Version: $VERSION"
           TAG_NAME="v$VERSION"
           
-          # Output for next steps
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          # 2. Extract Changelog for this version
+          # We initialize NOTES as empty
+          NOTES=""
+          
+          if [ -f CHANGELOG.md ]; then
+            echo "CHANGELOG.md found. Extracting notes for $VERSION..."
+            # This command extracts the text between the current version header and the next one
+            NOTES=$(sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$ d')
+          else
+            echo "Warning: CHANGELOG.md not found."
+          fi
+          
+          # 3. Log extracted notes
+          echo "Extracted notes:"
+          echo "$NOTES"
 
-          # 2. Create the GitHub Release
+          # 4. Create the GitHub Release AND Tag
+          # We use the extracted "$NOTES" here
           gh release create "$TAG_NAME" \
             --title "$TAG_NAME" \
-            --notes "Automated release for version $TAG_NAME. See CHANGELOG.md for details." \
+            --notes "$NOTES" \
             --target ${{ github.base_ref }}
-
-      - name: Delete release branch
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION="${{ steps.create_release.outputs.version }}"
-          RELEASE_BRANCH="release/${VERSION}"
-          
-          # Check if branch exists before deleting
-          if git ls-remote --exit-code --heads origin "$RELEASE_BRANCH" >/dev/null 2>&1; then
-            echo "Deleting release branch: $RELEASE_BRANCH"
-            git push origin --delete "$RELEASE_BRANCH"
-          else
-            echo "Release branch $RELEASE_BRANCH already deleted."
-          fi
