@@ -6,6 +6,7 @@ on:
       - closed
     branches:
       - master
+      - testing-feature
 
 permissions:
   contents: write
