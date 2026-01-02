@@ -6,7 +6,6 @@ on:
       - closed
     branches:
       - master
-      - test/commt-msg
 
 permissions:
   contents: write
