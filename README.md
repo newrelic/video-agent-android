@@ -217,3 +217,5 @@ Important: Ingesting video telemetry data via this video agent requires a subscr
 
 New Relic Video Agent is licensed under the [Apache 2.0](http://apache.org/licenses/LICENSE-2.0.txt) License.
  
+
+
