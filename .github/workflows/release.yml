@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - test/commt-msg
   workflow_dispatch:
 
 permissions:
