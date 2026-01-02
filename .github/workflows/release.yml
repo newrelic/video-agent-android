@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - master
-      - fix/staging-config
+      - test/commt-msg
   workflow_dispatch:
 
 permissions:
