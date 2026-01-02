@@ -1,0 +1,58 @@
+#!/bin/bash
+
+# Conventional Commits Validation Hook
+# This hook validates commit messages follow the conventional commits format
+
+commit_msg=$(cat "$1")
+
+# Skip merge commits
+if echo "$commit_msg" | grep -qE "^Merge "; then
+    exit 0
+fi
+
+# Regex pattern for conventional commits
+# Format: <type>(<scope>)?: <subject>
+# Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+pattern="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?(!)?: .+"
+
+if ! echo "$commit_msg" | grep -qE "$pattern"; then
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "❌ ERROR: Invalid commit message format!"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "Your message:"
+    echo "  $commit_msg"
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Valid format: <type>(<scope>)?: <subject>"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "Allowed types:"
+    echo "  feat:      New feature (MINOR version bump)"
+    echo "  fix:       Bug fix (PATCH version bump)"
+    echo "  docs:      Documentation only"
+    echo "  style:     Formatting, no code change"
+    echo "  refactor: Code restructuring"
+    echo "  perf:     Performance improvement"
+    echo "  test:     Adding tests"
+    echo "  build:    Build system changes"
+    echo "  ci:       CI/CD changes"
+    echo "  chore:    Maintenance tasks"
+    echo "  revert:   Revert changes"
+    echo ""
+    echo "Breaking changes (MAJOR version bump):"
+    echo "  feat!:    Breaking feature change"
+    echo "  fix!:     Breaking bug fix"
+    echo ""
+    echo "Examples:"
+    echo "  fix: resolve null pointer exception"
+    echo "  feat: add video tracking capability"
+    echo "  feat(player): add seek functionality"
+    echo "  feat!: redesign tracking API "
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    exit 1
+fi
+
+exit 0

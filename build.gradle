@@ -27,3 +27,16 @@ allprojects {
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+
+// Install Git commit-msg hook for conventional commits validation
+task installGitHook(type: Copy) {
+    description 'Installs the commit-msg hook for conventional commits validation'
+    from new File(rootProject.rootDir, 'scripts/commit-msg')
+    into new File(rootProject.rootDir, '.git/hooks')
+    fileMode 0755
+}
+
+// Run hook installation before build
+tasks.matching { it.name == 'preBuild' }.configureEach {
+    dependsOn installGitHook
+}
