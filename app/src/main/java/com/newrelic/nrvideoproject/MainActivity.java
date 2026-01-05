@@ -34,6 +34,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         findViewById(R.id.video1).setOnClickListener(this);
         findViewById(R.id.video2).setOnClickListener(this);
         findViewById(R.id.video3).setOnClickListener(this);
+
+        // MediaTailor button - launches MediaTailor player with auto-start
+        findViewById(R.id.mediatailor_button).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent = new Intent(MainActivity.this, VideoPlayerMediaTailor.class);
+                intent.putExtra("autoplay", true);
+                startActivity(intent);
+            }
+        });
+
         findViewById(R.id.video4).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
