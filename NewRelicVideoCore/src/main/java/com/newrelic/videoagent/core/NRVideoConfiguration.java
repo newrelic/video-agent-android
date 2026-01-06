@@ -42,6 +42,7 @@ public final class NRVideoConfiguration {
     private final boolean memoryOptimized;
     private final boolean debugLoggingEnabled;
     private final boolean isTV;
+    private final String collectorAddress;
 
     // Performance optimization constants
     private static final int DEFAULT_HARVEST_CYCLE_SECONDS = 5 * 60; // 5 minutes
@@ -78,6 +79,7 @@ public final class NRVideoConfiguration {
         this.memoryOptimized = builder.memoryOptimized;
         this.debugLoggingEnabled = builder.debugLoggingEnabled;
         this.isTV = builder.isTV;
+        this.collectorAddress = builder.collectorAddress;
     }
 
     // Immutable getters
@@ -91,6 +93,7 @@ public final class NRVideoConfiguration {
     public boolean isMemoryOptimized() { return memoryOptimized; }
     public boolean isDebugLoggingEnabled() { return debugLoggingEnabled; }
     public boolean isTV() { return isTV; }
+    public String getCollectorAddress() { return collectorAddress; }
 
     /**
      * Get dead letter retry interval in milliseconds
@@ -107,41 +110,56 @@ public final class NRVideoConfiguration {
     }
 
     /**
-     * Enterprise-grade region identification with multiple fallback strategies
-     * Thread-safe and optimized for performance
+     * Parse region code from application token prefix
+     * Matches NewRelic iOS Agent pattern: extracts region prefix before 'x'
+     * Examples: "EUxABCD..." -> "EU", "APxABCD..." -> "AP", "AA..." -> ""
+     */
+    private static String parseRegionFromToken(String applicationToken) {
+        if (applicationToken == null || applicationToken.length() < 3) {
+            return "";
+        }
+
+        // Find the first 'x' in the token
+        int xIndex = applicationToken.indexOf('x');
+        if (xIndex == -1) {
+            return ""; // No region prefix found
+        }
+
+        // Extract everything before the first 'x'
+        String regionCode = applicationToken.substring(0, xIndex);
+
+        // Remove any trailing 'x' characters
+        while (regionCode.length() > 0 && regionCode.charAt(regionCode.length() - 1) == 'x') {
+            regionCode = regionCode.substring(0, regionCode.length() - 1);
+        }
+
+        return regionCode;
+    }
+
+    /**
+     * Identify region with proper token parsing and fallback logic
+     * Behavior similar to NewRelic iOS Agent's NRMAAgentConfiguration
      */
     private static String identifyRegion(String applicationToken) {
         if (applicationToken == null || applicationToken.length() < 10) {
             return "US"; // Safe default
         }
 
-        String cleanToken = applicationToken.trim().toLowerCase();
+        // First, try to parse region from token prefix (e.g., "EUx", "APx")
+        String regionCode = parseRegionFromToken(applicationToken);
 
-        // Strategy 1: Direct prefix matching (most reliable)
-        for (Map.Entry<String, String> entry : REGION_MAPPINGS.entrySet()) {
-            String regionKey = entry.getKey().toLowerCase();
-            if (cleanToken.startsWith(regionKey) || cleanToken.contains("-" + regionKey + "-")) {
-                return entry.getValue();
+        if (regionCode != null && regionCode.length() > 0) {
+            // Convert region code to uppercase and validate
+            String upperRegion = regionCode.toUpperCase();
+
+            // Map region codes to standard regions
+            String mappedRegion = REGION_MAPPINGS.get(upperRegion);
+            if (mappedRegion != null) {
+                return mappedRegion;
             }
         }
 
-        // Strategy 2: Token structure analysis
-        if (cleanToken.length() >= 40) { // Standard NR token length
-            // EU tokens often have specific patterns
-            if (cleanToken.contains("eu") || cleanToken.contains("europe")) {
-                return "EU";
-            }
-            // AP tokens often have specific patterns
-            if (cleanToken.contains("ap") || cleanToken.contains("asia") || cleanToken.contains("pacific")) {
-                return "AP";
-            }
-            // Gov tokens have specific patterns
-            if (cleanToken.contains("gov") || cleanToken.contains("fed")) {
-                return "GOV";
-            }
-        }
-
-        // Strategy 3: Default to US for production stability
+        // Default to US for standard tokens without region prefix
         return "US";
     }
 
@@ -158,6 +176,7 @@ public final class NRVideoConfiguration {
         private boolean memoryOptimized = true;
         private boolean debugLoggingEnabled = false;
         private boolean isTV = false;
+        private String collectorAddress = null;
 
         public Builder(String applicationToken) {
             this.applicationToken = applicationToken;
@@ -232,6 +251,16 @@ public final class NRVideoConfiguration {
 
         public Builder enableLogging() {
             this.debugLoggingEnabled = true;
+            return this;
+        }
+
+        /**
+         * Set custom collector domain address for /connect and /data endpoints (optional)
+         * Example: "staging-mobile-collector.newrelic.com" or "mobile-collector.newrelic.com"
+         * If not set, will be auto-detected from application token region
+         */
+        public Builder withCollectorAddress(String collectorAddress) {
+            this.collectorAddress = collectorAddress;
             return this;
         }
 

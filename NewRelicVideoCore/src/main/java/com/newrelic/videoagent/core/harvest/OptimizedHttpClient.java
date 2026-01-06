@@ -40,10 +40,9 @@ public class OptimizedHttpClient implements HttpClientInterface {
 
     static {
         REGIONAL_ENDPOINTS.put("US", "https://mobile-collector.newrelic.com/mobile/v3/data");
-        REGIONAL_ENDPOINTS.put("EU", "https://mobile-collector.eu.newrelic.com/mobile/v3/data");
-        REGIONAL_ENDPOINTS.put("AP", "https://mobile-collector.ap.newrelic.com/mobile/v3/data");
-        REGIONAL_ENDPOINTS.put("GOV", "https://mobile-collector.gov.newrelic.com/mobile/v3/data");
-        REGIONAL_ENDPOINTS.put("STAGING", "https://mobile-collector.staging.newrelic.com/mobile/v3/data");
+        REGIONAL_ENDPOINTS.put("EU", "https://mobile-collector.eu.nr-data.net/mobile/v3/data");
+        REGIONAL_ENDPOINTS.put("AP", "https://mobile-collector.ap.nr-data.net/mobile/v3/data");
+        REGIONAL_ENDPOINTS.put("GOV", "https://gov-mobile-collector.newrelic.com/mobile/v3/data");
         REGIONAL_ENDPOINTS.put("DEFAULT", REGIONAL_ENDPOINTS.get("US"));
     }
 
@@ -59,10 +58,15 @@ public class OptimizedHttpClient implements HttpClientInterface {
         this.tokenManager = new TokenManager(context, configuration);
         this.deviceInfo = DeviceInformation.getInstance(context);
 
-        // Set endpoint URL based on region, defaulting to US if not found
-        String region = configuration.getRegion().toUpperCase();
-        String regionEndpoint = REGIONAL_ENDPOINTS.get(region);
-        this.endpointUrl = regionEndpoint != null ? regionEndpoint : REGIONAL_ENDPOINTS.get("DEFAULT");
+        // If collectorAddress is explicitly set, use it
+        if (configuration.getCollectorAddress() != null && !configuration.getCollectorAddress().isEmpty()) {
+            this.endpointUrl = "https://" + configuration.getCollectorAddress() + "/mobile/v3/data";
+        } else {
+            // Otherwise, auto-detect from region
+            String region = configuration.getRegion().toUpperCase();
+            String regionEndpoint = REGIONAL_ENDPOINTS.get(region);
+            this.endpointUrl = regionEndpoint != null ? regionEndpoint : REGIONAL_ENDPOINTS.get("DEFAULT");
+        }
 
         if (configuration.isMemoryOptimized()) {
             connectionTimeoutMs = 6000;
@@ -74,7 +78,7 @@ public class OptimizedHttpClient implements HttpClientInterface {
         System.setProperty("http.keepAliveDuration", "300000"); // 5 minutes
         System.setProperty("http.maxConnections", "5");
 
-        NRLog.d("Initialized with region: " + region +
+        NRLog.d("Initialized with region: " + configuration.getRegion() +
               ", endpoint URL: " + endpointUrl);
     }
 
