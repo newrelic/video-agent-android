@@ -154,20 +154,26 @@ public final class TokenManager {
 
     /**
      * Build token endpoint URL based on region
+     * If collectorAddress is explicitly set, use it for /connect endpoint
+     * Otherwise, auto-detect from region
      */
     private String buildTokenEndpoint() {
+        // If collectorAddress is explicitly set, use it for /connect endpoint
+        if (configuration.getCollectorAddress() != null && !configuration.getCollectorAddress().isEmpty()) {
+            return "https://" + configuration.getCollectorAddress() + "/mobile/v5/connect";
+        }
+
+        // Otherwise, auto-detect from region
         String region = configuration.getRegion().toUpperCase();
         switch (region) {
             case "EU":
-                return "https://mobile-collector.eu.newrelic.com/mobile/v5/connect";
+                return "https://mobile-collector.eu.nr-data.net/mobile/v5/connect";
             case "AP":
-                return "https://mobile-collector.ap.newrelic.com/mobile/v5/connect";
+                return "https://mobile-collector.ap.nr-data.net/mobile/v5/connect";
             case "GOV":
-                return "https://mobile-collector.gov.newrelic.com/mobile/v5/connect";
-            case "STAGING":
-                return "https://mobile-collector.staging.newrelic.com/mobile/v5/connect";
+                return "https://gov-mobile-collector.newrelic.com/mobile/v5/connect";
             default:
-                return "https://mobile-collector.newrelic.com/mobile/v5/connect";
+                return "https://mobile-collector.newrelic.com/mobile/v5/connect"; // US/DEFAULT
         }
     }
 
