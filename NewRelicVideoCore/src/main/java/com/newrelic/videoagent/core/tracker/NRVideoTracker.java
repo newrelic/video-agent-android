@@ -93,7 +93,7 @@ public class NRVideoTracker extends NRTracker {
         contentRequestTimestamp = null;
         contentStartTimestamp = null;
         contentErrorTimestamp = null;
-        startupPeriodAdTime = 0L;
+        startupPeriodAdTime = null;
         hasContentStarted = false;
 
         // Initialize time-weighted bitrate tracking
@@ -271,7 +271,12 @@ public class NRVideoTracker extends NRTracker {
     public void updatePlaytime() {
         if (playtimeSinceLastEventTimestamp > 0) {
             playtimeSinceLastEvent = System.currentTimeMillis() - playtimeSinceLastEventTimestamp;
-            totalPlaytime += playtimeSinceLastEvent;
+            try {
+                totalPlaytime = Math.addExact(totalPlaytime, playtimeSinceLastEvent);
+            } catch (ArithmeticException e) {
+                NRLog.w("Total playtime accumulation overflow - resetting to prevent data corruption");
+                totalPlaytime = playtimeSinceLastEvent;
+            }
             playtimeSinceLastEventTimestamp = System.currentTimeMillis();
         } else {
             playtimeSinceLastEvent = 0L;
@@ -487,7 +492,12 @@ public class NRVideoTracker extends NRTracker {
                 Map<String, Object> attributes = getAttributes(CONTENT_BUFFER_END, null);
                 Object timeSinceBufferBegin = attributes.get("timeSinceBufferBegin");
                 if (timeSinceBufferBegin instanceof Long && !bufferType.equals("initial")) {
-                    qoeTotalRebufferingTime += (Long) timeSinceBufferBegin;
+                    try {
+                        qoeTotalRebufferingTime = Math.addExact(qoeTotalRebufferingTime, (Long) timeSinceBufferBegin);
+                    } catch (ArithmeticException e) {
+                        NRLog.w("QoE rebuffering time accumulation overflow - resetting to prevent data corruption");
+                        qoeTotalRebufferingTime = (Long) timeSinceBufferBegin;
+                    }
                 }
                 sendVideoEvent(CONTENT_BUFFER_END);
             }
@@ -625,7 +635,7 @@ public class NRVideoTracker extends NRTracker {
             kpiAttributes.put("averageBitrate", timeWeightedAverage);
         } else if (qoeBitrateCount > 0) {
             // Fallback to simple average if time-weighted calculation is not available
-            long averageBitrate = qoeBitrateSum / qoeBitrateCount;
+            long averageBitrate = Math.round((double) qoeBitrateSum / qoeBitrateCount);
             kpiAttributes.put("averageBitrate", averageBitrate);
         }
 
@@ -644,10 +654,6 @@ public class NRVideoTracker extends NRTracker {
     private void updateTimeWeightedBitrate(Long newBitrate) {
         long currentTime = System.currentTimeMillis();
 
-        // Safety check: ensure fields are initialized
-        if (qoeTotalBitrateWeightedTime == null) qoeTotalBitrateWeightedTime = 0L;
-        if (qoeTotalActiveTime == null) qoeTotalActiveTime = 0L;
-
         // If we have a previous bitrate and timing, accumulate its weighted time
         if (qoeCurrentBitrate != null && qoeLastRenditionChangeTime != null && qoeCurrentBitrate > 0) {
             // Ensure valid timestamps
@@ -656,8 +662,15 @@ public class NRVideoTracker extends NRTracker {
                 if (segmentDuration > 0) {
                     // Prevent overflow in multiplication
                     if (qoeCurrentBitrate <= Long.MAX_VALUE / segmentDuration) {
-                        qoeTotalBitrateWeightedTime += qoeCurrentBitrate * segmentDuration;
-                        qoeTotalActiveTime += segmentDuration;
+                        try {
+                            qoeTotalBitrateWeightedTime = Math.addExact(qoeTotalBitrateWeightedTime, qoeCurrentBitrate * segmentDuration);
+                            qoeTotalActiveTime = Math.addExact(qoeTotalActiveTime, segmentDuration);
+                        } catch (ArithmeticException e) {
+                            // Overflow in time-weighted bitrate accumulation - reset to prevent future overflows
+                            NRLog.w("QoE bitrate accumulation overflow - resetting accumulated values to start fresh");
+                            qoeTotalBitrateWeightedTime = 0L;
+                            qoeTotalActiveTime = 0L;
+                        }
                     }
                 }
             }
@@ -665,7 +678,7 @@ public class NRVideoTracker extends NRTracker {
 
         // Update current tracking values (accept null/zero values for reset scenarios)
         qoeCurrentBitrate = newBitrate;
-        qoeLastRenditionChangeTime = (currentTime > 0) ? currentTime : System.currentTimeMillis();
+        qoeLastRenditionChangeTime = currentTime;
     }
 
     /**
@@ -675,10 +688,6 @@ public class NRVideoTracker extends NRTracker {
      * @return Time-weighted average bitrate, or null if no data available
      */
     private Long calculateTimeWeightedAverageBitrate() {
-        // Safety check: ensure required fields are properly initialized
-        if (qoeTotalBitrateWeightedTime == null) qoeTotalBitrateWeightedTime = 0L;
-        if (qoeTotalActiveTime == null) qoeTotalActiveTime = 0L;
-
         // Include current segment in calculation
         if (qoeCurrentBitrate != null && qoeLastRenditionChangeTime != null && qoeCurrentBitrate > 0) {
             long currentTime = System.currentTimeMillis();
@@ -691,17 +700,24 @@ public class NRVideoTracker extends NRTracker {
                 if (currentSegmentDuration > 0) {
                     // Prevent overflow in multiplication
                     if (qoeCurrentBitrate <= Long.MAX_VALUE / currentSegmentDuration) {
-                        long totalWeightedTime = qoeTotalBitrateWeightedTime + (qoeCurrentBitrate * currentSegmentDuration);
-                        long totalTime = qoeTotalActiveTime + currentSegmentDuration;
+                        try {
+                            long totalWeightedTime = Math.addExact(qoeTotalBitrateWeightedTime, qoeCurrentBitrate * currentSegmentDuration);
+                            long totalTime = Math.addExact(qoeTotalActiveTime, currentSegmentDuration);
 
-                        if (totalTime > 0) {
-                            return totalWeightedTime / totalTime;
+                            if (totalTime > 0) {
+                                return Math.round((double) totalWeightedTime / totalTime);
+                            }
+                        } catch (ArithmeticException e) {
+                            // Overflow in time-weighted bitrate calculation - reset to prevent future overflows
+                            NRLog.w("QoE bitrate calculation overflow - resetting accumulated values to start fresh");
+                            qoeTotalBitrateWeightedTime = 0L;
+                            qoeTotalActiveTime = 0L;
                         }
                     }
                 }
                 // If current segment has zero duration, check if we have accumulated data
                 else if (qoeTotalActiveTime > 0) {
-                    return qoeTotalBitrateWeightedTime / qoeTotalActiveTime;
+                    return Math.round((double) qoeTotalBitrateWeightedTime / qoeTotalActiveTime);
                 }
                 // If we have current bitrate but no accumulated time and zero segment duration,
                 // return current bitrate as the average (single point average)
@@ -713,7 +729,7 @@ public class NRVideoTracker extends NRTracker {
 
         // Fallback to accumulated data only
         if (qoeTotalActiveTime != null && qoeTotalActiveTime > 0 && qoeTotalBitrateWeightedTime != null) {
-            return qoeTotalBitrateWeightedTime / qoeTotalActiveTime;
+            return Math.round((double) qoeTotalBitrateWeightedTime / qoeTotalActiveTime);
         }
 
         return null; // No time-weighted data available
@@ -738,6 +754,33 @@ public class NRVideoTracker extends NRTracker {
         contentErrorTimestamp = null;
         startupPeriodAdTime = null;
         hasContentStarted = false;
+
+        // Reset time-weighted bitrate fields
+        qoeCurrentBitrate = null;
+        qoeLastRenditionChangeTime = null;
+        qoeTotalBitrateWeightedTime = 0L;
+        qoeTotalActiveTime = 0L;
+    }
+
+    /**
+     * Reset QoE metrics but preserve error timestamps for startup time calculation.
+     * Called after errors to clean metrics while keeping timing data for analysis.
+     */
+    private void resetQoeMetricsPreservingTimestamps() {
+        qoePeakBitrate = null;
+        qoeHadPlaybackFailure = false;
+        qoeTotalRebufferingTime = 0L;
+        qoeBitrateSum = 0L;
+        qoeBitrateCount = 0L;
+        qoeLastTrackedBitrate = null; // Reset cache
+        qoeStartupTime = null; // Reset cached startup time for new view session
+
+        // DO NOT reset startup time calculation fields - preserve for error analysis:
+        // contentRequestTimestamp - PRESERVED
+        // contentStartTimestamp - PRESERVED
+        // contentErrorTimestamp - PRESERVED
+        // startupPeriodAdTime - PRESERVED
+        hasContentStarted = false; // Reset state flag
 
         // Reset time-weighted bitrate fields
         qoeCurrentBitrate = null;
@@ -787,6 +830,10 @@ public class NRVideoTracker extends NRTracker {
                 qoeHadPlaybackFailure = true;
             }
         }
+
+        // Reset QoE metrics but preserve error timestamps for startup time calculation
+        resetQoeMetricsPreservingTimestamps();
+
         sendVideoErrorEvent(actionName, errAttr);
     }
 
@@ -1165,8 +1212,6 @@ public class NRVideoTracker extends NRTracker {
         addTimeSinceEntry(CONTENT_RENDITION_CHANGE, "timeSinceLastRenditionChange", "^CONTENT_RENDITION_CHANGE$");
         addTimeSinceEntry(AD_RENDITION_CHANGE, "timeSinceLastAdRenditionChange", "^AD_RENDITION_CHANGE$");
 
-        addTimeSinceEntry(QOE_AGGREGATE, "timeSinceLastQoeAggregate", "^QOE_AGGREGATE$");
-
         addTimeSinceEntry(AD_BREAK_START, "timeSinceAdBreakBegin", "^AD_BREAK_END$");
 
         addTimeSinceEntry(AD_QUARTILE, "timeSinceLastAdQuartile", "^AD_QUARTILE$");
@@ -1250,11 +1295,6 @@ public class NRVideoTracker extends NRTracker {
      * @param processedAttributes Fully processed attributes including contentBitrate
      */
     private void trackBitrateFromProcessedAttributes(String action, Map<String, Object> processedAttributes) {
-        // Fast filter: only track for events that can have bitrate information
-        if (!isContentBitrateEvent(action)) {
-            return;
-        }
-
         Long currentBitrate = extractBitrateValue(processedAttributes.get("contentBitrate"));
         if (currentBitrate == null || currentBitrate <= 0) {
             return;
@@ -1272,13 +1312,6 @@ public class NRVideoTracker extends NRTracker {
         updateQoeBitrateMetrics(currentBitrate, action);
     }
 
-    /**
-     * Fast check if this action can contain bitrate information.
-     */
-    private static boolean isContentBitrateEvent(String action) {
-        return CONTENT_HEARTBEAT.equals(action) || CONTENT_START.equals(action) ||
-                CONTENT_RENDITION_CHANGE.equals(action) || CONTENT_RESUME.equals(action);
-    }
 
     /**
      * Efficiently extract Long bitrate value from various numeric types.
