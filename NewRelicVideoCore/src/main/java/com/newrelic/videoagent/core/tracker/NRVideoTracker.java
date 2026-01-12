@@ -93,7 +93,7 @@ public class NRVideoTracker extends NRTracker {
         contentRequestTimestamp = null;
         contentStartTimestamp = null;
         contentErrorTimestamp = null;
-        startupPeriodAdTime = null;
+        startupPeriodAdTime = 0L;
         hasContentStarted = false;
 
         // Initialize time-weighted bitrate tracking
