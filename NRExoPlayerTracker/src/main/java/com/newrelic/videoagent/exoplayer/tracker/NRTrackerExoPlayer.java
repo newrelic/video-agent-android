@@ -517,10 +517,11 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     @Override
     public void onLoadCompleted(@NonNull EventTime eventTime, @NonNull LoadEventInfo loadEventInfo, @NonNull MediaLoadData mediaLoadData) {
         if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA
-                && mediaLoadData.trackType == C.TRACK_TYPE_VIDEO
-                && loadEventInfo.loadDurationMs > 0) {
-            // Calculate the bitrate for this specific chunk in bits per second
-            this.actualBitrate = (loadEventInfo.bytesLoaded * 8 * 1000) / loadEventInfo.loadDurationMs;
+                && mediaLoadData.trackType == C.TRACK_TYPE_VIDEO) {
+            // Get the declared bitrate from HLS/DASH manifest
+            if (mediaLoadData.trackFormat != null && mediaLoadData.trackFormat.bitrate > 0) {
+                this.actualBitrate = mediaLoadData.trackFormat.bitrate;
+            }
         }
     }
 
