@@ -4,7 +4,8 @@ plugins {
 }
 android {
     compileSdkVersion 34
-     buildToolsVersion "34.0.0"
+    buildToolsVersion "34.0.0"
+
     defaultConfig {
         minSdkVersion 16
         targetSdkVersion 34
@@ -37,7 +38,7 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.2.0'
     implementation 'com.google.android.material:material:1.2.1'
     implementation project(path: ':NewRelicVideoCore')
-    implementation 'androidx.media3:media3-exoplayer:1.1.0'
+    implementation 'androidx.media3:media3-exoplayer:1.2.0'
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.robolectric:robolectric:4.10.3'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'

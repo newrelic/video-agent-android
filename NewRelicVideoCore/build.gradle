@@ -37,8 +37,8 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation 'com.google.android.material:material:1.1.0'
     implementation 'com.newrelic.agent.android:android-agent:7.6.3'
-    implementation 'androidx.media3:media3-exoplayer:1.1.0'
-    implementation 'androidx.media3:media3-exoplayer-ima:1.1.0'
+    implementation 'androidx.media3:media3-exoplayer:1.2.0'
+    implementation 'androidx.media3:media3-exoplayer-ima:1.2.0'
 
     // Add androidx.leanback for accurate Android TV detection
 //    implementation 'androidx.leanback:leanback:1.0.0'
