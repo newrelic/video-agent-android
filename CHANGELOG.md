@@ -2,7 +2,7 @@
 
 ### Bug Fixes
 
-* Replace bitrate calculation to use video quality instead of download speed ([b676954](https://github.com/newrelic/video-agent-android/commit/b67695487e25d1b3b24ceba660fb0b7aa6d6c0d4))
+* Replace bitrate calculation to use manifest rendition bit rate instead of download speed ([b676954](https://github.com/newrelic/video-agent-android/commit/b67695487e25d1b3b24ceba660fb0b7aa6d6c0d4))
 * Update media3 from 1.1.0 to 1.2.0 for Android 14 compatibility ([320d92b](https://github.com/newrelic/video-agent-android/commit/320d92bdbc9ef5f75eceddede00eaddd5d1b8aad))
 ## [4.0.4](https://github.com/newrelic/video-agent-android/compare/v4.0.3...v4.0.4) (2025-12-18)
 
