@@ -167,11 +167,11 @@ public final class TokenManager {
         String region = configuration.getRegion().toUpperCase();
         switch (region) {
             case "EU":
-                return "https://mobile-collector.eu.nr-data.net/mobile/v5/connect";
+                return "https://mobile-collector.eu.newrelic.com/mobile/v5/connect";
             case "AP":
-                return "https://mobile-collector.ap.nr-data.net/mobile/v5/connect";
+                return "https://mobile-collector.ap.newrelic.com/mobile/v5/connect";
             case "GOV":
-                return "https://gov-mobile-collector.newrelic.com/mobile/v5/connect";
+                return "https://mobile-collector.gov.newrelic.com/mobile/v5/connect";
             default:
                 return "https://mobile-collector.newrelic.com/mobile/v5/connect"; // US/DEFAULT
         }
