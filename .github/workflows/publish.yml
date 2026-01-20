@@ -1,0 +1,60 @@
+name: Publish Release
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  publish-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    # Run only if merged AND has 'release' label
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release')
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Create Release and Tag
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 1. Extract Version
+          VERSION=$(grep "^GLOBAL_VERSION_NAME=" gradle.properties | cut -d'=' -f2)
+
+          if [ -z "$VERSION" ]; then
+            echo "Error: Could not detect version from gradle.properties."
+            exit 1
+          fi
+
+          echo "Detected Version: $VERSION"
+          TAG_NAME="v$VERSION"
+          
+          # 2. Extract Changelog for this version
+          # We initialize NOTES as empty
+          NOTES=""
+          
+          if [ -f CHANGELOG.md ]; then
+            echo "CHANGELOG.md found. Extracting notes for $VERSION..."
+            # This command extracts the text between the current version header and the next one
+            NOTES=$(sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$ d')
+          else
+            echo "Warning: CHANGELOG.md not found."
+          fi
+          
+          # 3. Log extracted notes
+          echo "Extracted notes:"
+          echo "$NOTES"
+
+          # 4. Create the GitHub Release AND Tag
+          # We use the extracted "$NOTES" here
+          gh release create "$TAG_NAME" \
+            --title "$TAG_NAME" \
+            --notes "$NOTES" \
+            --target ${{ github.base_ref }}

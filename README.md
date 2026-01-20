@@ -49,13 +49,13 @@ dependencies {
     ...
 
     // Add this to install the NewRelicVideoCore (required)
-    implementation 'com.github.newrelic.video-agent-android:NewRelicVideoCore:v4.0.1'
+    implementation 'com.github.newrelic.video-agent-android:NewRelicVideoCore:v4.0.3'
     
     // Add this to install the ExoPlayer tracker
-    implementation 'com.github.newrelic.video-agent-android:NRExoPlayerTracker:v4.0.1'
+    implementation 'com.github.newrelic.video-agent-android:NRExoPlayerTracker:v4.0.3'
     
     // Add this to install the Google IMA library tracker
-    implementation 'com.github.newrelic.video-agent-android:NRIMATracker:v4.0.1'
+    implementation 'com.github.newrelic.video-agent-android:NRIMATracker:v4.0.3'
 }
 ```
 
@@ -216,3 +216,4 @@ Important: Ingesting video telemetry data via this video agent requires a subscr
 ## License
 
 New Relic Video Agent is licensed under the [Apache 2.0](http://apache.org/licenses/LICENSE-2.0.txt) License.
+ 
