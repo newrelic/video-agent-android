@@ -48,12 +48,8 @@ public class NRVideoTracker extends NRTracker {
     private Long qoeBitrateCount;
     private Long qoeLastTrackedBitrate;
     private Long qoeStartupTime; // Cached startup time, calculated once per view session
-
-    // Startup time calculation fields - capture actual event timestamps
-    private Long contentRequestTimestamp;
-    private Long contentStartTimestamp;
-    private Long contentErrorTimestamp; // Timestamp when content error occurred (for startup failures)
     private Long startupPeriodAdTime; // Ad time that occurred during startup period
+    private Long startupPeriodPauseTime; // Pause time that occurred during startup period
     private boolean hasContentStarted; // Tracks whether content has successfully started (for buffer classification)
 
     // Time-weighted bitrate calculation fields
@@ -90,10 +86,8 @@ public class NRVideoTracker extends NRTracker {
         qoeStartupTime = null; // Will be calculated during first QOE_AGGREGATE event
 
         // Initialize startup time calculation fields
-        contentRequestTimestamp = null;
-        contentStartTimestamp = null;
-        contentErrorTimestamp = null;
         startupPeriodAdTime = 0L;
+        startupPeriodPauseTime = 0L;
         hasContentStarted = false;
 
         // Initialize time-weighted bitrate tracking
@@ -272,7 +266,7 @@ public class NRVideoTracker extends NRTracker {
         if (playtimeSinceLastEventTimestamp > 0) {
             playtimeSinceLastEvent = System.currentTimeMillis() - playtimeSinceLastEventTimestamp;
             try {
-                totalPlaytime = Math.addExact(totalPlaytime, playtimeSinceLastEvent);
+                totalPlaytime = safeAdd(totalPlaytime, playtimeSinceLastEvent);
             } catch (ArithmeticException e) {
                 NRLog.w("Total playtime accumulation overflow - resetting to prevent data corruption");
                 totalPlaytime = playtimeSinceLastEvent;
@@ -293,10 +287,6 @@ public class NRVideoTracker extends NRTracker {
             if (state.isAd) {
                 sendVideoAdEvent(AD_REQUEST);
             } else {
-                // QoE: Capture CONTENT_REQUEST timestamp for startup time calculation
-                if (contentRequestTimestamp == null) {
-                    contentRequestTimestamp = System.currentTimeMillis();
-                }
                 sendVideoEvent(CONTENT_REQUEST);
             }
         }
@@ -309,8 +299,6 @@ public class NRVideoTracker extends NRTracker {
         if (state.goStart()) {
             startHeartbeat();
             if (state.isAd) {
-                // Start ad chrono for precise ad duration tracking
-                state.adChrono.start();
                 numberOfAds++;
                 ((NRVideoTracker) linkedTracker).sendPause ();
                 if (linkedTracker instanceof NRVideoTracker) {
@@ -327,11 +315,6 @@ public class NRVideoTracker extends NRTracker {
                 }
                 numberOfVideos++;
 
-                // QoE: Capture CONTENT_START timestamp
-                if (contentStartTimestamp == null) {
-                    contentStartTimestamp = System.currentTimeMillis();
-                }
-
                 // QoE: Mark that content has successfully started (for buffer type classification)
                 hasContentStarted = true;
 
@@ -347,10 +330,7 @@ public class NRVideoTracker extends NRTracker {
     public void sendPause() {
         if (state.goPause()) {
             if(!state.isBuffering){
-                if (state.isAd) {
-                    // Accumulate ad watch time using ad chrono
-                    state.accumulatedAdWatchTime += state.adChrono.getDeltaTime();
-                } else {
+                if (!state.isAd) {
                     state.accumulatedVideoWatchTime += state.chrono.getDeltaTime();
                 }
             }
@@ -369,13 +349,25 @@ public class NRVideoTracker extends NRTracker {
     public void sendResume() {
         if (state.goResume()) {
             if(!state.isBuffering){
-                if (state.isAd) {
-                    // Resume ad chrono for ad duration tracking
-                    state.adChrono.start();
-                } else {
+                if (!state.isAd) {
                     state.chrono.start();
                 }
             }
+
+            // QoE: Calculate pause time during startup period (before CONTENT_START) using timing system
+            // This applies to both content and ad resumes that occurred during the startup window
+            if (!hasContentStarted) {
+                // Get pause duration from timing system instead of manual timestamp tracking
+                Long timeSinceAdPaused = getTimeSince(AD_PAUSE);
+                if (timeSinceAdPaused != null && timeSinceAdPaused > 0) {
+                    try {
+                        startupPeriodPauseTime = safeAdd(startupPeriodPauseTime, timeSinceAdPaused);
+                    } catch (ArithmeticException e) {
+                        startupPeriodPauseTime = timeSinceAdPaused;
+                    }
+                }
+            }
+
             if (state.isAd) {
                 sendVideoAdEvent(AD_RESUME);
             } else {
@@ -452,10 +444,7 @@ public class NRVideoTracker extends NRTracker {
     public void sendBufferStart() {
         if (state.goBufferStart()) {
             if(state.isPlaying){
-                if (state.isAd) {
-                    // Accumulate ad watch time using ad chrono
-                    state.accumulatedAdWatchTime += state.adChrono.getDeltaTime();
-                } else {
+                if (!state.isAd) {
                     state.accumulatedVideoWatchTime += state.chrono.getDeltaTime();
                 }
             }
@@ -475,10 +464,7 @@ public class NRVideoTracker extends NRTracker {
     public void sendBufferEnd() {
         if (state.goBufferEnd()) {
             if(state.isPlaying){
-                if (state.isAd) {
-                    // Resume ad chrono after buffer ends
-                    state.adChrono.start();
-                } else {
+                if (!state.isAd) {
                     state.chrono.start();
                 }
             }
@@ -493,7 +479,7 @@ public class NRVideoTracker extends NRTracker {
                 Object timeSinceBufferBegin = attributes.get("timeSinceBufferBegin");
                 if (timeSinceBufferBegin instanceof Long && !bufferType.equals("initial")) {
                     try {
-                        qoeTotalRebufferingTime = Math.addExact(qoeTotalRebufferingTime, (Long) timeSinceBufferBegin);
+                        qoeTotalRebufferingTime = safeAdd(qoeTotalRebufferingTime, (Long) timeSinceBufferBegin);
                     } catch (ArithmeticException e) {
                         NRLog.w("QoE rebuffering time accumulation overflow - resetting to prevent data corruption");
                         qoeTotalRebufferingTime = (Long) timeSinceBufferBegin;
@@ -563,36 +549,67 @@ public class NRVideoTracker extends NRTracker {
     private Map<String, Object> calculateQOEKpiAttributes() {
         Map<String, Object> kpiAttributes = new HashMap<>();
 
-        // Add captured timestamps to QOE_AGGREGATE events
-        if (contentRequestTimestamp != null) {
-            kpiAttributes.put("timeSinceRequested", contentRequestTimestamp);
+        // Get timeSince values from QOE_AGGREGATE context (timeSince attributes should be included automatically)
+        Map<String, Object> currentAttribs = getAttributes(QOE_AGGREGATE, new HashMap<>());
+
+        // Apply timing attributes to get the timeSince values
+        applyTimingAttributes(QOE_AGGREGATE, currentAttribs);
+
+        Long timeSinceRequested = null;
+        Long timeSinceStarted = null;
+        Long timeSinceLastError = null;
+
+        // Only use timeSince values for content events, not ad events
+        if (!state.isAd) {
+            timeSinceRequested = (Long) currentAttribs.get("timeSinceRequested");
+            timeSinceStarted = (Long) currentAttribs.get("timeSinceStarted");
+            timeSinceLastError = (Long) currentAttribs.get("timeSinceLastError");
         }
 
-        if (contentStartTimestamp != null) {
-            kpiAttributes.put("timeSinceStarted", contentStartTimestamp);
+        // Add timeSince values to QOE_AGGREGATE events
+        if (timeSinceRequested != null) {
+            kpiAttributes.put("timeSinceRequested", timeSinceRequested);
+        }
+
+        if (timeSinceStarted != null) {
+            kpiAttributes.put("timeSinceStarted", timeSinceStarted);
         }
 
         // startupTime - Calculate once during first QOE_AGGREGATE event and cache for reuse
-        if (qoeStartupTime == null && contentRequestTimestamp != null) {
-            Long endTimestamp = null;
+        if (qoeStartupTime == null && timeSinceRequested != null) {
+            Long rawStartupTime = null;
 
-            // Determine end timestamp: use contentStartTimestamp (success) or contentErrorTimestamp (failure)
-            if (contentStartTimestamp != null) {
-                endTimestamp = contentStartTimestamp; // Normal startup success
-            } else if (contentErrorTimestamp != null) {
-                endTimestamp = contentErrorTimestamp; // Startup failure - time to error
+            // Calculate startup time using timeSince values
+            if (timeSinceStarted != null) {
+                // Normal startup success: rawStartupTime = timeSinceRequested - timeSinceStarted
+                // (START happened after REQUEST, so timeSinceStarted should be smaller)
+                rawStartupTime = timeSinceRequested - timeSinceStarted;
+            } else if (timeSinceLastError != null) {
+                // Startup failure: rawStartupTime = timeSinceRequested - timeSinceLastError
+                // (ERROR happened after REQUEST, so timeSinceLastError should be smaller)
+                rawStartupTime = timeSinceRequested - timeSinceLastError;
             }
 
-            if (endTimestamp != null) {
-                long rawStartupTime = endTimestamp - contentRequestTimestamp;
+            if (rawStartupTime != null && rawStartupTime >= 0) {
+                // For content trackers only - exclude ad time and pause time from startup calculation
+                if (!state.isAd) {
+                    Long totalExclusionTime = 0L;
 
-                // For content trackers only - exclude ad time from startup calculation
-                if (!state.isAd && startupPeriodAdTime != null && startupPeriodAdTime > 0) {
-                    // Apply JavaScript pattern: max(rawTime - adTime, 0)
-                    qoeStartupTime = Math.max(rawStartupTime - startupPeriodAdTime, 0L);
+                    // Exclude ad time that occurred during startup period
+                    if (startupPeriodAdTime != null && startupPeriodAdTime > 0) {
+                        totalExclusionTime += startupPeriodAdTime;
+                    }
+
+                    // Exclude pause time that occurred during startup period
+                    if (startupPeriodPauseTime != null && startupPeriodPauseTime > 0) {
+                        totalExclusionTime += startupPeriodPauseTime;
+                    }
+
+                    // Apply enhanced exclusion pattern: max(rawTime - adTime - pauseTime, 0)
+                    qoeStartupTime = Math.max(rawStartupTime - totalExclusionTime, 0L);
                 } else {
-                    // No ads or ad tracker itself - use raw calculation
-                    qoeStartupTime = rawStartupTime > 0 ? rawStartupTime : 0L;
+                    // Ad tracker itself - use raw calculation
+                    qoeStartupTime = rawStartupTime;
                 }
             }
         }
@@ -608,8 +625,8 @@ public class NRVideoTracker extends NRTracker {
         }
 
         // hadStartupFailure - Boolean indicating if CONTENT_ERROR occurred before CONTENT_START
-        // True when we have contentErrorTimestamp but no contentStartTimestamp
-        boolean hadStartupFailure = (contentErrorTimestamp != null && contentStartTimestamp == null);
+        // True when we have timeSinceLastError but no timeSinceStarted (content never started)
+        boolean hadStartupFailure = (timeSinceLastError != null && timeSinceStarted == null);
         kpiAttributes.put("hadStartupFailure", hadStartupFailure);
 
         // hadPlaybackFailure - Boolean indicating if CONTENT_ERROR occurred at any time during content playback
@@ -663,8 +680,8 @@ public class NRVideoTracker extends NRTracker {
                     // Prevent overflow in multiplication
                     if (qoeCurrentBitrate <= Long.MAX_VALUE / segmentDuration) {
                         try {
-                            qoeTotalBitrateWeightedTime = Math.addExact(qoeTotalBitrateWeightedTime, qoeCurrentBitrate * segmentDuration);
-                            qoeTotalActiveTime = Math.addExact(qoeTotalActiveTime, segmentDuration);
+                            qoeTotalBitrateWeightedTime = safeAdd(qoeTotalBitrateWeightedTime, qoeCurrentBitrate * segmentDuration);
+                            qoeTotalActiveTime = safeAdd(qoeTotalActiveTime, segmentDuration);
                         } catch (ArithmeticException e) {
                             // Overflow in time-weighted bitrate accumulation - reset to prevent future overflows
                             NRLog.w("QoE bitrate accumulation overflow - resetting accumulated values to start fresh");
@@ -701,8 +718,8 @@ public class NRVideoTracker extends NRTracker {
                     // Prevent overflow in multiplication
                     if (qoeCurrentBitrate <= Long.MAX_VALUE / currentSegmentDuration) {
                         try {
-                            long totalWeightedTime = Math.addExact(qoeTotalBitrateWeightedTime, qoeCurrentBitrate * currentSegmentDuration);
-                            long totalTime = Math.addExact(qoeTotalActiveTime, currentSegmentDuration);
+                            long totalWeightedTime = safeAdd(qoeTotalBitrateWeightedTime, qoeCurrentBitrate * currentSegmentDuration);
+                            long totalTime = safeAdd(qoeTotalActiveTime, currentSegmentDuration);
 
                             if (totalTime > 0) {
                                 return Math.round((double) totalWeightedTime / totalTime);
@@ -747,12 +764,8 @@ public class NRVideoTracker extends NRTracker {
         qoeBitrateCount = 0L;
         qoeLastTrackedBitrate = null; // Reset cache
         qoeStartupTime = null; // Reset cached startup time for new view session
-
-        // Reset startup time calculation fields
-        contentRequestTimestamp = null;
-        contentStartTimestamp = null;
-        contentErrorTimestamp = null;
         startupPeriodAdTime = null;
+        startupPeriodPauseTime = 0L; // Reset pause time tracking for new view session
         hasContentStarted = false;
 
         // Reset time-weighted bitrate fields
@@ -762,32 +775,6 @@ public class NRVideoTracker extends NRTracker {
         qoeTotalActiveTime = 0L;
     }
 
-    /**
-     * Reset QoE metrics but preserve error timestamps for startup time calculation.
-     * Called after errors to clean metrics while keeping timing data for analysis.
-     */
-    private void resetQoeMetricsPreservingTimestamps() {
-        qoePeakBitrate = null;
-        qoeHadPlaybackFailure = false;
-        qoeTotalRebufferingTime = 0L;
-        qoeBitrateSum = 0L;
-        qoeBitrateCount = 0L;
-        qoeLastTrackedBitrate = null; // Reset cache
-        qoeStartupTime = null; // Reset cached startup time for new view session
-
-        // DO NOT reset startup time calculation fields - preserve for error analysis:
-        // contentRequestTimestamp - PRESERVED
-        // contentStartTimestamp - PRESERVED
-        // contentErrorTimestamp - PRESERVED
-        // startupPeriodAdTime - PRESERVED
-        hasContentStarted = false; // Reset state flag
-
-        // Reset time-weighted bitrate fields
-        qoeCurrentBitrate = null;
-        qoeLastRenditionChangeTime = null;
-        qoeTotalBitrateWeightedTime = 0L;
-        qoeTotalActiveTime = 0L;
-    }
 
     /**
      * Send request event.
@@ -817,11 +804,6 @@ public class NRVideoTracker extends NRTracker {
         if (state.isAd) {
             actionName = AD_ERROR;
         } else {
-            // QoE: Capture CONTENT_ERROR timestamp for startup time calculation
-            if (contentErrorTimestamp == null) {
-                contentErrorTimestamp = System.currentTimeMillis();
-            }
-
             // QoE: Track playback errors for content (errors after CONTENT_START)
             Map<String, Object> currentAttributes = getAttributes(actionName, null);
             Object timeSinceStarted = currentAttributes.get("timeSinceStarted");
@@ -831,8 +813,6 @@ public class NRVideoTracker extends NRTracker {
             }
         }
 
-        // Reset QoE metrics but preserve error timestamps for startup time calculation
-        resetQoeMetricsPreservingTimestamps();
 
         sendVideoErrorEvent(actionName, errAttr);
     }
@@ -1185,10 +1165,10 @@ public class NRVideoTracker extends NRTracker {
         addTimeSinceEntry(CONTENT_HEARTBEAT, "timeSinceLastHeartbeat", "^CONTENT_[A-Z_]+$");
         addTimeSinceEntry(AD_HEARTBEAT, "timeSinceLastAdHeartbeat", "^AD_[A-Z_]+$");
 
-        addTimeSinceEntry(CONTENT_REQUEST, "timeSinceRequested", "^CONTENT_[A-Z_]+$");
+        addTimeSinceEntry(CONTENT_REQUEST, "timeSinceRequested", "^(CONTENT_[A-Z_]+|QOE_AGGREGATE)$");
         addTimeSinceEntry(AD_REQUEST, "timeSinceAdRequested", "^AD_[A-Z_]+$");
 
-        addTimeSinceEntry(CONTENT_START, "timeSinceStarted", "^CONTENT_[A-Z_]+$");
+        addTimeSinceEntry(CONTENT_START, "timeSinceStarted", "^(CONTENT_[A-Z_]+|QOE_AGGREGATE)$");
         addTimeSinceEntry(AD_START, "timeSinceAdStarted", "^AD_[A-Z_]+$");
 
         addTimeSinceEntry(CONTENT_PAUSE, "timeSincePaused", "^CONTENT_RESUME$");
@@ -1206,7 +1186,7 @@ public class NRVideoTracker extends NRTracker {
         addTimeSinceEntry(CONTENT_BUFFER_START, "timeSinceBufferBegin", "^CONTENT_BUFFER_END$");
         addTimeSinceEntry(AD_BUFFER_START, "timeSinceAdBufferBegin", "^AD_BUFFER_END$");
 
-        addTimeSinceEntry(CONTENT_ERROR, "timeSinceLastError", "^CONTENT_[A-Z_]+$");
+        addTimeSinceEntry(CONTENT_ERROR, "timeSinceLastError", "^(CONTENT_[A-Z_]+|QOE_AGGREGATE)$");
         addTimeSinceEntry(AD_ERROR, "timeSinceLastAdError", "^AD_[A-Z_]+$");
 
         addTimeSinceEntry(CONTENT_RENDITION_CHANGE, "timeSinceLastRenditionChange", "^CONTENT_RENDITION_CHANGE$");
@@ -1240,14 +1220,9 @@ public class NRVideoTracker extends NRTracker {
             return "pause";
         }
 
-        // Enhanced initial buffer classification: combine content start state with playhead position
-        // This prevents misclassifying early connection issues as initial buffering
-        if (playhead < 100) {
-            // If content hasn't started yet, this is likely initial buffering
-            // If content has started, use stricter criteria (very early playhead)
-            if (!hasContentStarted || playhead < 10) {
-                return "initial";
-            }
+        //NOTE: the player starts counting contentPlayhead after buffering ends, and by the time we calculate BUFFER_END, playhead can be a bit higher than zero (few milliseconds).
+        if (playhead < 10) {
+            return "initial";
         }
 
         // If none of the above is true, it is a connection buffering
@@ -1347,7 +1322,7 @@ public class NRVideoTracker extends NRTracker {
 
         // Update simple average (with overflow protection)
         if (qoeBitrateCount < Long.MAX_VALUE - 1) {
-            qoeBitrateSum = Math.addExact(qoeBitrateSum, bitrate);
+            qoeBitrateSum = safeAdd(qoeBitrateSum, bitrate);
             qoeBitrateCount++;
         }
 
@@ -1359,6 +1334,26 @@ public class NRVideoTracker extends NRTracker {
     public void sendVideoErrorEvent(String action, Map<String, Object> attributes) {
         updatePlaytime();
         super.sendVideoErrorEvent(action, attributes);
+    }
+
+    /**
+     * Safe addition with overflow detection, compatible with Android API 16+
+     * Equivalent to Math.addExact but works on older Android versions
+     *
+     * @param a first operand
+     * @param b second operand
+     * @return the sum
+     * @throws ArithmeticException if the result overflows a long
+     */
+    private static long safeAdd(long a, long b) {
+        long result = a + b;
+
+        // Check for overflow using the same logic as Math.addExact
+        if (((a ^ result) & (b ^ result)) < 0) {
+            throw new ArithmeticException("long overflow");
+        }
+
+        return result;
     }
 
 }

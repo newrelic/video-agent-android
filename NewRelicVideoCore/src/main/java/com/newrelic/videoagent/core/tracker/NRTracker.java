@@ -75,6 +75,26 @@ public class NRTracker {
     }
 
     /**
+     * Apply timing attributes to the given attributes map.
+     *
+     * @param action Action name.
+     * @param attributes Attributes map to apply timing attributes to.
+     */
+    protected void applyTimingAttributes(String action, Map<String, Object> attributes) {
+        timeSinceTable.applyAttributes(action, attributes);
+    }
+
+    /**
+     * Get time since for a specific action.
+     *
+     * @param action Action to get time since for.
+     * @return Time since in milliseconds, or null if not found.
+     */
+    protected Long getTimeSince(String action) {
+        return timeSinceTable.getTimeSince(action);
+    }
+
+    /**
      * Add an entry to the timeSince table.
      *
      * @param action Action name.

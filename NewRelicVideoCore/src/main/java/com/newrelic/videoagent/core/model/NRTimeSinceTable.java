@@ -50,9 +50,23 @@ public class NRTimeSinceTable {
                 attributes.put(ts.getAttribute(), ts.timeSince());
             }
             if (ts.isAction(action)) {
-                // attributes.put("elapsedTime", ts.timeSince());
                 ts.now();
             }
         }
+    }
+
+    /**
+     * Get time since for a specific action.
+     *
+     * @param action Action to get time since for.
+     * @return Time since in milliseconds, or null if not found.
+     */
+    public Long getTimeSince(String action) {
+        for (NRTimeSince ts : timeSinceTable) {
+            if (ts.isAction(action)) {
+                return ts.timeSince();
+            }
+        }
+        return null;
     }
 }
