@@ -43,6 +43,7 @@ public class NRVideoTracker extends NRTracker {
     // QoE (Quality of Experience) tracking fields
     private Long qoePeakBitrate;
     private Boolean qoeHadPlaybackFailure;
+    private Boolean qoeHadStartupFailure;
     private Long qoeTotalRebufferingTime;
     private Long qoeBitrateSum;
     private Long qoeBitrateCount;
@@ -79,6 +80,7 @@ public class NRVideoTracker extends NRTracker {
         // Initialize QoE tracking fields
         qoePeakBitrate = 0L;
         qoeHadPlaybackFailure = false;
+        qoeHadStartupFailure = false;
         qoeTotalRebufferingTime = 0L;
         qoeBitrateSum = 0L;
         qoeBitrateCount = 0L;
@@ -642,10 +644,11 @@ public class NRVideoTracker extends NRTracker {
             attributes.put("startupTime", 0L);
         }
 
-        // Calculate hadStartupFailure using simple logic: if content never started playing and there are errors
-        // Simple check: if totalPlaytime is 0 or null AND there are errors, it's a startup failure
-        boolean hadStartupFailure = (totalPlaytime == null || totalPlaytime == 0) && numberOfErrors > 0;
-        attributes.put("hadStartupFailure", hadStartupFailure);
+        // Use the tracked startup failure flag (set during error handling)
+        if (qoeHadStartupFailure == null) {
+            qoeHadStartupFailure = false;
+        }
+        attributes.put("hadStartupFailure", qoeHadStartupFailure);
     }
 
     /**
@@ -745,6 +748,7 @@ public class NRVideoTracker extends NRTracker {
     private void resetQoeMetrics() {
         qoePeakBitrate = null;
         qoeHadPlaybackFailure = false;
+        qoeHadStartupFailure = false;
         qoeTotalRebufferingTime = 0L;
         qoeBitrateSum = 0L;
         qoeBitrateCount = 0L;
@@ -782,7 +786,6 @@ public class NRVideoTracker extends NRTracker {
             errorMessage = "<Unknown error>";
         }
         numberOfErrors++;
-
         Map<String, Object> errAttr = new HashMap<>();
         errAttr.put("errorMessage", errorMessage);
         errAttr.put("errorCode", errorCode);
@@ -794,6 +797,9 @@ public class NRVideoTracker extends NRTracker {
             if (totalPlaytime != null && totalPlaytime > 0) {
                 // Error occurred after content started playing, so it's a playback failure
                 qoeHadPlaybackFailure = true;
+            } else {
+                // Error occurred before content started playing, so it's a startup failure
+                qoeHadStartupFailure = true;
             }
         }
         sendVideoErrorEvent(actionName, errAttr);
