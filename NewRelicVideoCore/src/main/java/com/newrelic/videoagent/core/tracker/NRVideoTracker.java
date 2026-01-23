@@ -252,8 +252,6 @@ public class NRVideoTracker extends NRTracker {
             attr.put("contentIsLive", getIsLive());
         }
         attr = super.getAttributes(action, attr);
-
-
         // QoE: Track bitrate after all attributes are processed (including contentBitrate)
         if (!state.isAd && !QOE_AGGREGATE.equals(action)) {
             trackBitrateFromProcessedAttributes(action, attr);
@@ -261,16 +259,10 @@ public class NRVideoTracker extends NRTracker {
 
         return attr;
     }
-
     public void updatePlaytime() {
         if (playtimeSinceLastEventTimestamp > 0) {
             playtimeSinceLastEvent = System.currentTimeMillis() - playtimeSinceLastEventTimestamp;
-            try {
-                totalPlaytime = safeAdd(totalPlaytime, playtimeSinceLastEvent);
-            } catch (ArithmeticException e) {
-                NRLog.w("Total playtime accumulation overflow - resetting to prevent data corruption");
-                totalPlaytime = playtimeSinceLastEvent;
-            }
+            totalPlaytime += playtimeSinceLastEvent;
             playtimeSinceLastEventTimestamp = System.currentTimeMillis();
         } else {
             playtimeSinceLastEvent = 0L;
@@ -298,6 +290,7 @@ public class NRVideoTracker extends NRTracker {
     public void sendStart() {
         if (state.goStart()) {
             startHeartbeat();
+            state.chrono.start();
             if (state.isAd) {
                 numberOfAds++;
                 ((NRVideoTracker) linkedTracker).sendPause ();
@@ -306,8 +299,6 @@ public class NRVideoTracker extends NRTracker {
                 }
                 sendVideoAdEvent(AD_START);
             } else {
-                // Start content chrono for content watch time
-                state.chrono.start();
                 if (linkedTracker instanceof NRVideoTracker) {
                     totalAdPlaytime = ((NRVideoTracker)linkedTracker).getTotalAdPlaytime();
                     // Store ad time for startup calculation (covers pre-roll scenario)
@@ -349,21 +340,21 @@ public class NRVideoTracker extends NRTracker {
     public void sendResume() {
         if (state.goResume()) {
             if(!state.isBuffering){
-                if (!state.isAd) {
-                    state.chrono.start();
-                }
+                state.chrono.start();
             }
 
-            // QoE: Calculate pause time during startup period (before CONTENT_START) using timing system
-            // This applies to both content and ad resumes that occurred during the startup window
-            if (!hasContentStarted) {
-                // Get pause duration from timing system instead of manual timestamp tracking
-                Long timeSinceAdPaused = getTimeSince(AD_PAUSE);
-                if (timeSinceAdPaused != null && timeSinceAdPaused > 0) {
+            // QoE: Calculate pause time during startup period for content events
+            if (!state.isAd && !hasContentStarted) {
+                // Content hasn't started yet, so this pause time should be excluded from startup calculation
+                Map<String, Object> resumeAttributes = getAttributes(CONTENT_RESUME, null);
+                Object timeSincePaused = resumeAttributes.get("timeSincePaused");
+
+                if (timeSincePaused instanceof Long && ((Long) timeSincePaused) > 0) {
                     try {
-                        startupPeriodPauseTime = safeAdd(startupPeriodPauseTime, timeSinceAdPaused);
+                        startupPeriodPauseTime = safeAdd(startupPeriodPauseTime, (Long) timeSincePaused);
                     } catch (ArithmeticException e) {
-                        startupPeriodPauseTime = timeSinceAdPaused;
+                        NRLog.w("QoE startup pause time accumulation overflow");
+                        startupPeriodPauseTime = (Long) timeSincePaused;
                     }
                 }
             }
@@ -402,7 +393,6 @@ public class NRVideoTracker extends NRTracker {
             playtimeSinceLastEventTimestamp = 0L;
             playtimeSinceLastEvent = 0L;
             totalPlaytime = 0L;
-
             // Reset QoE metrics for new view session
             resetQoeMetrics();
         }
@@ -444,9 +434,7 @@ public class NRVideoTracker extends NRTracker {
     public void sendBufferStart() {
         if (state.goBufferStart()) {
             if(state.isPlaying){
-                if (!state.isAd) {
-                    state.accumulatedVideoWatchTime += state.chrono.getDeltaTime();
-                }
+                state.accumulatedVideoWatchTime += state.chrono.getDeltaTime();
             }
             bufferType = calculateBufferType();
             if (state.isAd) {
@@ -464,9 +452,7 @@ public class NRVideoTracker extends NRTracker {
     public void sendBufferEnd() {
         if (state.goBufferEnd()) {
             if(state.isPlaying){
-                if (!state.isAd) {
-                    state.chrono.start();
-                }
+                state.chrono.start();
             }
             if (bufferType == null) {
                 bufferType = calculateBufferType();
@@ -474,14 +460,19 @@ public class NRVideoTracker extends NRTracker {
             if (state.isAd) {
                 sendVideoAdEvent(AD_BUFFER_END);
             } else {
-                // QoE: Calculate rebuffering time using timeSinceBufferBegin (excludes initial buffering)
+                // QoE: Calculate rebuffering time using timeSinceBufferBegin
+                // (excludes initial buffering)
                 Map<String, Object> attributes = getAttributes(CONTENT_BUFFER_END, null);
                 Object timeSinceBufferBegin = attributes.get("timeSinceBufferBegin");
-                if (timeSinceBufferBegin instanceof Long && !bufferType.equals("initial")) {
+                if (timeSinceBufferBegin instanceof Long &&
+                        !bufferType.equals("initial")) {
                     try {
-                        qoeTotalRebufferingTime = safeAdd(qoeTotalRebufferingTime, (Long) timeSinceBufferBegin);
+                        qoeTotalRebufferingTime = safeAdd(
+                                qoeTotalRebufferingTime,
+                                (Long) timeSinceBufferBegin
+                        );
                     } catch (ArithmeticException e) {
-                        NRLog.w("QoE rebuffering time accumulation overflow - resetting to prevent data corruption");
+                        NRLog.w("QoE rebuffering time accumulation overflow");
                         qoeTotalRebufferingTime = (Long) timeSinceBufferBegin;
                     }
                 }
@@ -549,32 +540,66 @@ public class NRVideoTracker extends NRTracker {
     private Map<String, Object> calculateQOEKpiAttributes() {
         Map<String, Object> kpiAttributes = new HashMap<>();
 
-        // Get timeSince values from QOE_AGGREGATE context (timeSince attributes should be included automatically)
-        Map<String, Object> currentAttribs = getAttributes(QOE_AGGREGATE, new HashMap<>());
-
-        // Apply timing attributes to get the timeSince values
-        applyTimingAttributes(QOE_AGGREGATE, currentAttribs);
-
-        Long timeSinceRequested = null;
-        Long timeSinceStarted = null;
-        Long timeSinceLastError = null;
-
-        // Only use timeSince values for content events, not ad events
-        if (!state.isAd) {
-            timeSinceRequested = (Long) currentAttribs.get("timeSinceRequested");
-            timeSinceStarted = (Long) currentAttribs.get("timeSinceStarted");
-            timeSinceLastError = (Long) currentAttribs.get("timeSinceLastError");
+        // peakBitrate - Maximum contentBitrate observed during content playback
+        if (qoePeakBitrate != null && qoePeakBitrate > 0) {
+            kpiAttributes.put("peakBitrate", qoePeakBitrate);
         }
 
-        // Add timeSince values to QOE_AGGREGATE events
-        if (timeSinceRequested != null) {
-            kpiAttributes.put("timeSinceRequested", timeSinceRequested);
+        // hadPlaybackFailure - Boolean indicating if CONTENT_ERROR occurred at any time during content playback
+        if (qoeHadPlaybackFailure == null) {
+            qoeHadPlaybackFailure = false;
+        }
+        kpiAttributes.put("hadPlaybackFailure", qoeHadPlaybackFailure);
+
+        // totalRebufferingTime - Total milliseconds spent rebuffering during content playback
+        if (qoeTotalRebufferingTime == null) {
+            qoeTotalRebufferingTime = 0L;
+        }
+        kpiAttributes.put("totalRebufferingTime", qoeTotalRebufferingTime);
+
+        // rebufferingRatio - Rebuffering time as a percentage of total playtime
+        if (totalPlaytime != null && totalPlaytime > 0) {
+            double rebufferingRatio = ((double) qoeTotalRebufferingTime / totalPlaytime) * 100;
+            kpiAttributes.put("rebufferingRatio", rebufferingRatio);
+        } else {
+            kpiAttributes.put("rebufferingRatio", 0.0);
         }
 
-        if (timeSinceStarted != null) {
-            kpiAttributes.put("timeSinceStarted", timeSinceStarted);
+        // totalPlaytime - Total milliseconds user spent watching content
+        if (totalPlaytime == null) {
+            totalPlaytime = 0L;
+        }
+        kpiAttributes.put("totalPlaytime", totalPlaytime);
+
+        // averageBitrate - Time-weighted average bitrate across all content playback
+        Long timeWeightedAverage = calculateTimeWeightedAverageBitrate();
+        if (timeWeightedAverage != null) {
+            kpiAttributes.put("averageBitrate", timeWeightedAverage);
+        } else if (qoeBitrateCount != null && qoeBitrateCount > 0 && qoeBitrateSum != null) {
+            // Fallback to simple average if time-weighted calculation is not available
+            long averageBitrate = Math.round((double) qoeBitrateSum / qoeBitrateCount);
+            kpiAttributes.put("averageBitrate", averageBitrate);
         }
 
+        // qoeAggregateVersion - Version identifier for QOE calculation algorithm
+        kpiAttributes.put("qoeAggregateVersion", "1.0.0");
+
+        return kpiAttributes;
+    }
+
+    /**
+     * Calculate and add startup time to QOE_AGGREGATE attributes.
+     * Called from NRTracker.sendEvent() where timing attributes are already available.
+     *
+     * @param attributes The QOE_AGGREGATE attributes map to add startup time to
+     * @param timeSinceRequested Time since CONTENT_REQUEST event
+     * @param timeSinceStarted Time since CONTENT_START event
+     * @param timeSinceLastError Time since CONTENT_ERROR event
+     */
+    public void calculateAndAddStartupTime(Map<String, Object> attributes,
+                                         Long timeSinceRequested,
+                                         Long timeSinceStarted,
+                                         Long timeSinceLastError) {
         // startupTime - Calculate once during first QOE_AGGREGATE event and cache for reuse
         if (qoeStartupTime == null && timeSinceRequested != null) {
             Long rawStartupTime = null;
@@ -582,11 +607,9 @@ public class NRVideoTracker extends NRTracker {
             // Calculate startup time using timeSince values
             if (timeSinceStarted != null) {
                 // Normal startup success: rawStartupTime = timeSinceRequested - timeSinceStarted
-                // (START happened after REQUEST, so timeSinceStarted should be smaller)
                 rawStartupTime = timeSinceRequested - timeSinceStarted;
             } else if (timeSinceLastError != null) {
                 // Startup failure: rawStartupTime = timeSinceRequested - timeSinceLastError
-                // (ERROR happened after REQUEST, so timeSinceLastError should be smaller)
                 rawStartupTime = timeSinceRequested - timeSinceLastError;
             }
 
@@ -599,12 +622,10 @@ public class NRVideoTracker extends NRTracker {
                     if (startupPeriodAdTime != null && startupPeriodAdTime > 0) {
                         totalExclusionTime += startupPeriodAdTime;
                     }
-
                     // Exclude pause time that occurred during startup period
                     if (startupPeriodPauseTime != null && startupPeriodPauseTime > 0) {
                         totalExclusionTime += startupPeriodPauseTime;
                     }
-
                     // Apply enhanced exclusion pattern: max(rawTime - adTime - pauseTime, 0)
                     qoeStartupTime = Math.max(rawStartupTime - totalExclusionTime, 0L);
                 } else {
@@ -616,50 +637,15 @@ public class NRVideoTracker extends NRTracker {
 
         // Include cached startup time if available (including zero for instant startup)
         if (qoeStartupTime != null && qoeStartupTime >= 0) {
-            kpiAttributes.put("startupTime", qoeStartupTime);
-        }
-
-        // peakBitrate - Maximum contentBitrate observed during content playback
-        if (qoePeakBitrate != null && qoePeakBitrate > 0) {
-            kpiAttributes.put("peakBitrate", qoePeakBitrate);
-        }
-
-        // hadStartupFailure - Boolean indicating if CONTENT_ERROR occurred before CONTENT_START
-        // True when we have timeSinceLastError but no timeSinceStarted (content never started)
-        boolean hadStartupFailure = (timeSinceLastError != null && timeSinceStarted == null);
-        kpiAttributes.put("hadStartupFailure", hadStartupFailure);
-
-        // hadPlaybackFailure - Boolean indicating if CONTENT_ERROR occurred at any time during content playback
-        kpiAttributes.put("hadPlaybackFailure", qoeHadPlaybackFailure);
-
-        // totalRebufferingTime - Total milliseconds spent rebuffering during content playback
-        kpiAttributes.put("totalRebufferingTime", qoeTotalRebufferingTime);
-
-        // rebufferingRatio - Rebuffering time as a percentage of total playtime
-        if (totalPlaytime > 0) {
-            double rebufferingRatio = ((double) qoeTotalRebufferingTime / totalPlaytime) * 100;
-            kpiAttributes.put("rebufferingRatio", rebufferingRatio);
+            attributes.put("startupTime", qoeStartupTime);
         } else {
-            kpiAttributes.put("rebufferingRatio", 0.0);
+            attributes.put("startupTime", 0L);
         }
 
-        // totalPlaytime - Total milliseconds user spent watching content
-        kpiAttributes.put("totalPlaytime", totalPlaytime);
-
-        // averageBitrate - Time-weighted average bitrate across all content playback
-        Long timeWeightedAverage = calculateTimeWeightedAverageBitrate();
-        if (timeWeightedAverage != null) {
-            kpiAttributes.put("averageBitrate", timeWeightedAverage);
-        } else if (qoeBitrateCount > 0) {
-            // Fallback to simple average if time-weighted calculation is not available
-            long averageBitrate = Math.round((double) qoeBitrateSum / qoeBitrateCount);
-            kpiAttributes.put("averageBitrate", averageBitrate);
-        }
-
-        // qoeAggregateVersion - Version identifier for QOE calculation algorithm
-        kpiAttributes.put("qoeAggregateVersion", "1.0.0");
-
-        return kpiAttributes;
+        // Calculate hadStartupFailure using simple logic: if content never started playing and there are errors
+        // Simple check: if totalPlaytime is 0 or null AND there are errors, it's a startup failure
+        boolean hadStartupFailure = (totalPlaytime == null || totalPlaytime == 0) && numberOfErrors > 0;
+        attributes.put("hadStartupFailure", hadStartupFailure);
     }
 
     /**
@@ -796,6 +782,7 @@ public class NRVideoTracker extends NRTracker {
             errorMessage = "<Unknown error>";
         }
         numberOfErrors++;
+
         Map<String, Object> errAttr = new HashMap<>();
         errAttr.put("errorMessage", errorMessage);
         errAttr.put("errorCode", errorCode);
@@ -804,16 +791,11 @@ public class NRVideoTracker extends NRTracker {
         if (state.isAd) {
             actionName = AD_ERROR;
         } else {
-            // QoE: Track playback errors for content (errors after CONTENT_START)
-            Map<String, Object> currentAttributes = getAttributes(actionName, null);
-            Object timeSinceStarted = currentAttributes.get("timeSinceStarted");
-            if (timeSinceStarted != null) {
-                // Error occurred after CONTENT_START, so it's a playback failure
+            if (totalPlaytime != null && totalPlaytime > 0) {
+                // Error occurred after content started playing, so it's a playback failure
                 qoeHadPlaybackFailure = true;
             }
         }
-
-
         sendVideoErrorEvent(actionName, errAttr);
     }
 
@@ -1162,13 +1144,13 @@ public class NRVideoTracker extends NRTracker {
     public void generateTimeSinceTable() {
         super.generateTimeSinceTable();
 
-        addTimeSinceEntry(CONTENT_HEARTBEAT, "timeSinceLastHeartbeat", "^CONTENT_[A-Z_]+$");
+        addTimeSinceEntry(CONTENT_HEARTBEAT, "timeSinceLastHeartbeat", "^(CONTENT_[A-Z_]+|QOE_[A-Z_]+)$");
         addTimeSinceEntry(AD_HEARTBEAT, "timeSinceLastAdHeartbeat", "^AD_[A-Z_]+$");
 
-        addTimeSinceEntry(CONTENT_REQUEST, "timeSinceRequested", "^(CONTENT_[A-Z_]+|QOE_AGGREGATE)$");
+        addTimeSinceEntry(CONTENT_REQUEST, "timeSinceRequested", "^(CONTENT_[A-Z_]+|QOE_[A-Z_]+)$");
         addTimeSinceEntry(AD_REQUEST, "timeSinceAdRequested", "^AD_[A-Z_]+$");
 
-        addTimeSinceEntry(CONTENT_START, "timeSinceStarted", "^(CONTENT_[A-Z_]+|QOE_AGGREGATE)$");
+        addTimeSinceEntry(CONTENT_START, "timeSinceStarted", "^(CONTENT_[A-Z_]+|QOE_[A-Z_]+)$");
         addTimeSinceEntry(AD_START, "timeSinceAdStarted", "^AD_[A-Z_]+$");
 
         addTimeSinceEntry(CONTENT_PAUSE, "timeSincePaused", "^CONTENT_RESUME$");
@@ -1186,7 +1168,7 @@ public class NRVideoTracker extends NRTracker {
         addTimeSinceEntry(CONTENT_BUFFER_START, "timeSinceBufferBegin", "^CONTENT_BUFFER_END$");
         addTimeSinceEntry(AD_BUFFER_START, "timeSinceAdBufferBegin", "^AD_BUFFER_END$");
 
-        addTimeSinceEntry(CONTENT_ERROR, "timeSinceLastError", "^(CONTENT_[A-Z_]+|QOE_AGGREGATE)$");
+        addTimeSinceEntry(CONTENT_ERROR, "timeSinceLastError", "^(CONTENT_[A-Z_]+|QOE_[A-Z_]+)$");
         addTimeSinceEntry(AD_ERROR, "timeSinceLastAdError", "^AD_[A-Z_]+$");
 
         addTimeSinceEntry(CONTENT_RENDITION_CHANGE, "timeSinceLastRenditionChange", "^CONTENT_RENDITION_CHANGE$");
@@ -1274,15 +1256,12 @@ public class NRVideoTracker extends NRTracker {
         if (currentBitrate == null || currentBitrate <= 0) {
             return;
         }
-
         // Skip if this is the same bitrate we just tracked (avoid duplicate processing)
         if (qoeLastTrackedBitrate != null && qoeLastTrackedBitrate.equals(currentBitrate)) {
             return;
         }
-
         // Update cached value to prevent duplicate processing
         qoeLastTrackedBitrate = currentBitrate;
-
         // Update QoE metrics efficiently
         updateQoeBitrateMetrics(currentBitrate, action);
     }
@@ -1355,5 +1334,4 @@ public class NRVideoTracker extends NRTracker {
 
         return result;
     }
-
 }

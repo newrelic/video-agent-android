@@ -73,27 +73,6 @@ public class NRTracker {
         attributes = eventAttributes.generateAttributes(action, attributes);
         return attributes;
     }
-
-    /**
-     * Apply timing attributes to the given attributes map.
-     *
-     * @param action Action name.
-     * @param attributes Attributes map to apply timing attributes to.
-     */
-    protected void applyTimingAttributes(String action, Map<String, Object> attributes) {
-        timeSinceTable.applyAttributes(action, attributes);
-    }
-
-    /**
-     * Get time since for a specific action.
-     *
-     * @param action Action to get time since for.
-     * @return Time since in milliseconds, or null if not found.
-     */
-    protected Long getTimeSince(String action) {
-        return timeSinceTable.getTimeSince(action);
-    }
-
     /**
      * Add an entry to the timeSince table.
      *
@@ -161,6 +140,9 @@ public class NRTracker {
     public void sendEvent(String eventType, String action, Map<String, Object> attributes) {
         attributes = getAttributes(action, attributes);
         timeSinceTable.applyAttributes(action, attributes);
+
+        // Process QOE_AGGREGATE events with timing calculations
+        processQoeAggregateEvent(action, attributes);
 
         attributes.put("agentSession", getAgentSession());
         attributes.put("instrumentation.provider", "newrelic");
@@ -267,5 +249,26 @@ public class NRTracker {
     public String getAgentSession() {
         return NewRelicVideoAgent.getInstance().getSessionId();
     }
-
+    /**
+     * Process QOE_AGGREGATE events by extracting timing attributes and calculating startup time.
+     * This method handles all QoE-specific processing that requires timing data.
+     *
+     * @param action The event action name
+     * @param attributes The event attributes map (timing attributes already applied)
+     */
+    private void processQoeAggregateEvent(String action, Map<String, Object> attributes) {
+        // Only process QOE_AGGREGATE events
+        if (!QOE_AGGREGATE.equals(action)) {
+            return;
+        }
+        // Extract timing attributes that are already available in the attributes map
+        Long timeSinceRequested = (Long) attributes.get("timeSinceRequested");
+        Long timeSinceStarted = (Long) attributes.get("timeSinceStarted");
+        Long timeSinceLastError = (Long) attributes.get("timeSinceLastError");
+        // Calculate startup time and other timing-dependent metrics if this is a NRVideoTracker
+        if (this instanceof NRVideoTracker) {
+            NRVideoTracker videoTracker = (NRVideoTracker) this;
+            videoTracker.calculateAndAddStartupTime(attributes, timeSinceRequested, timeSinceStarted, timeSinceLastError);
+        }
+    }
 }
