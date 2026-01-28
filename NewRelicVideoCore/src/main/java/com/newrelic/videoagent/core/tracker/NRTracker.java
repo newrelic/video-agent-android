@@ -141,8 +141,8 @@ public class NRTracker {
         attributes = getAttributes(action, attributes);
         timeSinceTable.applyAttributes(action, attributes);
 
-        // Process QOE_AGGREGATE events with timing calculations
-        processQoeAggregateEvent(action, attributes);
+        // Process QoE events that require timing attributes
+        processQoeEvents(action, attributes);
 
         attributes.put("agentSession", getAgentSession());
         attributes.put("instrumentation.provider", "newrelic");
@@ -250,25 +250,27 @@ public class NRTracker {
         return NewRelicVideoAgent.getInstance().getSessionId();
     }
     /**
-     * Process QOE_AGGREGATE events by extracting timing attributes and calculating startup time.
-     * This method handles all QoE-specific processing that requires timing data.
+     * Process QoE events that require timing attributes to be already applied.
+     * This method handles QOE_AGGREGATE and CONTENT_BUFFER_END events for various QoE calculations.
      *
      * @param action The event action name
      * @param attributes The event attributes map (timing attributes already applied)
      */
-    private void processQoeAggregateEvent(String action, Map<String, Object> attributes) {
-        // Only process QOE_AGGREGATE events
-        if (!QOE_AGGREGATE.equals(action)) {
-            return;
-        }
-        // Extract timing attributes that are already available in the attributes map
-        Long timeSinceRequested = (Long) attributes.get("timeSinceRequested");
-        Long timeSinceStarted = (Long) attributes.get("timeSinceStarted");
-        Long timeSinceLastError = (Long) attributes.get("timeSinceLastError");
-        // Calculate startup time and other timing-dependent metrics if this is a NRVideoTracker
+    private void processQoeEvents(String action, Map<String, Object> attributes) {
         if (this instanceof NRVideoTracker) {
             NRVideoTracker videoTracker = (NRVideoTracker) this;
-            videoTracker.calculateAndAddStartupTime(attributes, timeSinceRequested, timeSinceStarted, timeSinceLastError);
+
+            if (QOE_AGGREGATE.equals(action)) {
+                // Process QOE_AGGREGATE events for startup time calculation
+                Long timeSinceRequested = (Long) attributes.get("timeSinceRequested");
+                Long timeSinceStarted = (Long) attributes.get("timeSinceStarted");
+                Long timeSinceLastError = (Long) attributes.get("timeSinceLastError");
+                videoTracker.calculateAndAddStartupTime(attributes, timeSinceRequested, timeSinceStarted, timeSinceLastError);
+            }
+            else if (CONTENT_BUFFER_END.equals(action)) {
+                // Process CONTENT_BUFFER_END events for rebuffering time calculation
+                videoTracker.calculateRebufferingTime(attributes);
+            }
         }
     }
 }

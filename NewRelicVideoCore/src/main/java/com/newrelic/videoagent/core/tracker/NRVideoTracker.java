@@ -52,6 +52,7 @@ public class NRVideoTracker extends NRTracker {
     private Long startupPeriodAdTime; // Ad time that occurred during startup period
     private Long startupPeriodPauseTime; // Pause time that occurred during startup period
     private boolean hasContentStarted; // Tracks whether content has successfully started (for buffer classification)
+    private boolean initialBufferingHappened; // Tracks if initial buffering completed
 
     // Time-weighted bitrate calculation fields
     private Long qoeCurrentBitrate;
@@ -91,6 +92,7 @@ public class NRVideoTracker extends NRTracker {
         startupPeriodAdTime = 0L;
         startupPeriodPauseTime = 0L;
         hasContentStarted = false;
+        initialBufferingHappened = false;
 
         // Initialize time-weighted bitrate tracking
         qoeCurrentBitrate = null;
@@ -282,6 +284,8 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_REQUEST);
             } else {
                 sendVideoEvent(CONTENT_REQUEST);
+                // Send single and latest QOE with this VideoAction event
+                sendQoeAggregate();
             }
         }
     }
@@ -312,6 +316,8 @@ public class NRVideoTracker extends NRTracker {
                 hasContentStarted = true;
 
                 sendVideoEvent(CONTENT_START);
+                // Send single and latest QOE with this VideoAction event
+                sendQoeAggregate();
             }
             playtimeSinceLastEventTimestamp = System.currentTimeMillis();
         }
@@ -331,6 +337,8 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_PAUSE);
             } else {
                 sendVideoEvent(CONTENT_PAUSE);
+                // Send single and latest QOE with this VideoAction event
+                sendQoeAggregate();
             }
             playtimeSinceLastEventTimestamp = 0L;
         }
@@ -365,6 +373,8 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_RESUME);
             } else {
                 sendVideoEvent(CONTENT_RESUME);
+                // Send single and latest QOE with this VideoAction event
+                sendQoeAggregate();
             }
             if (!state.isBuffering && !state.isSeeking) {
                 playtimeSinceLastEventTimestamp = System.currentTimeMillis();
@@ -386,6 +396,8 @@ public class NRVideoTracker extends NRTracker {
                 totalAdPlaytime = totalAdPlaytime + totalPlaytime;
             } else {
                 sendVideoEvent(CONTENT_END);
+                // Send single and latest QOE with this VideoAction event
+                sendQoeAggregate();
             }
 
             stopHeartbeat();
@@ -409,6 +421,8 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_SEEK_START);
             } else {
                 sendVideoEvent(CONTENT_SEEK_START);
+                // Send single and latest QOE with this VideoAction event
+                sendQoeAggregate();
             }
             playtimeSinceLastEventTimestamp = 0L;
         }
@@ -423,6 +437,8 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_SEEK_END);
             } else {
                 sendVideoEvent(CONTENT_SEEK_END);
+                // Send single and latest QOE with this VideoAction event
+                sendQoeAggregate();
             }
             if (!state.isBuffering && !state.isPaused) {
                 playtimeSinceLastEventTimestamp = System.currentTimeMillis();
@@ -443,6 +459,8 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_BUFFER_START);
             } else {
                 sendVideoEvent(CONTENT_BUFFER_START);
+                // Send single and latest QOE with this VideoAction event
+                sendQoeAggregate();
             }
             playtimeSinceLastEventTimestamp = 0L;
         }
@@ -462,23 +480,9 @@ public class NRVideoTracker extends NRTracker {
             if (state.isAd) {
                 sendVideoAdEvent(AD_BUFFER_END);
             } else {
-                // QoE: Calculate rebuffering time using timeSinceBufferBegin
-                // (excludes initial buffering)
-                Map<String, Object> attributes = getAttributes(CONTENT_BUFFER_END, null);
-                Object timeSinceBufferBegin = attributes.get("timeSinceBufferBegin");
-                if (timeSinceBufferBegin instanceof Long &&
-                        !bufferType.equals("initial")) {
-                    try {
-                        qoeTotalRebufferingTime = safeAdd(
-                                qoeTotalRebufferingTime,
-                                (Long) timeSinceBufferBegin
-                        );
-                    } catch (ArithmeticException e) {
-                        NRLog.w("QoE rebuffering time accumulation overflow");
-                        qoeTotalRebufferingTime = (Long) timeSinceBufferBegin;
-                    }
-                }
                 sendVideoEvent(CONTENT_BUFFER_END);
+                // Send single and latest QOE with this VideoAction event
+                sendQoeAggregate();
             }
             if (!state.isSeeking && !state.isPaused) {
                 playtimeSinceLastEventTimestamp = System.currentTimeMillis();
@@ -503,6 +507,7 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_HEARTBEAT,eventData);
             } else {
                 sendVideoEvent(CONTENT_HEARTBEAT, eventData);
+                // Send single and latest QOE with this VideoAction event
                 sendQoeAggregate();
             }
         }
@@ -519,6 +524,8 @@ public class NRVideoTracker extends NRTracker {
             sendVideoAdEvent(AD_RENDITION_CHANGE);
         } else {
             sendVideoEvent(CONTENT_RENDITION_CHANGE);
+            // Send single and latest QOE with this VideoAction event
+            sendQoeAggregate();
         }
     }
 
@@ -587,6 +594,35 @@ public class NRVideoTracker extends NRTracker {
         kpiAttributes.put("qoeAggregateVersion", "1.0.0");
 
         return kpiAttributes;
+    }
+
+    /**
+     * Calculate rebuffering time from CONTENT_BUFFER_END events.
+     * Called from NRTracker.processBufferEndEvent() where timing attributes are already available.
+     *
+     * @param attributes The CONTENT_BUFFER_END attributes map (timing attributes already applied)
+     */
+    public void calculateRebufferingTime(Map<String, Object> attributes) {
+        // Extract timeSinceBufferBegin which is now available after applyAttributes()
+        Object timeSinceBufferBegin = attributes.get("timeSinceBufferBegin");
+
+        if (timeSinceBufferBegin instanceof Long &&
+                initialBufferingHappened) { // Only count if initial buffering already completed
+            try {
+                long previousTotal = qoeTotalRebufferingTime;
+                qoeTotalRebufferingTime = safeAdd(
+                        qoeTotalRebufferingTime,
+                        (Long) timeSinceBufferBegin
+                );
+            } catch (ArithmeticException e) {
+                NRLog.w("QoE rebuffering time accumulation overflow");
+                qoeTotalRebufferingTime = (Long) timeSinceBufferBegin;
+            }
+        }
+        // Set initialBufferingHappened flag after processing this buffer event
+        if (!initialBufferingHappened) {
+            initialBufferingHappened = true;
+        }
     }
 
     /**
@@ -757,6 +793,7 @@ public class NRVideoTracker extends NRTracker {
         startupPeriodAdTime = null;
         startupPeriodPauseTime = 0L; // Reset pause time tracking for new view session
         hasContentStarted = false;
+        initialBufferingHappened = false; // Reset initial buffering flag for new view session
 
         // Reset time-weighted bitrate fields
         qoeCurrentBitrate = null;
