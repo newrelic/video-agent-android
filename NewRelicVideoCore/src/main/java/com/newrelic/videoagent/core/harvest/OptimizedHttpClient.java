@@ -63,9 +63,9 @@ public class OptimizedHttpClient implements HttpClientInterface {
             this.endpointUrl = "https://" + configuration.getCollectorAddress() + "/mobile/v3/data";
         } else {
             // Otherwise, auto-detect from region
-            String region = configuration.getRegion().toUpperCase();
-            String regionEndpoint = REGIONAL_ENDPOINTS.get(region);
-            this.endpointUrl = regionEndpoint != null ? regionEndpoint : REGIONAL_ENDPOINTS.get("DEFAULT");
+            String region = configuration.getRegion();
+            region = (region != null) ? region.toUpperCase() : "US";
+            this.endpointUrl = REGIONAL_ENDPOINTS.getOrDefault(region, REGIONAL_ENDPOINTS.get("DEFAULT"));
         }
 
         if (configuration.isMemoryOptimized()) {

@@ -164,7 +164,8 @@ public final class TokenManager {
         }
 
         // Otherwise, auto-detect from region
-        String region = configuration.getRegion().toUpperCase();
+        String region = configuration.getRegion();
+        region = (region != null) ? region.toUpperCase() : "US";
         switch (region) {
             case "EU":
                 return "https://mobile-collector.eu.newrelic.com/mobile/v5/connect";
