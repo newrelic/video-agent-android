@@ -42,6 +42,17 @@ public final class NRVideo {
         return instance != null;
     }
 
+    /**
+     * Get configured harvest cycle in seconds
+     * @return harvest cycle seconds, or default 60 if not initialized
+     */
+    public static int getHarvestCycleSeconds() {
+        if (instance != null && instance.harvestManager != null) {
+            return instance.harvestManager.getFactory().getConfiguration().getHarvestCycleSeconds();
+        }
+        return 60; // Default harvest cycle
+    }
+
     public static Integer addPlayer(NRVideoPlayerConfiguration config) {
         if (!isInitialized()) {
             NRLog.w("NRVideo not initialized - cannot add player");
@@ -152,7 +163,7 @@ public final class NRVideo {
             NRTracker contentTracker = NewRelicVideoAgent.getInstance().getContentTracker(trackerId);
             if (contentTracker != null) {
                 contentTracker.sendEvent(action, attributes);
-            } 
+            }
         } else {
             // Global event - send to all trackers
             NRVideo videoInstance = getInstance();
@@ -224,7 +235,7 @@ public final class NRVideo {
             if (applicationContext instanceof Application) {
                 Application app = (Application) applicationContext;
                 NRVideoLifecycleObserver lifecycleObserver =
-                    new NRVideoLifecycleObserver(harvestManager.getFactory());
+                        new NRVideoLifecycleObserver(harvestManager.getFactory());
 
                 // Register with application
                 app.registerActivityLifecycleCallbacks(lifecycleObserver);
