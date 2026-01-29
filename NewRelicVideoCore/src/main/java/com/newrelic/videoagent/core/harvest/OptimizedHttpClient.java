@@ -65,7 +65,8 @@ public class OptimizedHttpClient implements HttpClientInterface {
             // Otherwise, auto-detect from region
             String region = configuration.getRegion();
             region = (region != null) ? region.toUpperCase() : "US";
-            this.endpointUrl = REGIONAL_ENDPOINTS.getOrDefault(region, REGIONAL_ENDPOINTS.get("DEFAULT"));
+            String endpoint = REGIONAL_ENDPOINTS.get(region);
+            this.endpointUrl = (endpoint != null) ? endpoint : REGIONAL_ENDPOINTS.get("DEFAULT");
         }
 
         if (configuration.isMemoryOptimized()) {
