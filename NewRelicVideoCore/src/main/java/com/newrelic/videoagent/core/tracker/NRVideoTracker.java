@@ -564,27 +564,12 @@ public class NRVideoTracker extends NRTracker {
         long currentTime = System.currentTimeMillis();
         // Use user-configured harvest cycle
         long harvestCycleMs = NRVideo.getHarvestCycleSeconds() * 1000L;
-
-        NRLog.d("Checking QOE_AGGREGATE cycle - currentTime: " + currentTime +
-               ", lastHarvestCycleTimestamp: " + lastHarvestCycleTimestamp +
-               ", harvestCycleMs: " + harvestCycleMs);
-
         // Check if we're in a new harvest cycle
         if (lastHarvestCycleTimestamp == null ||
             (currentTime - lastHarvestCycleTimestamp) >= harvestCycleMs) {
-
-            // New harvest cycle - reset flags
-            if (lastHarvestCycleTimestamp != null) {
-                NRLog.d("New harvest cycle started - resetting QOE_AGGREGATE flags (cycle: " +
-                       (harvestCycleMs / 1000) + "s)");
-            }
             resetHarvestCycleFlags();
             lastHarvestCycleTimestamp = currentTime;
         }
-
-        NRLog.d("QOE_AGGREGATE flags - hasVideoActionInCurrentCycle: " + hasVideoActionInCurrentCycle +
-               ", qoeAggregateAlreadySent: " + qoeAggregateAlreadySent);
-
         // Send QOE_AGGREGATE if we haven't sent it yet and we have video actions
         if (hasVideoActionInCurrentCycle && !qoeAggregateAlreadySent) {
             sendQoeAggregate();
