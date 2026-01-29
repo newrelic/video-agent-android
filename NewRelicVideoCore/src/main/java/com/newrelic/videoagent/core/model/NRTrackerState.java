@@ -256,5 +256,4 @@ public class NRTrackerState {
         } else {
             return false;
         }
-    }
-}
+    }}

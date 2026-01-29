@@ -521,7 +521,6 @@ public class NRVideoTracker extends NRTracker {
         state.accumulatedVideoWatchTime = 0L;
     }
 
-
     /**
      * Send rendition change event.
      */
@@ -1369,7 +1368,6 @@ public class NRVideoTracker extends NRTracker {
         updateQoeBitrateMetrics(currentBitrate, action);
     }
 
-
     /**
      * Efficiently extract Long bitrate value from various numeric types.
      * @param bitrateObj Object that may contain bitrate value
@@ -1407,9 +1405,7 @@ public class NRVideoTracker extends NRTracker {
             qoeBitrateSum = safeAdd(qoeBitrateSum, bitrate);
             qoeBitrateCount++;
         }
-
         // QoE bitrate tracking completed
-
     }
 
 
@@ -1434,7 +1430,6 @@ public class NRVideoTracker extends NRTracker {
         if (((a ^ result) & (b ^ result)) < 0) {
             throw new ArithmeticException("long overflow");
         }
-
         return result;
     }
 }
