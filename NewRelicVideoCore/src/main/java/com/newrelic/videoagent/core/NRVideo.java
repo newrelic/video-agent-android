@@ -42,6 +42,17 @@ public final class NRVideo {
         return instance != null;
     }
 
+    /**
+     * Get configured harvest cycle in seconds
+     * @return harvest cycle seconds, or default 60 if not initialized
+     */
+    public static int getHarvestCycleSeconds() {
+        if (instance != null && instance.harvestManager != null) {
+            return instance.harvestManager.getFactory().getConfiguration().getHarvestCycleSeconds();
+        }
+        return 60; // Default harvest cycle
+    }
+
     public static Integer addPlayer(NRVideoPlayerConfiguration config) {
         if (!isInitialized()) {
             NRLog.w("NRVideo not initialized - cannot add player");
