@@ -73,7 +73,6 @@ public class NRTracker {
         attributes = eventAttributes.generateAttributes(action, attributes);
         return attributes;
     }
-
     /**
      * Add an entry to the timeSince table.
      *
@@ -141,6 +140,9 @@ public class NRTracker {
     public void sendEvent(String eventType, String action, Map<String, Object> attributes) {
         attributes = getAttributes(action, attributes);
         timeSinceTable.applyAttributes(action, attributes);
+
+        // Process QoE events that require timing attributes
+        processQoeEvents(action, attributes);
 
         attributes.put("agentSession", getAgentSession());
         attributes.put("instrumentation.provider", "newrelic");
@@ -247,5 +249,28 @@ public class NRTracker {
     public String getAgentSession() {
         return NewRelicVideoAgent.getInstance().getSessionId();
     }
+    /**
+     * Process QoE events that require timing attributes to be already applied.
+     * This method handles QOE_AGGREGATE and CONTENT_BUFFER_END events for various QoE calculations.
+     *
+     * @param action The event action name
+     * @param attributes The event attributes map (timing attributes already applied)
+     */
+    private void processQoeEvents(String action, Map<String, Object> attributes) {
+        if (this instanceof NRVideoTracker) {
+            NRVideoTracker videoTracker = (NRVideoTracker) this;
 
+            if (QOE_AGGREGATE.equals(action)) {
+                // Process QOE_AGGREGATE events for startup time calculation
+                Long timeSinceRequested = (Long) attributes.get("timeSinceRequested");
+                Long timeSinceStarted = (Long) attributes.get("timeSinceStarted");
+                Long timeSinceLastError = (Long) attributes.get("timeSinceLastError");
+                videoTracker.calculateAndAddStartupTime(attributes, timeSinceRequested, timeSinceStarted, timeSinceLastError);
+            }
+            else if (CONTENT_BUFFER_END.equals(action)) {
+                // Process CONTENT_BUFFER_END events for rebuffering time calculation
+                videoTracker.calculateRebufferingTime(attributes);
+            }
+        }
+    }
 }
