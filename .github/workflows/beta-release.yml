@@ -52,17 +52,43 @@ jobs:
         run: |
           CURRENT_VERSION="${{ steps.current_version.outputs.current_version }}"
 
-          # Run dry-run
+          # Run semantic-release dry-run to determine bump type
           npx semantic-release --dry-run --no-ci > semantic-output.txt 2>&1 || true
           cat semantic-output.txt
 
-          # Parse output
-          NEXT_VERSION=$(grep "The next release version is" semantic-output.txt | sed -E 's/.*The next release version is ([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -1)
-
-          if [ -z "$NEXT_VERSION" ]; then
+          # Check if semantic-release determined a new version is needed
+          if ! grep -q "The next release version is" semantic-output.txt; then
             echo "::notice::No new version needed."
             echo "should_create_pr=false" >> $GITHUB_OUTPUT
             exit 0
+          fi
+
+          # Get the version that semantic-release would create (for comparison)
+          SR_VERSION=$(grep "The next release version is" semantic-output.txt | sed -E 's/.*The next release version is ([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -1)
+
+          # Strip -beta suffix from current version to get base version
+          BASE_VERSION=$(echo "$CURRENT_VERSION" | sed 's/-beta$//')
+
+          # Parse current version components
+          CURRENT_MAJOR=$(echo "$BASE_VERSION" | cut -d. -f1)
+          CURRENT_MINOR=$(echo "$BASE_VERSION" | cut -d. -f2)
+          CURRENT_PATCH=$(echo "$BASE_VERSION" | cut -d. -f3)
+
+          # Parse semantic-release suggested version components
+          SR_MAJOR=$(echo "$SR_VERSION" | cut -d. -f1)
+          SR_MINOR=$(echo "$SR_VERSION" | cut -d. -f2)
+          SR_PATCH=$(echo "$SR_VERSION" | cut -d. -f3)
+
+          # Determine bump type and apply to current version
+          if [ "$SR_MAJOR" -gt "$CURRENT_MAJOR" ]; then
+            # Major bump
+            NEXT_VERSION="$((CURRENT_MAJOR + 1)).0.0"
+          elif [ "$SR_MINOR" -gt "$CURRENT_MINOR" ]; then
+            # Minor bump
+            NEXT_VERSION="${CURRENT_MAJOR}.$((CURRENT_MINOR + 1)).0"
+          else
+            # Patch bump
+            NEXT_VERSION="${CURRENT_MAJOR}.${CURRENT_MINOR}.$((CURRENT_PATCH + 1))"
           fi
 
           # Create beta version
