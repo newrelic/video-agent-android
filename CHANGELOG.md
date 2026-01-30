@@ -1,9 +1,3 @@
-## ## [4.0.6](https://github.com/newrelic/video-agent-android/compare/v4.0.5...v4.0.6) (2026-01-30)
-
-### Bug Fixes
-
-* Drop bitrate attributes before content/ad start - `contentBitrate`, `contentRenditionBitrate`, `adBitrate`, and `adRenditionBitrate` are now only included in events after the first frame is shown (CONTENT_START/AD_START). This ensures bitrate values represent actual playback quality rather than pre-start estimates, aligning behavior with the JavaScript video-core-js library.
-
 ## [4.0.5](https://github.com/newrelic/video-agent-android/compare/v4.0.4...v4.0.5) (2026-01-20)
 
 ### Bug Fixes
