@@ -1,3 +1,9 @@
+## [4.1.0-beta](https://github.com/newrelic/video-agent-android/compare/v4.0.5...v4.1.0-beta) (2026-01-30)
+
+### Features
+
+* add beta release workflow for JitPack from stable-beta branch ([94475c6](https://github.com/newrelic/video-agent-android/commit/94475c6da583f9a6bb583077c5372e56c5c79d2b))
+* beta release workflow update ([131dd23](https://github.com/newrelic/video-agent-android/commit/131dd232ea3dd293695ecf65abe77709d5ebd2a7))
 ## [4.0.5](https://github.com/newrelic/video-agent-android/compare/v4.0.4...v4.0.5) (2026-01-20)
 
 ### Bug Fixes
