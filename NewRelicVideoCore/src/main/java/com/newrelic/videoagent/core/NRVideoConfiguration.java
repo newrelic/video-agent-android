@@ -4,6 +4,7 @@ import android.app.ActivityManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import com.newrelic.videoagent.core.utils.NRLog;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -44,6 +45,14 @@ public final class NRVideoConfiguration {
     private final boolean isTV;
     private final String collectorAddress;
 
+    // Runtime configuration fields (mutable, thread-safe) - Using AtomicBoolean for better performance
+    private final AtomicBoolean qoeAggregateEnabled = new AtomicBoolean(true);
+    private final AtomicBoolean runtimeConfigInitialized = new AtomicBoolean(false);
+
+    // Static holder for current configuration instance (for tracker access)
+    // WeakReference to prevent memory leaks if static cleanup is missed
+    private static volatile java.lang.ref.WeakReference<NRVideoConfiguration> currentInstanceRef;
+
     // Performance optimization constants
     private static final int DEFAULT_HARVEST_CYCLE_SECONDS = 5 * 60; // 5 minutes
     private static final int DEFAULT_LIVE_HARVEST_CYCLE_SECONDS = 30; // 30 seconds
@@ -79,7 +88,6 @@ public final class NRVideoConfiguration {
         this.memoryOptimized = builder.memoryOptimized;
         this.debugLoggingEnabled = builder.debugLoggingEnabled;
         this.isTV = builder.isTV;
-        this.collectorAddress = builder.collectorAddress;
     }
 
     // Immutable getters
@@ -95,6 +103,55 @@ public final class NRVideoConfiguration {
     public boolean isTV() { return isTV; }
     public String getCollectorAddress() { return collectorAddress; }
 
+    // Runtime configuration getters and setters
+    /**
+     * Check if QOE_AGGREGATE events should be sent during harvest cycles
+     * @return true if QOE_AGGREGATE should be sent, false otherwise
+     */
+    public boolean isQoeAggregateEnabled() {
+        if (!runtimeConfigInitialized.get()) {
+            throw new IllegalStateException("NRVideoConfiguration not initialized! Call build() first.");
+        }
+        return qoeAggregateEnabled.get();
+    }
+
+    /**
+     * Set whether QOE_AGGREGATE events should be sent during harvest cycles
+     * Lock-free, thread-safe runtime configuration using AtomicBoolean
+     * @param enabled true to enable QOE_AGGREGATE, false to disable
+     */
+    public void setQoeAggregateEnabled(boolean enabled) {
+        this.qoeAggregateEnabled.set(enabled);
+    }
+
+    /**
+     * Initialize configuration with client settings
+     * @param clientQoeAggregateEnabled QOE aggregate setting from client (null if not provided)
+     */
+    public void initializeFromClient(Boolean clientQoeAggregateEnabled) {
+        // If client provides a value, use it; otherwise keep current default
+        if (clientQoeAggregateEnabled != null) {
+            this.qoeAggregateEnabled.set(clientQoeAggregateEnabled);
+        }
+    }
+
+    /**
+     * Get the current configuration instance (for tracker access)
+     * @return Current NRVideoConfiguration instance
+     * @throws IllegalStateException if no configuration has been built yet
+     */
+    public static NRVideoConfiguration getCurrentInstance() {
+        if (currentInstanceRef == null) {
+            throw new IllegalStateException("No NRVideoConfiguration has been built yet!");
+        }
+
+        NRVideoConfiguration instance = currentInstanceRef.get();
+        if (instance == null) {
+            throw new IllegalStateException("NRVideoConfiguration has been garbage collected! Create a new instance.");
+        }
+
+        return instance;
+    }
     /**
      * Get dead letter retry interval in milliseconds
      * Optimized for different device types and network conditions
@@ -177,6 +234,7 @@ public final class NRVideoConfiguration {
         private boolean debugLoggingEnabled = false;
         private boolean isTV = false;
         private String collectorAddress = null;
+        private boolean qoeAggregateEnabled = true; // Default enabled
 
         public Builder(String applicationToken) {
             this.applicationToken = applicationToken;
@@ -264,6 +322,25 @@ public final class NRVideoConfiguration {
             return this;
         }
 
+        /**
+         * Enable QOE aggregate events (default: enabled)
+         * @return Builder instance for method chaining
+         */
+        public Builder enableQoeAggregate() {
+            this.qoeAggregateEnabled = true;
+            return this;
+        }
+
+        /**
+         * Configure QOE aggregate events
+         * @param enabled true to enable QOE_AGGREGATE events, false to disable
+         * @return Builder instance for method chaining
+         */
+        public Builder enableQoeAggregate(boolean enabled) {
+            this.qoeAggregateEnabled = enabled;
+            return this;
+        }
+
         private void applyTVOptimizations() {
             this.harvestCycleSeconds = TV_HARVEST_CYCLE_SECONDS;
             this.liveHarvestCycleSeconds = TV_LIVE_HARVEST_CYCLE_SECONDS;
@@ -280,7 +357,10 @@ public final class NRVideoConfiguration {
         }
 
         public NRVideoConfiguration build() {
-            return new NRVideoConfiguration(this);
+            NRVideoConfiguration config = new NRVideoConfiguration(this);
+            // Set current instance for tracker access using WeakReference
+            NRVideoConfiguration.currentInstanceRef = new java.lang.ref.WeakReference<>(config);
+            return config;
         }
     }
 
