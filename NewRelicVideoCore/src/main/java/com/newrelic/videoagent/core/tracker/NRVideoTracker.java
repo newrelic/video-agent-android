@@ -3,6 +3,7 @@ package com.newrelic.videoagent.core.tracker;
 import android.os.Handler;
 
 import com.newrelic.videoagent.core.NRVideo;
+import com.newrelic.videoagent.core.config.NRVideoConfig;
 import com.newrelic.videoagent.core.model.NRTimeSince;
 import com.newrelic.videoagent.core.model.NRTrackerState;
 import com.newrelic.videoagent.core.utils.NRLog;
@@ -587,7 +588,8 @@ public class NRVideoTracker extends NRTracker {
      * Send QOE_AGGREGATE event (internal method - called once per cycle)
      */
     private void sendQoeAggregate() {
-        if (!state.isAd) { // Only send for content, not ads
+        if (!state.isAd && NRVideoConfig.getInstance().isQoeAggregateEnabled()) {
+            // Only send for content, not ads, and only if QOE aggregate is enabled
             Map<String, Object> kpiAttributes = calculateQOEKpiAttributes();
             sendVideoEvent(QOE_AGGREGATE, kpiAttributes);
             qoeAggregateAlreadySent = true;
