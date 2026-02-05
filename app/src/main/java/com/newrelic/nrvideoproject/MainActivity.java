@@ -8,7 +8,6 @@ import android.widget.Switch;
 
 import com.newrelic.videoagent.core.NRVideo;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
-import com.newrelic.videoagent.core.config.NRVideoConfig;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -18,35 +17,35 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     Switch adsSwitch;
     Switch qoeSwitch;
     int counter = 0;
+    NRVideoConfiguration config;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        NRVideoConfiguration config = new NRVideoConfiguration.Builder("AAdc5e75073d8720260b9b0139b9a6fc686b954936-NRMA")
+        NRVideoConfiguration config = new NRVideoConfiguration.Builder(BuildConfig.NR_APPLICATION_TOKEN)
                 .autoDetectPlatform(getApplicationContext())
                 .withHarvestCycle(60)
                 .enableLogging()
+                .enableQoeAggregate(BuildConfig.QOE_AGGREGATE_DEFAULT)
                 .build();
         NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
-        // Initialize QOE configuration with value from local.properties
-        NRVideoConfig.getInstance().initializeDefaults(BuildConfig.QOE_AGGREGATE_DEFAULT);
         setContentView(R.layout.activity_main);
 
         adsSwitch = findViewById(R.id.ads_switch);
         qoeSwitch = findViewById(R.id.qoe_switch);
 
         // Initialize QOE switch with current configuration state
-        qoeSwitch.setChecked(NRVideoConfig.getInstance().isQoeAggregateEnabled());
+        qoeSwitch.setChecked(config.isQoeAggregateEnabled());
 
-        // Set up QOE switch listener
+        // Set up QOE switch listener with optimized UI operations
         qoeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            // Toggle QOE aggregate functionality at runtime
-            NRVideoConfig.getInstance().setQoeAggregateEnabled(isChecked);
-            android.util.Log.d("QOE_TOGGLE", "QOE Aggregate " + (isChecked ? "ENABLED" : "DISABLED"));
+            // Perform config update on background thread to avoid UI blocking
+                    // Toggle QOE aggregate functionality at runtime
+                    config.setQoeAggregateEnabled(isChecked);
 
-            // Show user feedback
-            String message = "QOE Aggregate " + (isChecked ? "Enabled" : "Disabled");
-            android.widget.Toast.makeText(MainActivity.this, message, android.widget.Toast.LENGTH_SHORT).show();
+                    // Show user feedback on UI thread
+                        String message = "QOE Aggregate " + (isChecked ? "Enabled" : "Disabled");
+                        android.widget.Toast.makeText(MainActivity.this, message, android.widget.Toast.LENGTH_SHORT).show();
         });
 
         findViewById(R.id.video0).setOnClickListener(this);
