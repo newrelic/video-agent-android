@@ -10,12 +10,14 @@ if (localPropertiesFile.exists()) {
     }
 }
 def applicationToken = localProperties.getProperty('nr.applicationToken', "")
+def qoeAggregateEnabled = localProperties.getProperty('nr.qoeAggregate', "true").toBoolean()
 
 android {
     compileSdkVersion 34
     buildToolsVersion "34.0.0"
     defaultConfig {
         buildConfigField "String", "NR_APPLICATION_TOKEN", "\"${applicationToken}\""
+        buildConfigField "boolean", "QOE_AGGREGATE_DEFAULT", "${qoeAggregateEnabled}"
         applicationId "com.newrelic.nrvideoproject"
         minSdkVersion 16
         targetSdkVersion 34
