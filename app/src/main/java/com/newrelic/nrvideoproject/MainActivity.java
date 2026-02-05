@@ -8,7 +8,6 @@ import android.widget.Switch;
 
 import com.newrelic.videoagent.core.NRVideo;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
-import com.newrelic.videoagent.core.config.NRVideoConfig;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -30,8 +29,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 .enableQoeAggregate(BuildConfig.QOE_AGGREGATE_DEFAULT)
                 .build();
         NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
-        // Initialize QOE configuration with value from local.properties
-        NRVideoConfig.getInstance().initializeDefaults(BuildConfig.QOE_AGGREGATE_DEFAULT);
         setContentView(R.layout.activity_main);
 
         adsSwitch = findViewById(R.id.ads_switch);
