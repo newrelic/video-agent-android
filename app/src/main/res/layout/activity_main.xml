@@ -73,6 +73,18 @@
         app:layout_constraintTop_toBottomOf="@+id/video2" />
 
     <Switch
+        android:id="@+id/qoe_switch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:text="Enable QOE Aggregate"
+        app:layout_constraintBottom_toTopOf="@+id/ads_switch"
+        android:layout_marginRight="8dp"
+        app:layout_constraintRight_toRightOf="parent"
+        android:layout_marginLeft="8dp"
+        app:layout_constraintLeft_toLeftOf="parent"/>
+
+    <Switch
         android:id="@+id/ads_switch"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

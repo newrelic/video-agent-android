@@ -16,12 +16,13 @@ import java.util.Map;
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
     Switch adsSwitch;
+    Switch qoeSwitch;
     int counter = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        NRVideoConfiguration config = new NRVideoConfiguration.Builder(BuildConfig.NR_APPLICATION_TOKEN)
+        NRVideoConfiguration config = new NRVideoConfiguration.Builder("AAdc5e75073d8720260b9b0139b9a6fc686b954936-NRMA")
                 .autoDetectPlatform(getApplicationContext())
                 .withHarvestCycle(60)
                 .enableLogging()
@@ -32,6 +33,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         setContentView(R.layout.activity_main);
 
         adsSwitch = findViewById(R.id.ads_switch);
+        qoeSwitch = findViewById(R.id.qoe_switch);
+
+        // Initialize QOE switch with current configuration state
+        qoeSwitch.setChecked(NRVideoConfig.getInstance().isQoeAggregateEnabled());
+
+        // Set up QOE switch listener
+        qoeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            // Toggle QOE aggregate functionality at runtime
+            NRVideoConfig.getInstance().setQoeAggregateEnabled(isChecked);
+            android.util.Log.d("QOE_TOGGLE", "QOE Aggregate " + (isChecked ? "ENABLED" : "DISABLED"));
+
+            // Show user feedback
+            String message = "QOE Aggregate " + (isChecked ? "Enabled" : "Disabled");
+            android.widget.Toast.makeText(MainActivity.this, message, android.widget.Toast.LENGTH_SHORT).show();
+        });
 
         findViewById(R.id.video0).setOnClickListener(this);
         findViewById(R.id.video1).setOnClickListener(this);
