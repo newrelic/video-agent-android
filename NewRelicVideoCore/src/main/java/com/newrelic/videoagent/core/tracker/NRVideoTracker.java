@@ -416,7 +416,7 @@ public class NRVideoTracker extends NRTracker {
         state.accumulatedVideoWatchTime = (Math.abs(state.accumulatedVideoWatchTime - heartbeatInterval) <= 5 ? heartbeatInterval : state.accumulatedVideoWatchTime);
         Map<String, Object> eventData = new HashMap<>();
         eventData.put("elapsedTime", state.accumulatedVideoWatchTime);
-        if (state.accumulatedVideoWatchTime != null && state.accumulatedVideoWatchTime > 0L) {
+        if (state.accumulatedVideoWatchTime != null) {
             if (state.isAd) {
                 sendVideoAdEvent(AD_HEARTBEAT,eventData);
             } else {
