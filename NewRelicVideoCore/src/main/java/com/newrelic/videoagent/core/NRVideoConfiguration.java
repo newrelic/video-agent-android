@@ -43,14 +43,12 @@ public final class NRVideoConfiguration {
     private final boolean memoryOptimized;
     private final boolean debugLoggingEnabled;
     private final boolean isTV;
+    private final String collectorAddress;
 
     // Runtime configuration fields (mutable, thread-safe) - Using AtomicBoolean for better performance
     private final AtomicBoolean qoeAggregateEnabled = new AtomicBoolean(true);
     private final AtomicBoolean runtimeConfigInitialized = new AtomicBoolean(false);
 
-    // Static holder for current configuration instance (for tracker access)
-    // WeakReference to prevent memory leaks if static cleanup is missed
-    private static volatile java.lang.ref.WeakReference<NRVideoConfiguration> currentInstanceRef;
 
     // Performance optimization constants
     private static final int DEFAULT_HARVEST_CYCLE_SECONDS = 5 * 60; // 5 minutes
@@ -139,23 +137,6 @@ public final class NRVideoConfiguration {
         }
     }
 
-    /**
-     * Get the current configuration instance (for tracker access)
-     * @return Current NRVideoConfiguration instance
-     * @throws IllegalStateException if no configuration has been built yet
-     */
-    public static NRVideoConfiguration getCurrentInstance() {
-        if (currentInstanceRef == null) {
-            throw new IllegalStateException("No NRVideoConfiguration has been built yet!");
-        }
-
-        NRVideoConfiguration instance = currentInstanceRef.get();
-        if (instance == null) {
-            throw new IllegalStateException("NRVideoConfiguration has been garbage collected! Create a new instance.");
-        }
-
-        return instance;
-    }
     /**
      * Get dead letter retry interval in milliseconds
      * Optimized for different device types and network conditions
@@ -347,8 +328,6 @@ public final class NRVideoConfiguration {
 
         public NRVideoConfiguration build() {
             NRVideoConfiguration config = new NRVideoConfiguration(this);
-            // Set current instance for tracker access using WeakReference
-            NRVideoConfiguration.currentInstanceRef = new java.lang.ref.WeakReference<>(config);
             // Mark runtime configuration as initialized
             config.runtimeConfigInitialized.set(true);
             return config;
