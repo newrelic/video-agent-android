@@ -19,6 +19,7 @@ import androidx.media3.exoplayer.analytics.AnalyticsListener;
 import androidx.media3.exoplayer.source.LoadEventInfo;
 import androidx.media3.exoplayer.source.MediaLoadData;
 
+import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.exoplayer.BuildConfig;
@@ -73,15 +74,39 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     /**
      * Init a new ExoPlayer tracker.
      */
+    public NRTrackerExoPlayer(NRVideoConfiguration configuration) {
+        super(configuration);
+    }
+
+    /**
+     * Create a new NRTrackerExoPlayer (deprecated - use constructor with configuration).
+     * @deprecated Use NRTrackerExoPlayer(NRVideoConfiguration) constructor instead
+     */
+    @Deprecated
     public NRTrackerExoPlayer() {
+        super();
     }
 
     /**
      * Init a new ExoPlayer tracker.
      *
+     * @param configuration Video configuration
      * @param player ExoPlayer instance.
      */
+    public NRTrackerExoPlayer(NRVideoConfiguration configuration, ExoPlayer player) {
+        super(configuration);
+        setPlayer(player);
+    }
+
+    /**
+     * Init a new ExoPlayer tracker (deprecated).
+     *
+     * @param player ExoPlayer instance.
+     * @deprecated Use NRTrackerExoPlayer(NRVideoConfiguration, ExoPlayer) constructor instead
+     */
+    @Deprecated
     public NRTrackerExoPlayer(ExoPlayer player) {
+        super();
         setPlayer(player);
     }
 

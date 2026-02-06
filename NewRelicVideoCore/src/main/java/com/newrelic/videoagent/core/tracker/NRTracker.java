@@ -1,6 +1,7 @@
 package com.newrelic.videoagent.core.tracker;
 
 import com.newrelic.videoagent.core.NRVideo;
+import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.NewRelicVideoAgent;
 import com.newrelic.videoagent.core.model.NREventAttributes;
 import com.newrelic.videoagent.core.model.NRTimeSince;
@@ -21,15 +22,35 @@ public class NRTracker {
      */
     public NRTracker linkedTracker;
 
+    protected final NRVideoConfiguration configuration;
     private final NREventAttributes eventAttributes;
     private NRTimeSinceTable timeSinceTable;
 
     /**
-     * Create a new NRTracker.
+     * Create a new NRTracker with configuration.
      */
-    public NRTracker() {
+    public NRTracker(NRVideoConfiguration configuration) {
+        this.configuration = configuration;
         eventAttributes = new NREventAttributes();
         generateTimeSinceTable();
+    }
+
+    /**
+     * Create a new NRTracker (deprecated - use constructor with configuration).
+     * @deprecated Use NRTracker(NRVideoConfiguration) constructor instead
+     */
+    @Deprecated
+    public NRTracker() {
+        this.configuration = null;
+        eventAttributes = new NREventAttributes();
+        generateTimeSinceTable();
+    }
+
+    /**
+     * Get the tracker configuration.
+     */
+    public NRVideoConfiguration getConfiguration() {
+        return configuration;
     }
 
     /**
