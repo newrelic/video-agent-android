@@ -6,6 +6,8 @@ import java.util.HashMap;
 import java.util.Locale;
 
 import android.content.Context;
+import android.util.Log;
+
 import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.storage.CrashSafeHarvestFactory;
 import com.newrelic.videoagent.core.NRVideoConstants;
@@ -110,6 +112,7 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
             );
 
             if (!events.isEmpty()) {
+                Log.d("aravind", "harvest: " + events.size());
                 boolean success = factory.getHttpClient().sendEvents(events, harvestType);
                 if (!success) {
                     factory.getDeadLetterHandler().handleFailedEvents(events, harvestType);

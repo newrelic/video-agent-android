@@ -70,7 +70,23 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | timestamp                | The time (date, hour, minute, second) at which the interaction occurred.                                                                           |
 | instrumentation.provider | Player/agent name.                                                                                                                                 |
 | instrumentation.name     | Name of the instrumentation collecting the data.                                                                                                   |
-| instrumentation.version  | Agent’s version.                                                                                                                                   |
+| instrumentation.version  | Agent's version.                                                                                                                                   |
+
+**QoE (Quality of Experience) Attributes** - These attributes are sent with `actionName = QOE_AGGREGATE` events:
+
+| Attribute Name           | Definition                                                                                                                                         |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| startupTime      | Time from CONTENT_REQUEST to CONTENT_START in milliseconds. Measures video startup performance. Only included if value is not null.                |
+| peakBitrate      | Maximum contentBitrate (in bits per second) observed during content playback. Tracks the highest quality achieved. Only included if value > 0.     |
+| hadStartupFailure | Boolean indicating if CONTENT_ERROR occurred before CONTENT_START. True if video failed to start due to an error.                                 |
+| hadPlaybackFailure | Boolean indicating if CONTENT_ERROR occurred at any time during content playback.                                                                |
+| totalRebufferingTime | Total milliseconds spent rebuffering during content playback (excludes initial buffering).                                                      |
+| rebufferingRatio | Rebuffering time as a percentage of total playtime. Calculated as (totalRebufferingTime / totalPlaytime) × 100.                                    |
+| totalPlaytime    | Total milliseconds user spent watching content (excludes pausing, buffering, and ads). Represents actual content viewing time.                     |
+| averageBitrate   | Average bitrate (in bits per second) across all content playback weighted by playtime.                                                             |
+| qoeAggregateVersion | Version identifier for the QoE calculation algorithm (e.g., "1.0.0").                                                                           |
+
+**Note:** QOE_AGGREGATE events also include all standard VideoAction metadata attributes listed above (session, player, content, device, and instrumentation attributes) for comprehensive analysis context.
 
 #### List of possible Video Actions
 
@@ -89,6 +105,7 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | CONTENT_BUFFER_END       | Content video buffering ended.                                                                   |
 | CONTENT_HEARTBEAT        | Content video heartbeat, an event that happens once every 30 seconds while the video is playing. |
 | CONTENT_RENDITION_CHANGE | Content video stream quality changed.                                                            |
+| QOE_AGGREGATE            | Quality of Experience aggregate metrics sent once per harvest cycle (contains QoE KPIs).         |
 
 ### VideoAdAction
 

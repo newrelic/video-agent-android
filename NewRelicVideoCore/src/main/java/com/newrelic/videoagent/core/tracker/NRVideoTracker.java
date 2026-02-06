@@ -590,6 +590,17 @@ public class NRVideoTracker extends NRTracker {
 
     /**
      * Send QOE_AGGREGATE event (internal method - called once per cycle)
+     *
+     * This event includes:
+     * 1. QoE KPI metrics calculated in calculateQOEKpiAttributes() (peakBitrate, hadPlaybackFailure,
+     *    totalRebufferingTime, rebufferingRatio, totalPlaytime, averageBitrate, startupTime,
+     *    hadStartupFailure, qoeAggregateVersion)
+     * 2. All standard Heartbeat metadata attributes automatically added via getAttributes() including:
+     *    - Session: viewId, viewSession, numberOfVideos, trackerName, trackerVersion
+     *    - Player: playerName, playerVersion
+     *    - Content: contentTitle, contentId, contentIsLive, contentDuration, contentPlayhead,
+     *      contentSrc, contentIsMuted, contentFps, contentRenditionHeight, contentRenditionWidth
+     *    - Instrumentation: instrumentation.name, instrumentation.provider, instrumentation.version
      */
     private void sendQoeAggregate() {
         if (!state.isAd) { // Only send for content, not ads

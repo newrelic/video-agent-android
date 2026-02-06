@@ -22,7 +22,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onCreate(savedInstanceState);
         NRVideoConfiguration config = new NRVideoConfiguration.Builder(BuildConfig.NR_APPLICATION_TOKEN)
                 .autoDetectPlatform(getApplicationContext())
-                .withHarvestCycle(60)
+                .withHarvestCycle(30)
                 .enableLogging()
                 .build();
         NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
