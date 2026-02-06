@@ -88,6 +88,7 @@ public final class NRVideoConfiguration {
         this.memoryOptimized = builder.memoryOptimized;
         this.debugLoggingEnabled = builder.debugLoggingEnabled;
         this.isTV = builder.isTV;
+        this.collectorAddress = builder.collectorAddress;
     }
 
     // Immutable getters
@@ -360,6 +361,8 @@ public final class NRVideoConfiguration {
             NRVideoConfiguration config = new NRVideoConfiguration(this);
             // Set current instance for tracker access using WeakReference
             NRVideoConfiguration.currentInstanceRef = new java.lang.ref.WeakReference<>(config);
+            // Mark runtime configuration as initialized
+            config.runtimeConfigInitialized.set(true);
             return config;
         }
     }
