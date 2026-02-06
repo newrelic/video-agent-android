@@ -43,7 +43,6 @@ public final class NRVideoConfiguration {
     private final boolean memoryOptimized;
     private final boolean debugLoggingEnabled;
     private final boolean isTV;
-    private final String collectorAddress;
 
     // Runtime configuration fields (mutable, thread-safe) - Using AtomicBoolean for better performance
     private final AtomicBoolean qoeAggregateEnabled = new AtomicBoolean(true);
@@ -89,6 +88,10 @@ public final class NRVideoConfiguration {
         this.debugLoggingEnabled = builder.debugLoggingEnabled;
         this.isTV = builder.isTV;
         this.collectorAddress = builder.collectorAddress;
+
+        // Initialize runtime configuration
+        this.qoeAggregateEnabled.set(builder.qoeAggregateEnabled);
+        this.runtimeConfigInitialized.set(true);
     }
 
     // Immutable getters
@@ -168,56 +171,41 @@ public final class NRVideoConfiguration {
     }
 
     /**
-     * Parse region code from application token prefix
-     * Matches NewRelic iOS Agent pattern: extracts region prefix before 'x'
-     * Examples: "EUxABCD..." -> "EU", "APxABCD..." -> "AP", "AA..." -> ""
-     */
-    private static String parseRegionFromToken(String applicationToken) {
-        if (applicationToken == null || applicationToken.length() < 3) {
-            return "";
-        }
-
-        // Find the first 'x' in the token
-        int xIndex = applicationToken.indexOf('x');
-        if (xIndex == -1) {
-            return ""; // No region prefix found
-        }
-
-        // Extract everything before the first 'x'
-        String regionCode = applicationToken.substring(0, xIndex);
-
-        // Remove any trailing 'x' characters
-        while (regionCode.length() > 0 && regionCode.charAt(regionCode.length() - 1) == 'x') {
-            regionCode = regionCode.substring(0, regionCode.length() - 1);
-        }
-
-        return regionCode;
-    }
-
-    /**
-     * Identify region with proper token parsing and fallback logic
-     * Behavior similar to NewRelic iOS Agent's NRMAAgentConfiguration
+     * Enterprise-grade region identification with multiple fallback strategies
+     * Thread-safe and optimized for performance
      */
     private static String identifyRegion(String applicationToken) {
         if (applicationToken == null || applicationToken.length() < 10) {
             return "US"; // Safe default
         }
 
-        // First, try to parse region from token prefix (e.g., "EUx", "APx")
-        String regionCode = parseRegionFromToken(applicationToken);
+        String cleanToken = applicationToken.trim().toLowerCase();
 
-        if (regionCode != null && regionCode.length() > 0) {
-            // Convert region code to uppercase and validate
-            String upperRegion = regionCode.toUpperCase();
-
-            // Map region codes to standard regions
-            String mappedRegion = REGION_MAPPINGS.get(upperRegion);
-            if (mappedRegion != null) {
-                return mappedRegion;
+        // Strategy 1: Direct prefix matching (most reliable)
+        for (Map.Entry<String, String> entry : REGION_MAPPINGS.entrySet()) {
+            String regionKey = entry.getKey().toLowerCase();
+            if (cleanToken.startsWith(regionKey) || cleanToken.contains("-" + regionKey + "-")) {
+                return entry.getValue();
             }
         }
 
-        // Default to US for standard tokens without region prefix
+        // Strategy 2: Token structure analysis
+        if (cleanToken.length() >= 40) { // Standard NR token length
+            // EU tokens often have specific patterns
+            if (cleanToken.contains("eu") || cleanToken.contains("europe")) {
+                return "EU";
+            }
+            // AP tokens often have specific patterns
+            if (cleanToken.contains("ap") || cleanToken.contains("asia") || cleanToken.contains("pacific")) {
+                return "AP";
+            }
+            // Gov tokens have specific patterns
+            if (cleanToken.contains("gov") || cleanToken.contains("fed")) {
+                return "GOV";
+            }
+        }
+
+        // Strategy 3: Default to US for production stability
         return "US";
     }
 
