@@ -2,7 +2,6 @@ plugins {
     id 'com.android.library'
     id 'maven-publish'
     id 'jacoco'
-    id 'jacoco'
 }
 android {
     compileSdkVersion 34
