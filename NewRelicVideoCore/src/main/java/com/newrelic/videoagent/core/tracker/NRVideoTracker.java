@@ -3,6 +3,7 @@ package com.newrelic.videoagent.core.tracker;
 import android.os.Handler;
 
 import com.newrelic.videoagent.core.NRVideo;
+import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.model.NRTimeSince;
 import com.newrelic.videoagent.core.model.NRTrackerState;
 import com.newrelic.videoagent.core.utils.NRLog;
@@ -69,7 +70,8 @@ public class NRVideoTracker extends NRTracker {
     /**
      * Create a new NRVideoTracker.
      */
-    public NRVideoTracker() {
+    public NRVideoTracker(NRVideoConfiguration configuration) {
+        super(configuration);
         state = new NRTrackerState();
         numberOfAds = 0;
         numberOfErrors = 0;
@@ -83,6 +85,59 @@ public class NRVideoTracker extends NRTracker {
         playtimeSinceLastEvent = 0L;
         bufferType = null;
         isHeartbeatRunning = false;
+
+        // Initialize heartbeat components
+        heartbeatHandler = new Handler();
+        heartbeatRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (isHeartbeatRunning) {
+                    sendHeartbeat();
+                    heartbeatHandler.postDelayed(heartbeatRunnable, getHeartbeatIntervalMillis());
+                }
+            }
+        };
+
+        initializeTracker();
+    }
+
+    /**
+     * Create a new NRVideoTracker (deprecated - use constructor with configuration).
+     * @deprecated Use NRVideoTracker(NRVideoConfiguration) constructor instead
+     */
+    @Deprecated
+    public NRVideoTracker() {
+        super();
+        state = new NRTrackerState();
+        numberOfAds = 0;
+        numberOfErrors = 0;
+        numberOfVideos = 0;
+        viewIdIndex = 0;
+        adBreakIdIndex = 0;
+        viewSessionId = getAgentSession() + "-" + (System.currentTimeMillis() / 1000) + new Random().nextInt(10);
+        playtimeSinceLastEventTimestamp = 0L;
+        totalPlaytime = 0L;
+        totalAdPlaytime = 0L;
+        playtimeSinceLastEvent = 0L;
+        bufferType = null;
+        isHeartbeatRunning = false;
+
+        // Initialize heartbeat components
+        heartbeatHandler = new Handler();
+        heartbeatRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (isHeartbeatRunning) {
+                    sendHeartbeat();
+                    heartbeatHandler.postDelayed(heartbeatRunnable, getHeartbeatIntervalMillis());
+                }
+            }
+        };
+
+        initializeTracker();
+    }
+
+    private void initializeTracker() {
 
         // Initialize QoE tracking fields
         qoePeakBitrate = 0L;
@@ -105,16 +160,6 @@ public class NRVideoTracker extends NRTracker {
         qoeLastRenditionChangeTime = null;
         qoeTotalBitrateWeightedTime = 0L;
         qoeTotalActiveTime = 0L;
-        heartbeatHandler = new Handler();
-        heartbeatRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (isHeartbeatRunning) {
-                    sendHeartbeat();
-                    heartbeatHandler.postDelayed(heartbeatRunnable, getHeartbeatIntervalMillis());
-                }
-            }
-        };
     }
 
     /**
@@ -592,7 +637,8 @@ public class NRVideoTracker extends NRTracker {
      * Send QOE_AGGREGATE event (internal method - called once per cycle)
      */
     private void sendQoeAggregate() {
-        if (!state.isAd) { // Only send for content, not ads
+        if (!state.isAd && configuration != null && configuration.isQoeAggregateEnabled()) {
+            // Only send for content, not ads, and only if QOE aggregate is enabled
             Map<String, Object> kpiAttributes = calculateQOEKpiAttributes();
             sendVideoEvent(QOE_AGGREGATE, kpiAttributes);
             qoeAggregateAlreadySent = true;

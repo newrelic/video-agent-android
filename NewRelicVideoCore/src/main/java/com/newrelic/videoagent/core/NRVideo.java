@@ -22,6 +22,7 @@ public final class NRVideo {
     private static final Object lock = new Object();
 
     private volatile HarvestManager harvestManager;
+    private volatile NRVideoConfiguration configuration;
     private final Map<String, Integer> trackerIds = new HashMap<>();
 
     // Private constructor for singleton
@@ -60,10 +61,10 @@ public final class NRVideo {
         }
 
         // Create content tracker with ExoPlayer instance
-        NRTracker contentTracker = createContentTracker();
+        NRTracker contentTracker = createContentTracker(instance.configuration);
         NRTracker adsTracker = null;
         if (config.isAdEnabled()) {
-            adsTracker = createAdTracker();
+            adsTracker = createAdTracker(instance.configuration);
             NRLog.d("add tracker is added");
         }
 
@@ -228,6 +229,9 @@ public final class NRVideo {
         try {
             Context applicationContext = context.getApplicationContext();
 
+            // Store configuration for tracker creation
+            this.configuration = config;
+
             // Always use crash-safe storage - it's now the default behavior
             harvestManager = new HarvestManager(config, applicationContext);
 
@@ -256,25 +260,35 @@ public final class NRVideo {
         }
     }
 
-    private static NRTracker createContentTracker() {
+    private static NRTracker createContentTracker(NRVideoConfiguration config) {
         try {
-            // Create ExoPlayer tracker with player instance
+            // Create ExoPlayer tracker with configuration
             Class<?> exoTrackerClass = Class.forName("com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer");
-            return (NRTracker) exoTrackerClass.newInstance();
+            return (NRTracker) exoTrackerClass.getConstructor(NRVideoConfiguration.class).newInstance(config);
         } catch (Exception e) {
-            // Fallback to basic video tracker
-            throw new RuntimeException("Failed to create NRTrackerExoPlayer", e);
+            // Fallback to deprecated constructor for backward compatibility
+            try {
+                Class<?> exoTrackerClass = Class.forName("com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer");
+                return (NRTracker) exoTrackerClass.newInstance();
+            } catch (Exception fallbackException) {
+                throw new RuntimeException("Failed to create NRTrackerExoPlayer", fallbackException);
+            }
         }
     }
 
-    private static NRTracker createAdTracker() {
-
+    private static NRTracker createAdTracker(NRVideoConfiguration config) {
         try {
-            // Always use IMA tracker for ads
+            // Always use IMA tracker for ads with configuration
             Class<?> imaTrackerClass = Class.forName("com.newrelic.videoagent.ima.tracker.NRTrackerIMA");
-            return (NRTracker) imaTrackerClass.newInstance();
+            return (NRTracker) imaTrackerClass.getConstructor(NRVideoConfiguration.class).newInstance(config);
         } catch (Exception e) {
-            return null;
+            // Fallback to deprecated constructor for backward compatibility
+            try {
+                Class<?> imaTrackerClass = Class.forName("com.newrelic.videoagent.ima.tracker.NRTrackerIMA");
+                return (NRTracker) imaTrackerClass.newInstance();
+            } catch (Exception fallbackException) {
+                return null;
+            }
         }
     }
 
