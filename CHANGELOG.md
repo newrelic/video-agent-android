@@ -1,3 +1,8 @@
+## [4.0.6](https://github.com/newrelic/video-agent-android/compare/v4.0.5...v4.0.6) (2026-02-10)
+
+### Bug Fixes
+
+* Regional collector URLs, drop bitrate attributes before start, HEARTBEAT timing, and build fixes ([e717dda](https://github.com/newrelic/video-agent-android/commit/e717ddae75160f6f9509b0909f23975de359bf71))
 ## [4.0.5](https://github.com/newrelic/video-agent-android/compare/v4.0.4...v4.0.5) (2026-01-20)
 
 ### Bug Fixes
