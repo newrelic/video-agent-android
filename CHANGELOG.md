@@ -1,8 +1,10 @@
-## [4.0.6](https://github.com/newrelic/video-agent-android/compare/v4.0.5...v4.0.6) (2026-02-10)
+## [4.1.1-beta](https://github.com/newrelic/video-agent-android/compare/v4.1.0-beta...v4.1.1-beta) (2026-01-30)
+## [4.1.0-beta](https://github.com/newrelic/video-agent-android/compare/v4.0.5...v4.1.0-beta) (2026-01-30)
 
-### Bug Fixes
+### Features
 
-* Regional collector URLs, drop bitrate attributes before start, HEARTBEAT timing, and build fixes ([e717dda](https://github.com/newrelic/video-agent-android/commit/e717ddae75160f6f9509b0909f23975de359bf71))
+* add beta release workflow for JitPack from stable-beta branch ([94475c6](https://github.com/newrelic/video-agent-android/commit/94475c6da583f9a6bb583077c5372e56c5c79d2b))
+* beta release workflow update ([131dd23](https://github.com/newrelic/video-agent-android/commit/131dd232ea3dd293695ecf65abe77709d5ebd2a7))
 ## [4.0.5](https://github.com/newrelic/video-agent-android/compare/v4.0.4...v4.0.5) (2026-01-20)
 
 ### Bug Fixes

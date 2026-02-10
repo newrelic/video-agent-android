@@ -86,6 +86,10 @@ public final class NRVideoConfiguration {
         this.debugLoggingEnabled = builder.debugLoggingEnabled;
         this.isTV = builder.isTV;
         this.collectorAddress = builder.collectorAddress;
+
+        // Initialize runtime configuration
+        this.qoeAggregateEnabled.set(builder.qoeAggregateEnabled);
+        this.runtimeConfigInitialized.set(true);
     }
 
     // Immutable getters
@@ -183,21 +187,33 @@ public final class NRVideoConfiguration {
             return "US"; // Safe default
         }
 
-        // First, try to parse region from token prefix (e.g., "EUx", "APx")
-        String regionCode = parseRegionFromToken(applicationToken);
+        String cleanToken = applicationToken.trim().toLowerCase();
 
-        if (regionCode != null && regionCode.length() > 0) {
-            // Convert region code to uppercase and validate
-            String upperRegion = regionCode.toUpperCase();
-
-            // Map region codes to standard regions
-            String mappedRegion = REGION_MAPPINGS.get(upperRegion);
-            if (mappedRegion != null) {
-                return mappedRegion;
+        // Strategy 1: Direct prefix matching (most reliable)
+        for (Map.Entry<String, String> entry : REGION_MAPPINGS.entrySet()) {
+            String regionKey = entry.getKey().toLowerCase();
+            if (cleanToken.startsWith(regionKey) || cleanToken.contains("-" + regionKey + "-")) {
+                return entry.getValue();
             }
         }
 
-        // Default to US for standard tokens without region prefix
+        // Strategy 2: Token structure analysis
+        if (cleanToken.length() >= 40) { // Standard NR token length
+            // EU tokens often have specific patterns
+            if (cleanToken.contains("eu") || cleanToken.contains("europe")) {
+                return "EU";
+            }
+            // AP tokens often have specific patterns
+            if (cleanToken.contains("ap") || cleanToken.contains("asia") || cleanToken.contains("pacific")) {
+                return "AP";
+            }
+            // Gov tokens have specific patterns
+            if (cleanToken.contains("gov") || cleanToken.contains("fed")) {
+                return "GOV";
+            }
+        }
+
+        // Strategy 3: Default to US for production stability
         return "US";
     }
 
