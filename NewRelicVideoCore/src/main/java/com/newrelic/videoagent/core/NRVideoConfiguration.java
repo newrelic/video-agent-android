@@ -203,6 +203,8 @@ public final class NRVideoConfiguration {
         private boolean memoryOptimized = true;
         private boolean debugLoggingEnabled = false;
         private boolean isTV = false;
+        private String collectorAddress = null;
+        private boolean qoeAggregateEnabled = true; // Default enabled
 
         public Builder(String applicationToken) {
             this.applicationToken = applicationToken;
