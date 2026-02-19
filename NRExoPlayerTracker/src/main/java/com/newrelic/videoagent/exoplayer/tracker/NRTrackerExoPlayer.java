@@ -683,9 +683,10 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA
                 && mediaLoadData.trackType == C.TRACK_TYPE_VIDEO
                 && loadEventInfo.loadDurationMs > 0) {
-            // Use actual video bitrate from player's video format instead of download speed
             if (player != null && player.getVideoFormat() != null && player.getVideoFormat().bitrate != C.INDEX_UNSET) {
                 this.actualBitrate = player.getVideoFormat().bitrate;
+            } else {
+                this.actualBitrate = (loadEventInfo.bytesLoaded * 8 * 1000) / loadEventInfo.loadDurationMs;
             }
         }
     }
