@@ -47,7 +47,7 @@ public final class NRVideoConfiguration {
     private final int qoeIntervalFactor;
 
     // Runtime configuration fields (mutable, thread-safe) - Using AtomicBoolean for better performance
-    private final AtomicBoolean qoeAggregateEnabled = new AtomicBoolean(true);
+    private final AtomicBoolean qoeAggregateEnabled = new AtomicBoolean(false);
     private final AtomicBoolean runtimeConfigInitialized = new AtomicBoolean(false);
 
 
