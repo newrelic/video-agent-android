@@ -66,6 +66,7 @@ public class NRVideoTracker extends NRTracker {
     private boolean hasVideoActionInCurrentCycle = false;
     private boolean qoeAggregateAlreadySent = false;
     private Long lastHarvestCycleTimestamp = null;
+    private int harvestCycleCount = 0; // Track number of harvest cycles for qoeIntervalFactor
 
     /**
      * Create a new NRVideoTracker.
@@ -451,9 +452,11 @@ public class NRVideoTracker extends NRTracker {
                 }
                 totalAdPlaytime = totalAdPlaytime + totalPlaytime;
             } else {
+                // For last harvest cycle: force send QOE_AGGREGATE if not already sent and QOE is enabled
+                if (!qoeAggregateAlreadySent && configuration != null && configuration.isQoeAggregateEnabled()) {
+                    sendQoeAggregate();
+                }
                 sendVideoEvent(CONTENT_END);
-                // Send single and latest QOE with this VideoAction event
-                markVideoActionInCycle();
             }
 
             stopHeartbeat();
@@ -608,6 +611,7 @@ public class NRVideoTracker extends NRTracker {
     /**
      * Check if we need to send QOE_AGGREGATE for the current harvest cycle.
      * Only sends once per harvest cycle and only if there was a video action.
+     * Respects qoeIntervalFactor to reduce frequency (first and last cycles always send).
      */
     private void checkAndSendQoeAggregateIfNeeded() {
         long currentTime = System.currentTimeMillis();
@@ -618,11 +622,28 @@ public class NRVideoTracker extends NRTracker {
                 (currentTime - lastHarvestCycleTimestamp) >= harvestCycleMs) {
             resetHarvestCycleFlags();
             lastHarvestCycleTimestamp = currentTime;
+            harvestCycleCount++; // Increment cycle count for qoeIntervalFactor
         }
         // Send QOE_AGGREGATE if we haven't sent it yet and we have video actions
-        if (hasVideoActionInCurrentCycle && !qoeAggregateAlreadySent) {
+        // Check if this cycle should send based on qoeIntervalFactor
+        if (hasVideoActionInCurrentCycle && !qoeAggregateAlreadySent && shouldSendQoeInCurrentCycle()) {
             sendQoeAggregate();
         }
+    }
+
+    /**
+     * Determine if QOE_AGGREGATE should be sent in the current harvest cycle.
+     * First cycle (cycle 1) always sends. Then sends every Nth cycle where N = qoeIntervalFactor.
+     * @return true if QOE should be sent, false otherwise
+     */
+    private boolean shouldSendQoeInCurrentCycle() {
+        if (configuration == null) {
+            return true; // Default behavior if no config
+        }
+        int intervalFactor = configuration.getQoeIntervalFactor();
+        // First cycle always sends (harvestCycleCount == 1)
+        // Then send every intervalFactor cycles (e.g., if factor=3, send on cycles 1, 3, 6, 9, ...)
+        return harvestCycleCount == 1 || (harvestCycleCount % intervalFactor == 0);
     }
 
     /**
@@ -908,6 +929,7 @@ public class NRVideoTracker extends NRTracker {
         // Reset QOE_AGGREGATE harvest cycle tracking fields
         resetHarvestCycleFlags();
         lastHarvestCycleTimestamp = null;
+        harvestCycleCount = 0; // Reset cycle count for new view session
     }
 
 
