@@ -7,9 +7,11 @@ import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.model.NRTimeSince;
 import com.newrelic.videoagent.core.model.NRTrackerState;
 import com.newrelic.videoagent.core.utils.NRLog;
+import com.newrelic.videoagent.core.harvest.QoeProvider;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
@@ -18,8 +20,9 @@ import com.newrelic.videoagent.core.exception.ErrorExceptionHandler;
 
 /**
  * `NRVideoTracker` defines the basic behaviour of a video tracker.
+ * Implements QoeProvider for harvest-time QOE_AGGREGATE generation.
  */
-public class NRVideoTracker extends NRTracker {
+public class NRVideoTracker extends NRTracker implements QoeProvider {
 
 
     private static final int CONTENT_HEARTBEAT_INTERVAL_SEC = 30;
@@ -62,11 +65,9 @@ public class NRVideoTracker extends NRTracker {
     private Long qoeTotalBitrateWeightedTime;
     private Long qoeTotalActiveTime;
 
-    // QOE_AGGREGATE harvest cycle tracking fields
-    private boolean hasVideoActionInCurrentCycle = false;
-    private boolean qoeAggregateAlreadySent = false;
-    private Long lastHarvestCycleTimestamp = null;
-    private int harvestCycleCount = 0; // Track number of harvest cycles for qoeIntervalFactor
+    // QOE_AGGREGATE provider fields
+    private boolean qoeProviderRegistered = false;
+    private Map<String, Object> pendingQoeForNextHarvest = null; // For CONTENT_END
 
     /**
      * Create a new NRVideoTracker.
@@ -341,8 +342,6 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_REQUEST);
             } else {
                 sendVideoEvent(CONTENT_REQUEST);
-                // Mark video action for QOE_AGGREGATE once per harvest cycle
-                markVideoActionInCycle();
             }
         }
     }
@@ -373,8 +372,15 @@ public class NRVideoTracker extends NRTracker {
                 hasContentStarted = true;
 
                 sendVideoEvent(CONTENT_START);
-                // Mark video action for QOE_AGGREGATE once per harvest cycle
-                markVideoActionInCycle();
+
+                // Register QOE provider with HarvestManager (harvest-time generation)
+                if (!qoeProviderRegistered && configuration != null && configuration.isQoeAggregateEnabled()) {
+                    if (NRVideo.getInstance() != null && NRVideo.getInstance().getHarvestManager() != null) {
+                        NRVideo.getInstance().getHarvestManager().registerQoeProvider(this);
+                        qoeProviderRegistered = true;
+                        NRLog.d("QOE provider registered at CONTENT_START");
+                    }
+                }
             }
             playtimeSinceLastEventTimestamp = System.currentTimeMillis();
         }
@@ -394,8 +400,6 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_PAUSE);
             } else {
                 sendVideoEvent(CONTENT_PAUSE);
-                // Send single and latest QOE with this VideoAction event
-                markVideoActionInCycle();
             }
             playtimeSinceLastEventTimestamp = 0L;
         }
@@ -430,8 +434,6 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_RESUME);
             } else {
                 sendVideoEvent(CONTENT_RESUME);
-                // Send single and latest QOE with this VideoAction event
-                markVideoActionInCycle();
             }
             if (!state.isBuffering && !state.isSeeking) {
                 playtimeSinceLastEventTimestamp = System.currentTimeMillis();
@@ -452,11 +454,31 @@ public class NRVideoTracker extends NRTracker {
                 }
                 totalAdPlaytime = totalAdPlaytime + totalPlaytime;
             } else {
-                // For last harvest cycle: force send QOE_AGGREGATE if not already sent and QOE is enabled
-                if (!qoeAggregateAlreadySent && configuration != null && configuration.isQoeAggregateEnabled()) {
-                    sendQoeAggregate();
+                // Build QOE eagerly for CONTENT_END and enqueue for next harvest
+                if (configuration != null && configuration.isQoeAggregateEnabled()) {
+                    Map<String, Object> qoeEvent = new HashMap<>();
+                    qoeEvent.put("eventType", "VideoAction");
+                    qoeEvent.put("actionName", QOE_AGGREGATE);
+                    qoeEvent.put("timestamp", System.currentTimeMillis());
+                    qoeEvent.put("sessionId", getAgentSession());
+                    qoeEvent.put("viewId", getViewId());
+
+                    // Add QOE KPI attributes while tracker state is still valid
+                    Map<String, Object> kpiAttributes = calculateQOEKpiAttributes();
+                    qoeEvent.putAll(kpiAttributes);
+
+                    // Mark as final QOE so HarvestManager always sends it (even on empty batches)
+                    qoeEvent.put("isFinalQoe", true);
+
+                    // Enqueue for next harvest to avoid race conditions
+                    pendingQoeForNextHarvest = qoeEvent;
+                    NRLog.d("QOE_AGGREGATE built eagerly at CONTENT_END, enqueued for next harvest");
                 }
+
                 sendVideoEvent(CONTENT_END);
+
+                // NOTE: Provider unregistration is delayed until after final QOE is sent
+                // This happens automatically in HarvestManager when it detects "isFinalQoe" flag
             }
 
             stopHeartbeat();
@@ -480,8 +502,6 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_SEEK_START);
             } else {
                 sendVideoEvent(CONTENT_SEEK_START);
-                // Send single and latest QOE with this VideoAction event
-                markVideoActionInCycle();
             }
             playtimeSinceLastEventTimestamp = 0L;
         }
@@ -496,8 +516,6 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_SEEK_END);
             } else {
                 sendVideoEvent(CONTENT_SEEK_END);
-                // Send single and latest QOE with this VideoAction event
-                markVideoActionInCycle();
             }
             if (!state.isBuffering && !state.isPaused) {
                 playtimeSinceLastEventTimestamp = System.currentTimeMillis();
@@ -518,8 +536,6 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_BUFFER_START);
             } else {
                 sendVideoEvent(CONTENT_BUFFER_START);
-                // Send single and latest QOE with this VideoAction event
-                markVideoActionInCycle();
             }
             playtimeSinceLastEventTimestamp = 0L;
         }
@@ -540,8 +556,6 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_BUFFER_END);
             } else {
                 sendVideoEvent(CONTENT_BUFFER_END);
-                // Send single and latest QOE with this VideoAction event
-                markVideoActionInCycle();
             }
             if (!state.isSeeking && !state.isPaused) {
                 playtimeSinceLastEventTimestamp = System.currentTimeMillis();
@@ -566,8 +580,6 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_HEARTBEAT,eventData);
             } else {
                 sendVideoEvent(CONTENT_HEARTBEAT, eventData);
-                // Send single and latest QOE with this VideoAction event
-                markVideoActionInCycle();
             }
         }
         state.chrono.start();
@@ -582,8 +594,6 @@ public class NRVideoTracker extends NRTracker {
             sendVideoAdEvent(AD_RENDITION_CHANGE);
         } else {
             sendVideoEvent(CONTENT_RENDITION_CHANGE);
-            // Send single and latest QOE with this VideoAction event
-            sendQoeAggregate();
         }
     }
 
@@ -594,76 +604,60 @@ public class NRVideoTracker extends NRTracker {
      * This design choice focuses QoE measurement on the primary content viewing experience.
      */
     /**
-     * Mark that a video action occurred in the current harvest cycle.
-     * This will trigger QOE_AGGREGATE to be sent once per cycle.
+     * Implementation of QoeProvider interface.
+     * Called by HarvestManager during harvest to generate QOE_AGGREGATE events.
+     *
+     * @param batch The current harvest batch containing VideoAction events
+     * @param harvestCycleNumber The current harvest cycle number (1-based)
+     * @return QOE_AGGREGATE event map if it should be generated, null otherwise
      */
-    public void markVideoActionInCycle() {
-        if (!state.isAd) { // Only for content, not ads
-            checkAndSendQoeAggregateIfNeeded(); // Check for new cycle first (may reset flags)
-            hasVideoActionInCurrentCycle = true; // Now mark action in current cycle
-            // Check again now that we've marked the action
-            if (hasVideoActionInCurrentCycle && !qoeAggregateAlreadySent) {
-                sendQoeAggregate();
+    @Override
+    public Map<String, Object> generateQoeIfNeeded(List<Map<String, Object>> batch, int harvestCycleNumber) {
+        // Check if QOE is enabled
+        if (!state.isAd && configuration != null && configuration.isQoeAggregateEnabled()) {
+            // Check if this harvest cycle should send based on interval multiplier
+            int intervalMultiplier = configuration.getQoeAggregateIntervalMultiplier();
+
+            // First cycle always sends, then every Nth cycle
+            boolean shouldSend = harvestCycleNumber == 1 || (harvestCycleNumber % intervalMultiplier == 0);
+
+            if (shouldSend) {
+                // Build QOE event
+                Map<String, Object> qoeEvent = new HashMap<>();
+                qoeEvent.put("eventType", "VideoAction");
+                qoeEvent.put("actionName", QOE_AGGREGATE);
+                qoeEvent.put("timestamp", System.currentTimeMillis());
+                qoeEvent.put("sessionId", getAgentSession());
+                qoeEvent.put("viewId", getViewId());
+
+                // Add QOE KPI attributes
+                Map<String, Object> kpiAttributes = calculateQOEKpiAttributes();
+                qoeEvent.putAll(kpiAttributes);
+
+                NRLog.d("QOE_AGGREGATE generated for harvest cycle " + harvestCycleNumber);
+                return qoeEvent;
             }
         }
+
+        // Check if there's a pending QOE from CONTENT_END
+        if (pendingQoeForNextHarvest != null) {
+            Map<String, Object> qoe = pendingQoeForNextHarvest;
+            pendingQoeForNextHarvest = null; // Clear after use
+            NRLog.d("Pending QOE_AGGREGATE from CONTENT_END injected into harvest");
+            return qoe;
+        }
+
+        return null; // Don't generate QOE for this cycle
     }
 
     /**
-     * Check if we need to send QOE_AGGREGATE for the current harvest cycle.
-     * Only sends once per harvest cycle and only if there was a video action.
-     * Respects qoeIntervalFactor to reduce frequency (first and last cycles always send).
+     * Implementation of QoeProvider interface.
+     * Called when provider should be unregistered.
      */
-    private void checkAndSendQoeAggregateIfNeeded() {
-        long currentTime = System.currentTimeMillis();
-        // Use user-configured harvest cycle
-        long harvestCycleMs = NRVideo.getHarvestCycleSeconds() * 1000L;
-        // Check if we're in a new harvest cycle
-        if (lastHarvestCycleTimestamp == null ||
-                (currentTime - lastHarvestCycleTimestamp) >= harvestCycleMs) {
-            resetHarvestCycleFlags();
-            lastHarvestCycleTimestamp = currentTime;
-            harvestCycleCount++; // Increment cycle count for qoeIntervalFactor
-        }
-        // Send QOE_AGGREGATE if we haven't sent it yet and we have video actions
-        // Check if this cycle should send based on qoeIntervalFactor
-        if (hasVideoActionInCurrentCycle && !qoeAggregateAlreadySent && shouldSendQoeInCurrentCycle()) {
-            sendQoeAggregate();
-        }
-    }
-
-    /**
-     * Determine if QOE_AGGREGATE should be sent in the current harvest cycle.
-     * First cycle (cycle 1) always sends. Then sends every Nth cycle where N = qoeIntervalFactor.
-     * @return true if QOE should be sent, false otherwise
-     */
-    private boolean shouldSendQoeInCurrentCycle() {
-        if (configuration == null) {
-            return true; // Default behavior if no config
-        }
-        int intervalFactor = configuration.getQoeIntervalFactor();
-        // First cycle always sends (harvestCycleCount == 1)
-        // Then send every intervalFactor cycles (e.g., if factor=3, send on cycles 1, 3, 6, 9, ...)
-        return harvestCycleCount == 1 || (harvestCycleCount % intervalFactor == 0);
-    }
-
-    /**
-     * Reset harvest cycle tracking flags for new cycle
-     */
-    private void resetHarvestCycleFlags() {
-        hasVideoActionInCurrentCycle = false;
-        qoeAggregateAlreadySent = false;
-    }
-
-    /**
-     * Send QOE_AGGREGATE event (internal method - called once per cycle)
-     */
-    private void sendQoeAggregate() {
-        if (!state.isAd && configuration != null && configuration.isQoeAggregateEnabled()) {
-            // Only send for content, not ads, and only if QOE aggregate is enabled
-            Map<String, Object> kpiAttributes = calculateQOEKpiAttributes();
-            sendVideoEvent(QOE_AGGREGATE, kpiAttributes);
-            qoeAggregateAlreadySent = true;
-        }
+    @Override
+    public void unregister() {
+        qoeProviderRegistered = false;
+        NRLog.d("QOE provider unregistered for tracker");
     }
 
     /**
@@ -926,10 +920,8 @@ public class NRVideoTracker extends NRTracker {
         qoeTotalBitrateWeightedTime = 0L;
         qoeTotalActiveTime = 0L;
 
-        // Reset QOE_AGGREGATE harvest cycle tracking fields
-        resetHarvestCycleFlags();
-        lastHarvestCycleTimestamp = null;
-        harvestCycleCount = 0; // Reset cycle count for new view session
+        // Reset QOE provider fields for new view session
+        pendingQoeForNextHarvest = null;
     }
 
 
