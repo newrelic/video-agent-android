@@ -197,6 +197,22 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | CRASH         | App crash happened.  |
 | CONTENT_ERROR | Content video error. |
 
+### QOE_AGGREGATE
+
+Quality of Experience aggregate attributes sent with `CONTENT_END` events.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `startupTime` | Long | Time from CONTENT_REQUEST to CONTENT_START (ms) |
+| `hadStartupError` | Boolean | Error occurred before first frame |
+| `totalRebufferingTime` | Long | Total rebuffering duration (ms) |
+| `rebufferingRatio` | Float | `(totalRebufferingTime / totalPlaytime) × 100` |
+| `peakBitrate` | Long | Maximum bitrate observed (bps) |
+| `averageBitrate` | Long | Time-weighted average bitrate (bps) |
+| `hadPlaybackError` | Boolean | Error occurred during playback |
+| `totalPlaytime` | Long | Actual viewing time (ms) |
+| `qoeAggregateVersion` | String | Algorithm version (e.g. "1.0.0") |
+
 ### VideoCustomAction
 
 | Attribute Name           | Definition                                                                                                                                         |

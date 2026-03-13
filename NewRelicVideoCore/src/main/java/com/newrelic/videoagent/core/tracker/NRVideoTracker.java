@@ -44,8 +44,8 @@ public class NRVideoTracker extends NRTracker {
 
     // QoE (Quality of Experience) tracking fields
     private Long qoePeakBitrate;
-    private Boolean qoeHadPlaybackFailure;
-    private Boolean qoeHadStartupFailure;
+    private Boolean qoeHadPlaybackError;
+    private Boolean qoeHadStartupError;
     private Long qoeTotalRebufferingTime;
     private Long qoeBitrateSum;
     private Long qoeBitrateCount;
@@ -141,8 +141,8 @@ public class NRVideoTracker extends NRTracker {
 
         // Initialize QoE tracking fields
         qoePeakBitrate = 0L;
-        qoeHadPlaybackFailure = false;
-        qoeHadStartupFailure = false;
+        qoeHadPlaybackError = false;
+        qoeHadStartupError = false;
         qoeTotalRebufferingTime = 0L;
         qoeBitrateSum = 0L;
         qoeBitrateCount = 0L;
@@ -657,11 +657,11 @@ public class NRVideoTracker extends NRTracker {
             kpiAttributes.put("peakBitrate", qoePeakBitrate);
         }
 
-        // hadPlaybackFailure - Boolean indicating if CONTENT_ERROR occurred at any time during content playback
-        if (qoeHadPlaybackFailure == null) {
-            qoeHadPlaybackFailure = false;
+        // hadPlaybackError - Boolean indicating if CONTENT_ERROR occurred at any time during content playback
+        if (qoeHadPlaybackError == null) {
+            qoeHadPlaybackError = false;
         }
-        kpiAttributes.put("hadPlaybackFailure", qoeHadPlaybackFailure);
+        kpiAttributes.put("hadPlaybackError", qoeHadPlaybackError);
 
         // totalRebufferingTime - Total milliseconds spent rebuffering during content playback
         if (qoeTotalRebufferingTime == null) {
@@ -785,10 +785,10 @@ public class NRVideoTracker extends NRTracker {
         }
 
         // Use the tracked startup failure flag (set during error handling)
-        if (qoeHadStartupFailure == null) {
-            qoeHadStartupFailure = false;
+        if (qoeHadStartupError == null) {
+            qoeHadStartupError = false;
         }
-        attributes.put("hadStartupFailure", qoeHadStartupFailure);
+        attributes.put("hadStartupError", qoeHadStartupError);
     }
 
     /**
@@ -887,8 +887,8 @@ public class NRVideoTracker extends NRTracker {
      */
     private void resetQoeMetrics() {
         qoePeakBitrate = null;
-        qoeHadPlaybackFailure = false;
-        qoeHadStartupFailure = false;
+        qoeHadPlaybackError = false;
+        qoeHadStartupError = false;
         qoeTotalRebufferingTime = 0L;
         qoeBitrateSum = 0L;
         qoeBitrateCount = 0L;
@@ -940,11 +940,11 @@ public class NRVideoTracker extends NRTracker {
             actionName = AD_ERROR;
         } else {
             if (totalPlaytime != null && totalPlaytime > 0) {
-                // Error occurred after content started playing, so it's a playback failure
-                qoeHadPlaybackFailure = true;
+                // Error occurred after content started playing, so it's a playback error
+                qoeHadPlaybackError = true;
             } else {
-                // Error occurred before content started playing, so it's a startup failure
-                qoeHadStartupFailure = true;
+                // Error occurred before content started playing, so it's a startup error
+                qoeHadStartupError = true;
             }
         }
         sendVideoErrorEvent(actionName, errAttr);
