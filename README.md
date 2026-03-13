@@ -110,6 +110,8 @@ To start the video agent with ExoPlayer tracker only:
 NRVideoConfiguration config = new NRVideoConfiguration.Builder("application-token")
         .autoDetectPlatform(getApplicationContext())
         .withHarvestCycle(5*60) //This is in seconds, for ondemand video, please use minimum 5 minutes
+        .enableQoeAggregate(true) // Optional: Enable QoE metrics (disabled by default)
+        .withQoeAggregateIntervalMultiplier(2) // Optional: Send QoE every 2nd harvest cycle (default: 1)
         .build();
 NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
 
@@ -167,8 +169,18 @@ builder.setAdEventListener(adTracker.getAdEventListener());
 - **`harvestCycleSeconds`**  
   Interval \(in seconds\) between regular data harvests\. Controls how often data is sent to the New Relic\. Typical values range from 300 to 600 seconds\.
 
-- **`liveHarvestCycleSeconds`**  
+- **`liveHarvestCycleSeconds`**
   Interval \(in seconds\) for live stream data harvests\. Used for real\-time or near\-real\-time data transmission\. Valid range is 30 to 60 seconds\.
+
+- **`enableQoeAggregate`**
+  Enables Quality of Experience \(QoE\) aggregate metrics collection and reporting\. When enabled, the agent generates `QOE_AGGREGATE` events containing KPIs such as startup time, average bitrate, rebuffering metrics, and playback failures\. **Default: `false`** \(QoE is disabled by default and must be explicitly enabled\)\.
+
+- **`qoeAggregateIntervalMultiplier`**
+  Controls the frequency of QoE aggregate event generation as a multiplier of the harvest cycle\. For example:
+  - `1` = QoE generated every harvest cycle \(cycles 1, 2, 3, 4\.\.\.\)
+  - `2` = QoE generated every other harvest cycle \(cycles 1, 3, 5, 7\.\.\.\)
+  - `3` = QoE generated every third harvest cycle \(cycles 1, 4, 7, 10\.\.\.\)
+  **Default: `1`** \(QoE generated every harvest cycle when enabled\)\. Only applies when `enableQoeAggregate` is `true`\.
 
 **`NRVideoPlayerConfiguration.java`**
 
