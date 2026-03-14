@@ -70,6 +70,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
     // QOE_AGGREGATE provider fields
     private boolean qoeProviderRegistered = false;
     private Map<String, Object> pendingQoeForNextHarvest = null; // For CONTENT_END
+    private Map<String, Object> lastSentQoeKpis = null; // Snapshot of last sent QoE KPIs for dirty check
 
     /**
      * Create a new NRVideoTracker.
@@ -344,6 +345,16 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
             if (state.isAd) {
                 sendVideoAdEvent(AD_REQUEST);
             } else {
+                // Register QOE provider at CONTENT_REQUEST (like iOS) so QoE is captured
+                // even if CONTENT_START never happens (e.g., startup error)
+                if (!qoeProviderRegistered && configuration != null && configuration.isQoeAggregateEnabled()) {
+                    if (NRVideo.getInstance() != null && NRVideo.getInstance().getHarvestManager() != null) {
+                        NRVideo.getInstance().getHarvestManager().registerQoeProvider(this);
+                        qoeProviderRegistered = true;
+                        NRLog.d("QOE provider registered at CONTENT_REQUEST");
+                    }
+                }
+
                 sendVideoEvent(CONTENT_REQUEST);
             }
         }
@@ -381,15 +392,6 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
 
                 // Resume bitrate timer when content starts playing
                 resumeBitrateTimer();
-
-                // Register QOE provider with HarvestManager (harvest-time generation)
-                if (!qoeProviderRegistered && configuration != null && configuration.isQoeAggregateEnabled()) {
-                    if (NRVideo.getInstance() != null && NRVideo.getInstance().getHarvestManager() != null) {
-                        NRVideo.getInstance().getHarvestManager().registerQoeProvider(this);
-                        qoeProviderRegistered = true;
-                        NRLog.d("QOE provider registered at CONTENT_START");
-                    }
-                }
             }
             playtimeSinceLastEventTimestamp = System.currentTimeMillis();
         }
@@ -645,11 +647,22 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
             boolean shouldSend = (harvestCycleNumber - 1) % intervalMultiplier == 0;
 
             if (shouldSend) {
-                // Build QOE event with standard attributes (reuse existing attribute generation)
-                Map<String, Object> qoeEvent = buildQoeEventWithStandardAttributes();
+                // Calculate current QoE KPIs
+                Map<String, Object> currentKpis = calculateQOEKpiAttributes();
 
-                NRLog.d("QOE_AGGREGATE generated for harvest cycle " + harvestCycleNumber);
-                return qoeEvent;
+                // Dirty check: Only send if KPI values have changed since last send
+                if (haveQoeKpisChanged(currentKpis)) {
+                    // Build QOE event with standard attributes
+                    Map<String, Object> qoeEvent = buildQoeEventWithStandardAttributes();
+
+                    // Update snapshot for next dirty check
+                    lastSentQoeKpis = new HashMap<>(currentKpis);
+
+                    NRLog.d("QOE_AGGREGATE generated for harvest cycle " + harvestCycleNumber + " (KPIs changed)");
+                    return qoeEvent;
+                } else {
+                    NRLog.d("QOE_AGGREGATE skipped for harvest cycle " + harvestCycleNumber + " (no KPI changes)");
+                }
             }
         }
 
@@ -700,6 +713,48 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         }
 
         return qoeEvent;
+    }
+
+    /**
+     * Check if QoE KPI attributes have changed since the last sent QoE event.
+     * Implements dirty check pattern like iOS to prevent sending duplicate QoE with identical values.
+     *
+     * @param currentKpis Current QoE KPI attributes
+     * @return true if KPIs have changed or this is the first QoE, false if identical to last send
+     */
+    private boolean haveQoeKpisChanged(Map<String, Object> currentKpis) {
+        // First QoE always sends
+        if (lastSentQoeKpis == null) {
+            return true;
+        }
+
+        // Compare each KPI attribute
+        // KPI attributes: startupTime, peakBitrate, averageBitrate, totalPlaytime,
+        // totalRebufferingTime, rebufferingRatio, hadStartupFailure, hadPlaybackFailure
+        for (String key : currentKpis.keySet()) {
+            Object currentValue = currentKpis.get(key);
+            Object lastValue = lastSentQoeKpis.get(key);
+
+            // If key is missing in last snapshot, consider it changed
+            if (lastValue == null && currentValue != null) {
+                return true;
+            }
+
+            // Compare values (handles Long, Double, Boolean, String)
+            if (currentValue != null && !currentValue.equals(lastValue)) {
+                return true;
+            }
+        }
+
+        // Check if any keys were removed
+        for (String key : lastSentQoeKpis.keySet()) {
+            if (!currentKpis.containsKey(key)) {
+                return true;
+            }
+        }
+
+        // No changes detected
+        return false;
     }
 
     /**
@@ -1081,6 +1136,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
 
         // Reset QOE provider fields for new view session
         pendingQoeForNextHarvest = null;
+        lastSentQoeKpis = null; // Reset dirty check snapshot for new view session
     }
 
 

@@ -27,7 +27,6 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
 
     private final CrashSafeHarvestFactory factory;
     private final CopyOnWriteArrayList<QoeProvider> qoeProviders = new CopyOnWriteArrayList<>();
-    private final Map<QoeProvider, Map<String, Object>> pendingQoeEvents = new ConcurrentHashMap<>();
     private int harvestCycleNumber = 0;
 
     public HarvestManager(NRVideoConfiguration configuration,
@@ -123,7 +122,6 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
     public void unregisterQoeProvider(QoeProvider provider) {
         if (provider != null) {
             qoeProviders.remove(provider);
-            pendingQoeEvents.remove(provider);  // Clear any pending QOE
             NRLog.d("QOE provider unregistered. Remaining providers: " + qoeProviders.size());
         }
     }
@@ -172,13 +170,11 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
 
     /**
      * Inject QOE_AGGREGATE events into harvest batch if conditions are met.
-     * Implements "accumulate and send" pattern: QOE is only sent with batches
-     * that contain VideoAction events. If QOE should be sent but batch is empty,
-     * it's stored as pending and sent with the next batch containing video events.
+     * Like iOS: QOE is sent independently on each qualified harvest cycle,
+     * regardless of whether the batch contains other VideoAction events.
      *
-     * EXCEPTION: Final QOE from CONTENT_END (marked with "isFinalQoe" flag) is
-     * ALWAYS injected, even on empty batches, to ensure no data loss at session end.
-     * Provider is automatically unregistered after final QOE is sent.
+     * Final QOE from CONTENT_END (marked with "isFinalQoe" flag) is always injected
+     * and triggers provider unregistration.
      *
      * @param batch The harvest batch to potentially inject QOE events into
      * @param cycleNumber The current harvest cycle number
@@ -188,71 +184,29 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
             return;
         }
 
-        // Check if batch contains VideoAction events
-        boolean hasVideoAction = false;
-        for (Map<String, Object> event : batch) {
-            if ("VideoAction".equals(event.get("eventType"))) {
-                hasVideoAction = true;
-                break;
-            }
-        }
-
         // Process each registered QOE provider (use ArrayList copy to allow removal during iteration)
         List<QoeProvider> providersSnapshot = new ArrayList<>(qoeProviders);
         for (QoeProvider provider : providersSnapshot) {
             try {
                 // Check if current cycle should send QOE
                 Map<String, Object> currentQoeEvent = provider.generateQoeIfNeeded(batch, cycleNumber);
-                boolean shouldSendCurrentQoe = (currentQoeEvent != null);
 
-                // Check if this is the final QOE from CONTENT_END
-                if (currentQoeEvent != null && Boolean.TRUE.equals(currentQoeEvent.get("isFinalQoe"))) {
-                    // FINAL QOE - always send, even on empty batches
-                    currentQoeEvent.remove("isFinalQoe"); // Remove internal flag before sending
-                    batch.add(currentQoeEvent);
-                    NRLog.d("Final QOE_AGGREGATE from CONTENT_END injected - provider will be unregistered");
-
-                    // Unregister provider after injecting final QOE
-                    qoeProviders.remove(provider);
-                    pendingQoeEvents.remove(provider);
-                    continue; // Skip normal processing for this provider
-                }
-
-                // Check if there's a pending QOE from a previous empty batch
-                Map<String, Object> pendingQoeEvent = pendingQoeEvents.get(provider);
-                boolean hasPendingQoe = (pendingQoeEvent != null);
-
-                if (hasVideoAction) {
-                    // Batch has video events - send any pending and/or current QOE
-
-                    if (hasPendingQoe) {
-                        // Inject the stored pending QOE (don't regenerate)
-                        Object pendingCycleNum = pendingQoeEvent.remove("_cycleNumber"); // Remove internal field
-                        batch.add(pendingQoeEvent);
-                        NRLog.d("QOE_AGGREGATE injected (pending from cycle " + pendingCycleNum + ") at cycle " + cycleNumber);
-                        pendingQoeEvents.remove(provider);
-                    }
-
-                    if (shouldSendCurrentQoe) {
-                        // Send current cycle QOE
+                if (currentQoeEvent != null) {
+                    // Check if this is the final QOE from CONTENT_END
+                    if (Boolean.TRUE.equals(currentQoeEvent.get("isFinalQoe"))) {
+                        // FINAL QOE - remove internal flag before sending
+                        currentQoeEvent.remove("isFinalQoe");
                         batch.add(currentQoeEvent);
-                        NRLog.d("QOE_AGGREGATE injected into harvest batch (cycle " + cycleNumber + ")");
-                    }
-                } else {
-                    // Batch is empty (no video events)
+                        NRLog.d("Final QOE_AGGREGATE from CONTENT_END injected - provider will be unregistered");
 
-                    if (shouldSendCurrentQoe) {
-                        // Store the QOE event object as pending - will send with next video event batch
-                        // Don't overwrite if one already exists - keep the earlier QOE to avoid losing data
-                        if (!hasPendingQoe) {
-                            // Store cycle number in the event for logging (internal use only, removed before sending)
-                            currentQoeEvent.put("_cycleNumber", cycleNumber);
-                            pendingQoeEvents.put(provider, currentQoeEvent);
-                            NRLog.d("QOE_AGGREGATE pending for cycle " + cycleNumber + " - waiting for batch with video events");
-                        } else {
-                            NRLog.d("QOE_AGGREGATE for cycle " + cycleNumber + " skipped - pending QOE already exists");
-                        }
+                        // Unregister provider after injecting final QOE
+                        qoeProviders.remove(provider);
+                        continue;
                     }
+
+                    // Regular QOE - send independently (like iOS)
+                    batch.add(currentQoeEvent);
+                    NRLog.d("QOE_AGGREGATE injected into harvest batch (cycle " + cycleNumber + ")");
                 }
             } catch (Exception e) {
                 NRLog.e("Error generating QOE from provider: " + e.getMessage(), e);
