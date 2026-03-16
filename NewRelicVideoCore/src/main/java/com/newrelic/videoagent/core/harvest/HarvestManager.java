@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.ArrayList;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import android.content.Context;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
@@ -27,7 +28,7 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
 
     private final CrashSafeHarvestFactory factory;
     private final CopyOnWriteArrayList<QoeProvider> qoeProviders = new CopyOnWriteArrayList<>();
-    private int harvestCycleNumber = 0;
+    private final AtomicInteger harvestCycleNumber = new AtomicInteger(0);
 
     public HarvestManager(NRVideoConfiguration configuration,
                           Context context) {
@@ -135,8 +136,8 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
      */
     private void harvest(int batchSizeBytes, String priorityFilter, String harvestType) {
         try {
-            // Increment harvest cycle number
-            harvestCycleNumber++;
+            // Increment harvest cycle number (thread-safe atomic operation)
+            int currentCycle = harvestCycleNumber.incrementAndGet();
 
             SizeEstimator sizeEstimator = new DefaultSizeEstimator();
             List<Map<String, Object>> events = factory.getEventBuffer().pollBatchByPriority(
@@ -147,7 +148,7 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
 
             // Inject QOE events BEFORE checking if batch is empty
             // QOE should be generated based on cycle number, even if there are no other events
-            injectQoeEventsIfNeeded(events, harvestCycleNumber);
+            injectQoeEventsIfNeeded(events, currentCycle);
 
             if (!events.isEmpty()) {
                 boolean success = factory.getHttpClient().sendEvents(events, harvestType);
