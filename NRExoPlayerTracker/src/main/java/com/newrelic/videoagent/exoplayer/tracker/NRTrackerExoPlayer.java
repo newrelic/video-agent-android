@@ -5,6 +5,8 @@ import android.os.Handler;
 import android.os.Looper;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.OptIn;
+import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaLibraryInfo;
 import androidx.media3.common.MediaMetadata;
@@ -37,7 +39,12 @@ import static com.newrelic.videoagent.core.NRDef.*;
 
 /**
  * New Relic Video tracker for ExoPlayer.
+ * <p>
+ * @OptIn is required for Media3 APIs which are marked as @UnstableApi.
+ * This is by design as per Google's Media3 documentation.
+ * @see <a href="https://developer.android.com/media/media3/exoplayer/customization#unstable-api">Media3 Unstable API Documentation</a>
  */
+@OptIn(markerClass = UnstableApi.class)
 public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listener, AnalyticsListener {
 
     protected ExoPlayer player;
@@ -676,8 +683,10 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA
                 && mediaLoadData.trackType == C.TRACK_TYPE_VIDEO
                 && loadEventInfo.loadDurationMs > 0) {
-            // Calculate the bitrate for this specific chunk in bits per second
-            this.actualBitrate = (loadEventInfo.bytesLoaded * 8 * 1000) / loadEventInfo.loadDurationMs;
+            // Use actual video bitrate from player's video format instead of download speed
+            if (player != null && player.getVideoFormat() != null && player.getVideoFormat().bitrate != C.INDEX_UNSET) {
+                this.actualBitrate = player.getVideoFormat().bitrate;
+            }
         }
     }
 

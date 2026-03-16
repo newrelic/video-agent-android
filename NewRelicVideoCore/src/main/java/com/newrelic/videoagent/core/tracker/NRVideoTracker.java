@@ -163,8 +163,11 @@ public class NRVideoTracker extends NRTracker {
 
         if (state.isAd) {
             attr.put("adTitle", getTitle());
-            attr.put("adBitrate", getBitrate());
-            attr.put("adRenditionBitrate", getRenditionBitrate());
+            // Only add bitrate attributes after ad has started (first frame shown)
+            if (state.isStarted) {
+                attr.put("adBitrate", getBitrate());
+                attr.put("adRenditionBitrate", getRenditionBitrate());
+            }
             attr.put("adRenditionWidth", getRenditionWidth());
             attr.put("adRenditionHeight", getRenditionHeight());
             attr.put("adDuration", getDuration());
@@ -199,9 +202,11 @@ public class NRVideoTracker extends NRTracker {
             }
 
             attr.put("contentTitle", getTitle());
-//            attr.put("contentBitrate", getBitrate());
-            attr.put("contentBitrate", getActualBitrate());
-            attr.put("contentRenditionBitrate", getRenditionBitrate());
+            // Only add bitrate attributes after content has started (first frame shown)
+            if (state.isStarted) {
+                attr.put("contentBitrate", getActualBitrate());
+                attr.put("contentRenditionBitrate", getRenditionBitrate());
+            }
             attr.put("contentRenditionWidth", getRenditionWidth());
             attr.put("contentRenditionHeight", getRenditionHeight());
             attr.put("contentDuration", getDuration());
@@ -411,7 +416,7 @@ public class NRVideoTracker extends NRTracker {
         state.accumulatedVideoWatchTime = (Math.abs(state.accumulatedVideoWatchTime - heartbeatInterval) <= 5 ? heartbeatInterval : state.accumulatedVideoWatchTime);
         Map<String, Object> eventData = new HashMap<>();
         eventData.put("elapsedTime", state.accumulatedVideoWatchTime);
-        if (state.accumulatedVideoWatchTime != null && state.accumulatedVideoWatchTime > 0L) {
+        if (state.accumulatedVideoWatchTime != null) {
             if (state.isAd) {
                 sendVideoAdEvent(AD_HEARTBEAT,eventData);
             } else {
