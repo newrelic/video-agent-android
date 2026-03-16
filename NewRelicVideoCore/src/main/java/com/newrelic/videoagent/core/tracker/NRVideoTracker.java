@@ -807,10 +807,19 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         }
         kpiAttributes.put("totalRebufferingTime", qoeTotalRebufferingTime);
 
-        // Use elapsedTime (accumulatedVideoWatchTime) instead of totalPlaytime for QOE
-        Long elapsedTime = state.accumulatedVideoWatchTime;
+        // Calculate real-time totalPlaytime (cumulative, not reset like accumulatedVideoWatchTime)
+        // totalPlaytime is updated during video events, but we add time since last event for real-time value
+        Long elapsedTime = totalPlaytime;
         if (elapsedTime == null) {
             elapsedTime = 0L;
+        }
+
+        // If video is playing, add time since last video event update
+        if (state.isPlaying && playtimeSinceLastEventTimestamp > 0) {
+            long timeSinceLastUpdate = System.currentTimeMillis() - playtimeSinceLastEventTimestamp;
+            if (timeSinceLastUpdate > 0) {
+                elapsedTime += timeSinceLastUpdate;
+            }
         }
 
         // rebufferingRatio - Rebuffering time as a percentage of elapsed watch time
@@ -821,7 +830,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
             kpiAttributes.put("rebufferingRatio", 0.0);
         }
 
-        // totalPlaytime - Use elapsedTime (accumulated video watch time) instead of totalPlaytime
+        // totalPlaytime - Real-time cumulative playtime
         kpiAttributes.put("totalPlaytime", elapsedTime);
 
         // averageBitrate - Time-weighted average bitrate across all content playback
