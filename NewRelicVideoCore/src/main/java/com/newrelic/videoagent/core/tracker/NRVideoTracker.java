@@ -71,6 +71,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
     private boolean qoeProviderRegistered = false;
     private Map<String, Object> pendingQoeForNextHarvest = null; // For CONTENT_END
     private Map<String, Object> lastSentQoeKpis = null; // Snapshot of last sent QoE KPIs for dirty check
+    private volatile Map<String, Object> cachedStandardAttributes = null; // Cached attributes for thread-safe access
 
     /**
      * Create a new NRVideoTracker.
@@ -321,6 +322,14 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         // QoE: Track bitrate after all attributes are processed (including contentBitrate)
         if (!state.isAd && !QOE_AGGREGATE.equals(action)) {
             trackBitrateFromProcessedAttributes(action, attr);
+        }
+
+        // Cache attributes for non-QOE events (for thread-safe QOE generation)
+        // QOE generation runs on harvest background thread but ExoPlayer requires main thread access.
+        // By caching attributes here (called on main thread during video events), QOE can safely
+        // use these attributes without accessing the player directly.
+        if (attr != null && !QOE_AGGREGATE.equals(action)) {
+            cachedStandardAttributes = new HashMap<>(attr);
         }
 
         return attr;
@@ -679,7 +688,8 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
 
     /**
      * Build QOE event with all standard video tracking attributes.
-     * Reuses the existing attribute generation pipeline to ensure consistency.
+     * Thread-safe: Uses cached attributes from last video event instead of
+     * accessing player directly (which requires main thread).
      *
      * @return Complete QOE event map with standard attributes
      */
@@ -687,16 +697,22 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         // Start with QOE KPI attributes
         Map<String, Object> qoeEvent = calculateQOEKpiAttributes();
 
-        // Add standard video tracking attributes (reuse getAttributes pipeline)
-        qoeEvent = getAttributes(QOE_AGGREGATE, qoeEvent);
+        // Add cached standard video tracking attributes (thread-safe)
+        // Note: Cache is populated by video events (CONTENT_START, HEARTBEAT, etc.) on main thread
+        // This avoids thread safety issues with ExoPlayer which requires main thread access
+        if (cachedStandardAttributes != null) {
+            qoeEvent.putAll(cachedStandardAttributes);
+        } else {
+            NRLog.w("QOE: No cached attributes available yet (this is normal for very first QOE before any video events)");
+        }
 
-        // Add instrumentation attributes (same as NRTracker.sendEvent())
+        // Add/override instrumentation attributes (same as NRTracker.sendEvent())
         qoeEvent.put("agentSession", getAgentSession());
         qoeEvent.put("instrumentation.provider", "newrelic");
         qoeEvent.put("instrumentation.name", getInstrumentationName());
         qoeEvent.put("instrumentation.version", getCoreVersion());
 
-        // Add core attributes
+        // Add/override core attributes
         qoeEvent.put("eventType", "VideoAction");
         qoeEvent.put("actionName", QOE_AGGREGATE);
         qoeEvent.put("timestamp", System.currentTimeMillis());
