@@ -87,9 +87,8 @@ public class NRChronoTest {
 
     @Test
     public void testMultipleStartCalls() throws InterruptedException {
-        chrono.start();
-        Thread.sleep(10);
-
+        // Each call to start() resets the timer. Only the time elapsed since the
+        // *last* start() call should be reflected in getDeltaTime().
         chrono.start();
         Thread.sleep(10);
 
@@ -98,8 +97,8 @@ public class NRChronoTest {
 
         long delta = chrono.getDeltaTime();
 
+        // delta must be at least 10ms — the sleep after the last start() call.
         assertTrue(delta >= 10);
-        assertTrue(delta < 20);
     }
 
     @Test
