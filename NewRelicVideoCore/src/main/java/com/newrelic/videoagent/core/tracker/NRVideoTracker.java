@@ -697,13 +697,56 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         // Start with QOE KPI attributes
         Map<String, Object> qoeEvent = calculateQOEKpiAttributes();
 
-        // Add cached standard video tracking attributes (thread-safe)
+        // Add filtered cached attributes (match iOS behavior)
         // Note: Cache is populated by video events (CONTENT_START, HEARTBEAT, etc.) on main thread
         // This avoids thread safety issues with ExoPlayer which requires main thread access
         if (cachedStandardAttributes != null) {
-            qoeEvent.putAll(cachedStandardAttributes);
+            // Filter attributes to match iOS implementation:
+            // - Keep timeSinceRequested and timeSinceStarted (session context)
+            // - Filter out all other timeSince* attributes (event-specific)
+            // - Filter out bufferType (event-specific)
+            for (Map.Entry<String, Object> entry : cachedStandardAttributes.entrySet()) {
+                String key = entry.getKey();
+
+                // Filter out event-specific timeSince* attributes
+                // Keep only timeSinceRequested and timeSinceStarted for session context
+                if (key.startsWith("timeSince")
+                    && !key.equals("timeSinceRequested")
+                    && !key.equals("timeSinceStarted")) {
+                    continue;  // Skip event-specific timeSince
+                }
+
+                // Filter out buffer-specific attribute
+                if (key.equals("bufferType")) {
+                    continue;  // Skip buffer-specific attribute
+                }
+
+                // Include all other attributes
+                qoeEvent.put(key, entry.getValue());
+            }
         } else {
             NRLog.w("QOE: No cached attributes available yet (this is normal for very first QOE before any video events)");
+        }
+
+        // Explicitly ensure session context attributes are present by applying timeSince values
+        // This guarantees timeSinceRequested and timeSinceStarted are always included
+        Map<String, Object> freshTimeSinceAttributes = new HashMap<>();
+        timeSinceTable.applyAttributes(QOE_AGGREGATE, freshTimeSinceAttributes);
+
+        // Extract and add the session context timeSince attributes
+        if (freshTimeSinceAttributes.containsKey("timeSinceRequested")) {
+            qoeEvent.put("timeSinceRequested", freshTimeSinceAttributes.get("timeSinceRequested"));
+        }
+        if (freshTimeSinceAttributes.containsKey("timeSinceStarted")) {
+            qoeEvent.put("timeSinceStarted", freshTimeSinceAttributes.get("timeSinceStarted"));
+        }
+
+        // Log to verify these critical attributes are present
+        if (qoeEvent.containsKey("timeSinceRequested") || qoeEvent.containsKey("timeSinceStarted")) {
+            NRLog.d("QOE session context: timeSinceRequested=" + qoeEvent.get("timeSinceRequested") +
+                    ", timeSinceStarted=" + qoeEvent.get("timeSinceStarted"));
+        } else {
+            NRLog.w("QOE: Session context attributes (timeSinceRequested/timeSinceStarted) not available yet");
         }
 
         // Add/override instrumentation attributes (same as NRTracker.sendEvent())
