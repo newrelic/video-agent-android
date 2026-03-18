@@ -1,3 +1,4 @@
+## [4.1.3-beta](https://github.com/newrelic/video-agent-android/compare/v4.1.2-beta...v4.1.3-beta) (2026-03-18)
 ## [4.1.2-beta](https://github.com/newrelic/video-agent-android/compare/v4.0.6...v4.1.2-beta) (2026-03-18)
 
 ### Features
