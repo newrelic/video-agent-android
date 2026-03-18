@@ -44,9 +44,10 @@ public final class NRVideoConfiguration {
     private final boolean debugLoggingEnabled;
     private final boolean isTV;
     private final String collectorAddress;
+    private final int qoeAggregateIntervalMultiplier;
 
     // Runtime configuration fields (mutable, thread-safe) - Using AtomicBoolean for better performance
-    private final AtomicBoolean qoeAggregateEnabled = new AtomicBoolean(true);
+    private final AtomicBoolean qoeAggregateEnabled = new AtomicBoolean(false);
     private final AtomicBoolean runtimeConfigInitialized = new AtomicBoolean(false);
 
 
@@ -86,6 +87,7 @@ public final class NRVideoConfiguration {
         this.debugLoggingEnabled = builder.debugLoggingEnabled;
         this.isTV = builder.isTV;
         this.collectorAddress = builder.collectorAddress;
+        this.qoeAggregateIntervalMultiplier = builder.qoeAggregateIntervalMultiplier;
 
         // Initialize runtime configuration
         this.qoeAggregateEnabled.set(builder.qoeAggregateEnabled);
@@ -104,6 +106,7 @@ public final class NRVideoConfiguration {
     public boolean isDebugLoggingEnabled() { return debugLoggingEnabled; }
     public boolean isTV() { return isTV; }
     public String getCollectorAddress() { return collectorAddress; }
+    public int getQoeAggregateIntervalMultiplier() { return qoeAggregateIntervalMultiplier; }
 
     // Runtime configuration getters and setters
     /**
@@ -231,7 +234,8 @@ public final class NRVideoConfiguration {
         private boolean debugLoggingEnabled = false;
         private boolean isTV = false;
         private String collectorAddress = null;
-        private boolean qoeAggregateEnabled = true; // Default enabled
+        private boolean qoeAggregateEnabled = false; // Default disabled
+        private int qoeAggregateIntervalMultiplier = 1; // Default 1 (send every harvest cycle)
 
         public Builder(String applicationToken) {
             this.applicationToken = applicationToken;
@@ -335,6 +339,24 @@ public final class NRVideoConfiguration {
          */
         public Builder enableQoeAggregate(boolean enabled) {
             this.qoeAggregateEnabled = enabled;
+            return this;
+        }
+
+        /**
+         * Set QOE aggregate interval multiplier to reduce frequency of QOE_AGGREGATE events.
+         * If standard harvest cycle is 30s and this is set to 3, QOE events send every 90s.
+         * First and last harvest cycles of a view always send QOE_AGGREGATE regardless of this setting.
+         * @param multiplier Interval multiplier (must be a positive integer >= 1).
+         *                   Any value < 1 will default to 1. Decimal values are not supported.
+         * @return Builder instance for method chaining
+         */
+        public Builder withQoeAggregateIntervalMultiplier(int multiplier) {
+            if (multiplier < 1) {
+                NRLog.w("Invalid QOE aggregate interval multiplier: " + multiplier + ". Defaulting to 1.");
+                this.qoeAggregateIntervalMultiplier = 1;
+            } else {
+                this.qoeAggregateIntervalMultiplier = multiplier;
+            }
             return this;
         }
 
