@@ -735,8 +735,6 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
             Double playbackRate = getPlayrate();
 
             if (loadEventInfo.bytesLoaded > 0 && currentTime != null && currentTime > 0 && playbackRate != null && playbackRate > 0) {
-                // Formula: (bytesLoaded * 8 * 1000 * playbackRate) / currentTime
-                // Multiply by 1000 to convert from bits/ms to bits/second
                 this.actualBitrate = (long) ((loadEventInfo.bytesLoaded * 8 * 1000 * playbackRate) / currentTime);
             } else {
                 // Fallback to manifest bitrate if formula cannot be calculated
