@@ -204,7 +204,7 @@ public class NRVideoTracker extends NRTracker {
             attr.put("contentTitle", getTitle());
             // Only add bitrate attributes after content has started (first frame shown)
             if (state.isStarted) {
-                attr.put("contentBitrate", getBitrate());
+                attr.put("contentBitrate", getActualBitrate());
                 attr.put("contentRenditionBitrate", getRenditionBitrate());
                 attr.put("contentManifestBitrate", getManifestBitrate());
                 attr.put("contentMeasuredBitrate", getMeasuredBitrate());

@@ -175,7 +175,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      * @return Attribute.
      */
     public Long getBitrate() {
-        return actualBitrate;
+        return bitrateEstimate;
     }
 
     public Long getActualBitrate() {
