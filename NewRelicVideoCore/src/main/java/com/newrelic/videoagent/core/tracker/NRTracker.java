@@ -1,6 +1,7 @@
 package com.newrelic.videoagent.core.tracker;
 
 import com.newrelic.videoagent.core.NRVideo;
+import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.NewRelicVideoAgent;
 import com.newrelic.videoagent.core.model.NREventAttributes;
 import com.newrelic.videoagent.core.model.NRTimeSince;
@@ -21,15 +22,35 @@ public class NRTracker {
      */
     public NRTracker linkedTracker;
 
+    protected final NRVideoConfiguration configuration;
     private final NREventAttributes eventAttributes;
     private NRTimeSinceTable timeSinceTable;
 
     /**
-     * Create a new NRTracker.
+     * Create a new NRTracker with configuration.
      */
-    public NRTracker() {
+    public NRTracker(NRVideoConfiguration configuration) {
+        this.configuration = configuration;
         eventAttributes = new NREventAttributes();
         generateTimeSinceTable();
+    }
+
+    /**
+     * Create a new NRTracker (deprecated - use constructor with configuration).
+     * @deprecated Use NRTracker(NRVideoConfiguration) constructor instead
+     */
+    @Deprecated
+    public NRTracker() {
+        this.configuration = null;
+        eventAttributes = new NREventAttributes();
+        generateTimeSinceTable();
+    }
+
+    /**
+     * Get the tracker configuration.
+     */
+    public NRVideoConfiguration getConfiguration() {
+        return configuration;
     }
 
     /**
@@ -73,7 +94,6 @@ public class NRTracker {
         attributes = eventAttributes.generateAttributes(action, attributes);
         return attributes;
     }
-
     /**
      * Add an entry to the timeSince table.
      *
@@ -141,6 +161,9 @@ public class NRTracker {
     public void sendEvent(String eventType, String action, Map<String, Object> attributes) {
         attributes = getAttributes(action, attributes);
         timeSinceTable.applyAttributes(action, attributes);
+
+        // Process QoE events that require timing attributes
+        processQoeEvents(action, attributes);
 
         attributes.put("agentSession", getAgentSession());
         attributes.put("instrumentation.provider", "newrelic");
@@ -247,5 +270,28 @@ public class NRTracker {
     public String getAgentSession() {
         return NewRelicVideoAgent.getInstance().getSessionId();
     }
+    /**
+     * Process QoE events that require timing attributes to be already applied.
+     * This method handles QOE_AGGREGATE and CONTENT_BUFFER_END events for various QoE calculations.
+     *
+     * @param action The event action name
+     * @param attributes The event attributes map (timing attributes already applied)
+     */
+    private void processQoeEvents(String action, Map<String, Object> attributes) {
+        if (this instanceof NRVideoTracker) {
+            NRVideoTracker videoTracker = (NRVideoTracker) this;
 
+            if (QOE_AGGREGATE.equals(action)) {
+                // Process QOE_AGGREGATE events for startup time calculation
+                Long timeSinceRequested = (Long) attributes.get("timeSinceRequested");
+                Long timeSinceStarted = (Long) attributes.get("timeSinceStarted");
+                Long timeSinceLastError = (Long) attributes.get("timeSinceLastError");
+                videoTracker.calculateAndAddStartupTime(attributes, timeSinceRequested, timeSinceStarted, timeSinceLastError);
+            }
+            else if (CONTENT_BUFFER_END.equals(action)) {
+                // Process CONTENT_BUFFER_END events for rebuffering time calculation
+                videoTracker.calculateRebufferingTime(attributes);
+            }
+        }
+    }
 }

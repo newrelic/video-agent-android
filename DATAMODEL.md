@@ -43,7 +43,10 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | contentId                | The ID of the video.                                                                                                                               |
 | contentTitle             | The title of the video.                                                                                                                            |
 | contentIsLive            | True if the video is live.                                                                                                                         |
-| contentBitrate           | Bitrate (in bits) of the video.                                                                                                                    |
+| contentBitrate           | Average bitrate (in bits) of the video.                                                                                                            |
+| contentManifestBitrate   | Indicated Bitrate: The throughput, in bits per second, required to play the stream as advertised by the server in the manifest.                     |
+| contentMeasuredBitrate   | Observed Bitrate: The actual, empirical throughput measured in bits per second across all downloaded media.                                         |
+| contentDownloadBitrate   | The actual download throughput in bits per second.                                                                                                 |
 | contentRenditionName     | Name of the rendition (e.g., 1080p).                                                                                                               |
 | contentRenditionBitrate  | Target Bitrate of the rendition.                                                                                                                   |
 | contentRenditionHeight   | Rendition actual Height (before re-scaling).                                                                                                       |
@@ -196,6 +199,22 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | ERROR         | An error happened.   |
 | CRASH         | App crash happened.  |
 | CONTENT_ERROR | Content video error. |
+
+### QOE_AGGREGATE
+
+Quality of Experience aggregate attributes sent with `CONTENT_END` events.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `startupTime` | Long | Time from CONTENT_REQUEST to CONTENT_START (ms) |
+| `hadStartupError` | Boolean | Error occurred before first frame |
+| `totalRebufferingTime` | Long | Total rebuffering duration (ms) |
+| `rebufferingRatio` | Float | `(totalRebufferingTime / totalPlaytime) × 100` |
+| `peakBitrate` | Long | Maximum bitrate observed (bps) |
+| `averageBitrate` | Long | Time-weighted average bitrate (bps) |
+| `hadPlaybackError` | Boolean | Error occurred during playback |
+| `totalPlaytime` | Long | Actual viewing time (ms) |
+| `qoeAggregateVersion` | String | Algorithm version (e.g. "1.0.0") |
 
 ### VideoCustomAction
 

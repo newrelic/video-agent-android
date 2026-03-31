@@ -1,0 +1,78 @@
+name: Publish Beta Release
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - stable-beta
+
+permissions:
+  contents: write
+
+jobs:
+  publish-beta-release:
+    name: Create GitHub Beta Release
+    runs-on: ubuntu-latest
+    # Run only if merged AND has 'beta-release' label
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'beta-release')
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Create Beta Release and Tag
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 1. Extract Version
+          VERSION=$(grep "^GLOBAL_VERSION_NAME=" gradle.properties | cut -d'=' -f2)
+
+          if [ -z "$VERSION" ]; then
+            echo "Error: Could not detect version from gradle.properties."
+            exit 1
+          fi
+
+          echo "Detected Beta Version: $VERSION"
+          TAG_NAME="v$VERSION"
+
+          # 2. Extract Changelog for this version
+          # We initialize NOTES as empty
+          NOTES=""
+
+          if [ -f CHANGELOG.md ]; then
+            echo "CHANGELOG.md found. Extracting notes for $VERSION..."
+            # This command extracts the text between the current version header and the next one
+            NOTES=$(sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$ d')
+          else
+            echo "Warning: CHANGELOG.md not found."
+          fi
+
+          # Add JitPack usage instructions to notes
+          JITPACK_USAGE="
+
+          ### 📦 JitPack Usage
+          \`\`\`gradle
+          dependencies {
+              implementation 'com.github.newrelic.NewRelicVideoCore:$VERSION'
+              implementation 'com.github.newrelic.NRExoPlayerTracker:$VERSION'
+              implementation 'com.github.newrelic.NRIMATracker:$VERSION'
+          }
+          \`\`\`"
+
+          FULL_NOTES="$NOTES$JITPACK_USAGE"
+
+          # 3. Log extracted notes
+          echo "Extracted notes:"
+          echo "$FULL_NOTES"
+
+          # 4. Create the GitHub Release AND Tag as pre-release
+          # We use the extracted "$FULL_NOTES" here and mark as pre-release
+          gh release create "$TAG_NAME" \
+            --title "🚀 Beta Release $TAG_NAME" \
+            --notes "$FULL_NOTES" \
+            --prerelease \
+            --target ${{ github.base_ref }}
+
+          echo "✅ Beta release created: $TAG_NAME"
+          echo "🎯 JitPack will automatically detect and build this beta release"

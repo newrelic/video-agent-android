@@ -30,6 +30,7 @@ public class NRDef {
     public static final String CONTENT_HEARTBEAT = "CONTENT_HEARTBEAT";
     public static final String CONTENT_RENDITION_CHANGE = "CONTENT_RENDITION_CHANGE";
     public static final String CONTENT_ERROR = "CONTENT_ERROR";
+    public static final String QOE_AGGREGATE = "QOE_AGGREGATE";
 
     public static final String AD_REQUEST = "AD_REQUEST";
     public static final String AD_START = "AD_START";

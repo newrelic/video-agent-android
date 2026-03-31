@@ -3,6 +3,7 @@ package com.newrelic.videoagent.ima.tracker;
 import com.google.ads.interactivemedia.v3.api.Ad;
 import com.google.ads.interactivemedia.v3.api.AdErrorEvent;
 import com.google.ads.interactivemedia.v3.api.AdEvent;
+import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.ima.BuildConfig;
@@ -12,6 +13,22 @@ import java.lang.reflect.Method;
 import static com.newrelic.videoagent.core.NRDef.*;
 
 public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdErrorListener, AdEvent.AdEventListener {
+
+    /**
+     * Create a new IMA tracker with configuration.
+     */
+    public NRTrackerIMA(NRVideoConfiguration configuration) {
+        super(configuration);
+    }
+
+    /**
+     * Create a new IMA tracker (deprecated - use constructor with configuration).
+     * @deprecated Use NRTrackerIMA(NRVideoConfiguration) constructor instead
+     */
+    @Deprecated
+    public NRTrackerIMA() {
+        super();
+    }
 
     private String adPosition = null;
     private String creativeId = null;

@@ -19,6 +19,7 @@ import androidx.media3.exoplayer.analytics.AnalyticsListener;
 import androidx.media3.exoplayer.source.LoadEventInfo;
 import androidx.media3.exoplayer.source.MediaLoadData;
 
+import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.exoplayer.BuildConfig;
@@ -56,6 +57,8 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     protected int lastWindow;
     protected String renditionChangeShift;
     protected long actualBitrate;
+    protected long renditionBitrate;
+    protected long downloadBitrate;
     private static final long DEFAULT_AGGREGATION_WINDOW_MS = 5000; // 5 seconds
     private static final int MAX_EVENTS_PER_AGGREGATE = 50;
     private volatile boolean droppedFrameAggregationEnabled = true;
@@ -73,15 +76,39 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     /**
      * Init a new ExoPlayer tracker.
      */
+    public NRTrackerExoPlayer(NRVideoConfiguration configuration) {
+        super(configuration);
+    }
+
+    /**
+     * Create a new NRTrackerExoPlayer (deprecated - use constructor with configuration).
+     * @deprecated Use NRTrackerExoPlayer(NRVideoConfiguration) constructor instead
+     */
+    @Deprecated
     public NRTrackerExoPlayer() {
+        super();
     }
 
     /**
      * Init a new ExoPlayer tracker.
      *
+     * @param configuration Video configuration
      * @param player ExoPlayer instance.
      */
+    public NRTrackerExoPlayer(NRVideoConfiguration configuration, ExoPlayer player) {
+        super(configuration);
+        setPlayer(player);
+    }
+
+    /**
+     * Init a new ExoPlayer tracker (deprecated).
+     *
+     * @param player ExoPlayer instance.
+     * @deprecated Use NRTrackerExoPlayer(NRVideoConfiguration, ExoPlayer) constructor instead
+     */
+    @Deprecated
     public NRTrackerExoPlayer(ExoPlayer player) {
+        super();
         setPlayer(player);
     }
 
@@ -181,12 +208,48 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     }
 
     /**
+     * Get manifest (indicated) bitrate in bits per second.
+     *
+     * @return Attribute.
+     */
+    public Long getManifestBitrate() {
+        if (renditionBitrate > 0) {
+            return renditionBitrate;
+        }
+        return null;
+    }
+
+    /**
+     * Get measured bitrate in bits per second.
+     *
+     * @return Attribute.
+     */
+    public Long getMeasuredBitrate() {
+        return bitrateEstimate;
+    }
+
+    /**
+     * Get download bitrate in bits per second.
+     *
+     * @return Attribute.
+     */
+    public Long getDownloadBitrate() {
+        if (downloadBitrate > 0) {
+            return downloadBitrate;
+        }
+        return null;
+    }
+
+    /**
      * Get rendition bitrate.
      *
      * @return Attribute.
      */
     public Long getRenditionBitrate() {
-        return getBitrate();
+        if (renditionBitrate > 0) {
+            return renditionBitrate;
+        }
+        return null;
     }
 
     /**
@@ -378,6 +441,8 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         lastWidth = 0;
         lastHeight = 0;
         actualBitrate = 0;
+        renditionBitrate = 0;
+        downloadBitrate = 0;
     }
 
     /**
@@ -683,9 +748,27 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA
                 && mediaLoadData.trackType == C.TRACK_TYPE_VIDEO
                 && loadEventInfo.loadDurationMs > 0) {
-            // Use actual video bitrate from player's video format instead of download speed
-            if (player != null && player.getVideoFormat() != null && player.getVideoFormat().bitrate != C.INDEX_UNSET) {
-                this.actualBitrate = player.getVideoFormat().bitrate;
+            // Set renditionBitrate from manifest/track format
+            if (mediaLoadData.trackFormat != null && mediaLoadData.trackFormat.bitrate != C.INDEX_UNSET && mediaLoadData.trackFormat.bitrate > 0) {
+                this.renditionBitrate = mediaLoadData.trackFormat.bitrate;
+            } else if (player != null && player.getVideoFormat() != null && player.getVideoFormat().bitrate != C.INDEX_UNSET) {
+                this.renditionBitrate = player.getVideoFormat().bitrate;
+            }
+
+            // Calculate actualBitrate using formula: (BytesTransferred * 8) / (CurrentTime / Playback Rate)
+            Long currentTime = getPlayhead();
+            Double playbackRate = getPlayrate();
+
+            if (loadEventInfo.bytesLoaded > 0 && currentTime != null && currentTime > 0 && playbackRate != null && playbackRate > 0) {
+                this.actualBitrate = (long) ((loadEventInfo.bytesLoaded * 8 * 1000 * playbackRate) / currentTime);
+            } else {
+                // Fallback to manifest bitrate if formula cannot be calculated
+                this.actualBitrate = this.renditionBitrate;
+            }
+
+            // Calculate download bitrate from bytes transferred and duration
+            if (loadEventInfo.bytesLoaded > 0 && loadEventInfo.loadDurationMs > 0) {
+                this.downloadBitrate = (loadEventInfo.bytesLoaded * 8 * 1000) / loadEventInfo.loadDurationMs;
             }
         }
     }
