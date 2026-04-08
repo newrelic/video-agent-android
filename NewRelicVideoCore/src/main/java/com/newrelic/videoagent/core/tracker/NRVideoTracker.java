@@ -300,8 +300,8 @@ public class NRVideoTracker extends NRTracker {
                 attr.put("contentBitrate", getActualBitrate());
                 attr.put("contentRenditionBitrate", getRenditionBitrate());
                 attr.put("contentManifestBitrate", getManifestBitrate());
-                attr.put("contentMeasuredBitrate", getMeasuredBitrate());
-                attr.put("contentDownloadBitrate", getDownloadBitrate());
+                attr.put("segmentDownloadBitrate", getSegmentDownloadBitrate());
+                attr.put("networkDownloadBitrate", getNetworkDownloadBitrate());
             }
             attr.put("contentRenditionWidth", getRenditionWidth());
             attr.put("contentRenditionHeight", getRenditionHeight());
@@ -1081,7 +1081,7 @@ public class NRVideoTracker extends NRTracker {
      *
      * @return Attribute.
      */
-    public Long getMeasuredBitrate() {
+    public Long getSegmentDownloadBitrate() {
         return null;
     }
 
@@ -1090,7 +1090,7 @@ public class NRVideoTracker extends NRTracker {
      *
      * @return Attribute.
      */
-    public Long getDownloadBitrate() {
+    public Long getNetworkDownloadBitrate() {
         return null;
     }
 
