@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.Arrays;
 import java.util.zip.GZIPOutputStream;
+import com.newrelic.videoagent.core.ObfuscationEngine;
 
 /**
  * Optimized HTTP client for mobile/TV environments
@@ -89,8 +90,19 @@ public class OptimizedHttpClient implements HttpClientInterface {
             return true;
         }
 
-        // Attempt to send with immediate retries
-        return sendEventsWithRetry(events);
+        // Apply obfuscation rules to a COPY of the events before sending.
+        //
+        // React analogy: like doing const safeEvents = events.map(e => mask(e)) before
+        // calling fetch() — the original array stays untouched.
+        //
+        // Why a copy and not mutating in place?
+        // If sendEventsWithRetry() fails, HarvestManager passes the same list to the
+        // dead letter handler for retry. If we had mutated in place, the retry would
+        // run obfuscation again on already-obfuscated values — double masking.
+        // By working on a copy, the original list stays clean for any retry path.
+        List<Map<String, Object>> safeEvents = ObfuscationEngine.apply(events, configuration.getObfuscationRules());
+
+        return sendEventsWithRetry(safeEvents);
     }
 
     private boolean sendEventsWithRetry(List<Map<String, Object>> events) {
@@ -159,6 +171,13 @@ public class OptimizedHttpClient implements HttpClientInterface {
 
             List<Object> payload = new ArrayList<>();
             payload.add(appToken);
+
+            // Build device metadata map
+            HashMap<String, Object> deviceMetadata = new HashMap<>();
+            deviceMetadata.put("size", deviceInfo.getSize());
+            deviceMetadata.put("platform", deviceInfo.getApplicationFramework());
+            deviceMetadata.put("platformVersion", deviceInfo.getApplicationFrameworkVersion());
+
             payload.add(Arrays.asList(
                     deviceInfo.getOsName(),
                     deviceInfo.getOsVersion(),
@@ -169,11 +188,7 @@ public class OptimizedHttpClient implements HttpClientInterface {
                     "",
                     "",
                     deviceInfo.getManufacturer(),
-                    new HashMap<String, Object>() {{
-                        put("size", deviceInfo.getSize());
-                        put("platform", deviceInfo.getApplicationFramework());
-                        put("platformVersion", deviceInfo.getApplicationFrameworkVersion());
-                    }}
+                    deviceMetadata
             ));
             payload.add(0);
             payload.add(new ArrayList<>()); // []

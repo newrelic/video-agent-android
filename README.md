@@ -11,6 +11,7 @@ The New Relic Video Agent for Android contains multiple modules necessary to ins
 - **Quality of Experience (QoE) Metrics** - Optional aggregate KPIs including startup time, bitrate, and rebuffering ratio
 - **Configurable Harvest Cycles** - Control data transmission frequency for regular and live streaming content
 - **Crash-Safe Buffering** - Events are persisted and retried on network failures
+- **Obfuscation Rules** - Regex-based masking of sensitive data (user IDs, tokens, account numbers) before events leave the device
 
 ## Modules
 
@@ -173,6 +174,42 @@ NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
 </p>
 </details>
 
+To mask sensitive data using obfuscation rules:
+
+<details>
+<summary>Java</summary>
+<p>
+
+```java
+import com.newrelic.videoagent.core.ObfuscationRule;
+import java.util.Arrays;
+import java.util.List;
+
+// Define rules — each rule is a regex pattern and a replacement string.
+// Rules are applied in order on every string attribute of every outgoing event.
+List<ObfuscationRule> obfuscationRules = Arrays.asList(
+    // Mask account IDs:  "account-83729"  →  "ACCOUNT_ID"
+    new ObfuscationRule("account-\\d+", "ACCOUNT_ID"),
+
+    // Mask auth tokens:  "token=abc123xyz"  →  "token=REDACTED"
+    new ObfuscationRule("token=[^&\"]+", "token=REDACTED"),
+
+    // Mask user path segments:  "/users/john_doe"  →  "/users/USER_ID"
+    new ObfuscationRule("/users/[^\"/]+", "/users/USER_ID")
+);
+
+NRVideoConfiguration config = new NRVideoConfiguration.Builder("application-token")
+        .autoDetectPlatform(getApplicationContext())
+        .withHarvestCycle(5 * 60)
+        .withObfuscationRules(obfuscationRules)
+        .build();
+
+NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
+```
+
+</p>
+</details>
+
 To start the video agent with ExoPlayer and IMA trackers:
 
 <details>
@@ -221,6 +258,9 @@ builder.setAdEventListener(adTracker.getAdEventListener());
   - `3` = QoE generated every third harvest cycle \(cycles 1, 4, 7, 10\.\.\.\)
   **Default: `1`** \(QoE generated every harvest cycle when enabled\)\. Only applies when `enableQoeAggregate` is `true`\.
 
+- **`obfuscationRules`**
+  A list of `ObfuscationRule` objects applied to every string attribute of every outgoing event immediately before HTTP transmission\. Each rule is a compiled regex pattern and a plain\-string replacement\. Rules run in the order they are declared — the output of one rule feeds into the next\. **Default: empty list** \(no obfuscation\)\.
+
 ### Quality of Experience (QoE) Metrics
 
 When `enableQoeAggregate` is enabled, the agent generates `QOE_AGGREGATE` events containing the following KPIs:
@@ -254,6 +294,64 @@ D/NRVideoTracker: QOE_AGGREGATE generated for harvest cycle 1 (KPIs changed)
 D/HarvestManager: QOE_AGGREGATE injected into harvest batch (cycle 1)
 D/NRVideoTracker: QOE_AGGREGATE skipped for harvest cycle 2 (no KPI changes)
 ```
+
+### Obfuscation Rules
+
+Obfuscation rules let you mask sensitive data — user IDs, auth tokens, account numbers, PII in URLs — before events are transmitted to New Relic. Rules are applied at send time, so no sensitive data is written to the in-memory buffer, SQLite crash-recovery storage, or the dead-letter retry queue.
+
+#### How it works
+
+1. You define a list of `ObfuscationRule` objects, each with a regex pattern and a replacement string.
+2. Pass the list to `.withObfuscationRules()` on the config builder.
+3. Just before each HTTP transmission, `ObfuscationEngine` iterates every string attribute of every event in the batch and applies the rules in order.
+4. Only string values are processed — integers, longs, booleans, and nulls are passed through unchanged.
+5. The original event objects are never mutated, so failed batches can be retried cleanly without double-obfuscation.
+
+#### `ObfuscationRule` constructor
+
+```java
+new ObfuscationRule(String pattern, String replacement)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `pattern` | `String` | A Java regex pattern string. Compiled eagerly — an invalid pattern throws `IllegalArgumentException` at construction time. |
+| `replacement` | `String` | The string to substitute for each match. Use `""` to delete matches. `$` and `\` are treated as plain characters, not back-references. |
+
+#### Common patterns
+
+| What to mask | Pattern | Replacement |
+|---|---|---|
+| Numeric account IDs | `account-\\d+` | `ACCOUNT_ID` |
+| Auth / bearer tokens | `token=[^&\"]+` | `token=REDACTED` |
+| User path segments | `/users/[^\"/]+` | `/users/USER_ID` |
+| Email addresses | `[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}` | `EMAIL_REDACTED` |
+| UUIDs | `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}` | `UUID_REDACTED` |
+
+#### Rule ordering
+
+Rules are applied left-to-right. The output of rule N becomes the input of rule N+1. Order matters when one rule's replacement could match a later rule's pattern.
+
+```java
+// Rule 1 turns "/john" into "/USER", then Rule 2 sees "/USER_profile" and masks it.
+new ObfuscationRule("john", "USER"),
+new ObfuscationRule("USER_profile", "PROFILE")
+// Result: "/john_profile" → "/USER_profile" → "/PROFILE"
+```
+
+#### Edge cases
+
+| Situation | Behaviour |
+|-----------|-----------|
+| No rules configured | No-op — zero overhead, original list returned as-is |
+| Pattern matches nothing | Value is passed through unchanged |
+| Empty replacement `""` | Matched content is deleted |
+| `$` or `\` in replacement | Treated as plain characters (not regex back-references) |
+| Integer / Long / Boolean value | Skipped — only `String` values are processed |
+| `null` value | Skipped — no NullPointerException |
+| Invalid regex pattern | `IllegalArgumentException` thrown at `new ObfuscationRule(...)` construction — fails fast at startup, not silently at harvest time |
+| `null` replacement | `IllegalArgumentException` thrown at construction |
+| HTTP send fails → dead-letter retry | Original (unobfuscated) events are retried; obfuscation is re-applied correctly on the retry pass |
 
 **`NRVideoPlayerConfiguration.java`**
 
