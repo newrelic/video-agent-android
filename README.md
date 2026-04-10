@@ -2,8 +2,15 @@
 
 # New Relic Video Agent for Android
 
-
 The New Relic Video Agent for Android contains multiple modules necessary to instrument video players and send data to New Relic.
+
+## Features
+
+- **Comprehensive Video Tracking** - Automatic instrumentation for content playback, buffering, seeking, and errors
+- **Ad Tracking** - Support for Google IMA ad tracking with pre-roll, mid-roll, and post-roll ads
+- **Quality of Experience (QoE) Metrics** - Optional aggregate KPIs including startup time, bitrate, and rebuffering ratio
+- **Configurable Harvest Cycles** - Control data transmission frequency for regular and live streaming content
+- **Crash-Safe Buffering** - Events are persisted and retried on network failures
 
 ## Modules
 
@@ -107,10 +114,16 @@ To start the video agent with ExoPlayer tracker only:
 
 ```Java
 // Step 1: Initialize the NRVideo at main activity. i.e MainActivity.java
+// Basic configuration (QoE disabled by default):
 NRVideoConfiguration config = new NRVideoConfiguration.Builder("application-token")
         .autoDetectPlatform(getApplicationContext())
-        .withHarvestCycle(5*60) //This is in seconds, for ondemand video, please use minimum 5 minutes
+        .withHarvestCycle(5*60) // This is in seconds, for ondemand video, please use minimum 5 minutes
         .build();
+
+// Optional: Enable QoE aggregate metrics:
+// .enableQoeAggregate(true) // Enables QoE KPIs (disabled by default)
+// .withQoeAggregateIntervalMultiplier(2) // Send QoE every 2nd harvest cycle (default: 1)
+
 NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
 
 //Step 2: Initialize the player(it could have n number of players in your application). i.e VideoPlayer.java
@@ -127,6 +140,34 @@ void onDestroy() {
     NRVideo.releaseTracker(trackerId);
     player.stop();
 }
+```
+
+</p>
+</details>
+
+To enable Quality of Experience (QoE) aggregate metrics:
+
+<details>
+<summary>Java</summary>
+<p>
+
+```Java
+// Initialize with QoE enabled
+NRVideoConfiguration config = new NRVideoConfiguration.Builder("application-token")
+        .autoDetectPlatform(getApplicationContext())
+        .withHarvestCycle(5*60) // 5 minutes for on-demand content
+        .enableQoeAggregate(true) // Enable QoE KPIs
+        .withQoeAggregateIntervalMultiplier(1) // Send QoE every harvest cycle (default)
+        .build();
+NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
+
+// QoE events (QOE_AGGREGATE) will now be generated containing:
+// - startupTime, peakBitrate, averageBitrate, totalPlaytime
+// - totalRebufferingTime, rebufferingRatio
+// - hadStartupFailure, hadPlaybackFailure
+
+// Query QoE data in NRDB:
+// SELECT * FROM VideoAction WHERE actionName = 'QOE_AGGREGATE' SINCE 1 hour ago
 ```
 
 </p>
@@ -167,8 +208,52 @@ builder.setAdEventListener(adTracker.getAdEventListener());
 - **`harvestCycleSeconds`**  
   Interval \(in seconds\) between regular data harvests\. Controls how often data is sent to the New Relic\. Typical values range from 300 to 600 seconds\.
 
-- **`liveHarvestCycleSeconds`**  
+- **`liveHarvestCycleSeconds`**
   Interval \(in seconds\) for live stream data harvests\. Used for real\-time or near\-real\-time data transmission\. Valid range is 30 to 60 seconds\.
+
+- **`enableQoeAggregate`**
+  Enables Quality of Experience \(QoE\) aggregate metrics collection and reporting\. When enabled, the agent generates `QOE_AGGREGATE` events containing KPIs such as startup time, average bitrate, rebuffering metrics, and playback failures\. **Default: `false`** \(QoE is disabled by default and must be explicitly enabled\)\.
+
+- **`qoeAggregateIntervalMultiplier`**
+  Controls the frequency of QoE aggregate event generation as a multiplier of the harvest cycle\. For example:
+  - `1` = QoE generated every harvest cycle \(cycles 1, 2, 3, 4\.\.\.\)
+  - `2` = QoE generated every other harvest cycle \(cycles 1, 3, 5, 7\.\.\.\)
+  - `3` = QoE generated every third harvest cycle \(cycles 1, 4, 7, 10\.\.\.\)
+  **Default: `1`** \(QoE generated every harvest cycle when enabled\)\. Only applies when `enableQoeAggregate` is `true`\.
+
+### Quality of Experience (QoE) Metrics
+
+When `enableQoeAggregate` is enabled, the agent generates `QOE_AGGREGATE` events containing the following KPIs:
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `startupTime` | Long (ms) | Time from `CONTENT_REQUEST` to `CONTENT_START`, minus ad time and pause time |
+| `peakBitrate` | Long (bps) | Highest observed bitrate during the session |
+| `averageBitrate` | Long (bps) | Time-weighted average bitrate during active playback (excludes pause, buffer, seek time) |
+| `totalPlaytime` | Long (ms) | Total content playtime excluding pause, buffer, and seek; computed in real-time at harvest |
+| `totalRebufferingTime` | Long (ms) | Total duration of all rebuffering events (excludes initial buffer) |
+| `rebufferingRatio` | Double (%) | Percentage of playtime spent rebuffering: `(totalRebufferingTime / totalPlaytime) * 100` |
+| `hadStartupFailure` | Boolean | `true` if an error occurred before `CONTENT_START` |
+| `hadPlaybackFailure` | Boolean | `true` if an error occurred after `CONTENT_START` |
+
+#### How QoE Works
+
+**Architecture**:
+
+1. **Early Registration** - QoE provider registers at `CONTENT_REQUEST` (not `CONTENT_START`) to capture startup failures even if content never starts
+2. **Harvest-Time Generation** - QoE events are generated at harvest time based on real-time metrics, not buffered with regular events
+3. **Dirty Check** - QoE events are only sent when KPI values have changed since the last send, reducing unnecessary data transmission
+4. **Independent Send** - QoE sends independently on qualified harvest cycles regardless of whether other VideoAction events are present
+5. **Bitrate Timer** - Automatically pauses during non-play states (pause, buffer, seek) for accurate time-weighted average bitrate calculation
+6. **Final QoE** - Built eagerly at `CONTENT_END` while tracker state is still valid, ensuring no data loss at session end
+
+**Example Log Output:**
+```
+D/NRVideoTracker: QOE provider registered at CONTENT_REQUEST
+D/NRVideoTracker: QOE_AGGREGATE generated for harvest cycle 1 (KPIs changed)
+D/HarvestManager: QOE_AGGREGATE injected into harvest batch (cycle 1)
+D/NRVideoTracker: QOE_AGGREGATE skipped for harvest cycle 2 (no KPI changes)
+```
 
 **`NRVideoPlayerConfiguration.java`**
 
