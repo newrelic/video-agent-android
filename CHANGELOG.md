@@ -1,3 +1,19 @@
+## [4.1.1-beta](https://github.com/newrelic/video-agent-android/compare/v4.1.0...v4.1.1-beta) (2026-04-10)
+
+### Bug Fixes
+
+* Added qoeHarvestCycle ([aa4940c](https://github.com/newrelic/video-agent-android/commit/aa4940c801a781a2ff7f20a7fa5b78068ad6d67b))
+* Added qoeHarvestCycle ([0218d31](https://github.com/newrelic/video-agent-android/commit/0218d317ef4ad5af90a9b03be0e5580eb4b4f03e))
+* Added timeSinceRequested, timeSinceStarted to qoe event payload ([1f627cf](https://github.com/newrelic/video-agent-android/commit/1f627cf06a7023fde878c0db5a8a57098f94825c))
+* Adding QoeProvider ([ed48dee](https://github.com/newrelic/video-agent-android/commit/ed48deea85e71299e4a8132176571734a6508cf1))
+* Changed architecture of QOE ([7913826](https://github.com/newrelic/video-agent-android/commit/79138264e77cee91318192184b05421221922282))
+* Final QOE event at content end ([f151a21](https://github.com/newrelic/video-agent-android/commit/f151a21e0f7cc202bda80be2118c620932f7a011))
+* Thread-safe QOE generation and real-time totalPlaytime calculation ([e53e6f7](https://github.com/newrelic/video-agent-android/commit/e53e6f74755a69c9874054a264c40a617d47f05f))
+* Thread-safe QOE generation using attribute caching ([43d21cd](https://github.com/newrelic/video-agent-android/commit/43d21cd6d80148a1c70bb3c23cc06b5a44631dfb))
+* Thread-safe QOE with real-time metrics and immediate final QOE ([a506f66](https://github.com/newrelic/video-agent-android/commit/a506f6685f398f5087d5b81481f3546d10f96080))
+* Updated calculation of Startup time, Average bitrate ([371da00](https://github.com/newrelic/video-agent-android/commit/371da00df9bde031a67864315baf82f895ed3fe2))
+* Updated harvestCycle to AtomicInteger ([0d550d2](https://github.com/newrelic/video-agent-android/commit/0d550d2bb3dc0e030276ba1f05543aff694c8708))
+* Updated the condition of when the QOE events are sent and updated readme ([f307de9](https://github.com/newrelic/video-agent-android/commit/f307de99bc3abac4185389ebb8f1cc2f26ea5457))
 ## [4.1.2-beta](https://github.com/newrelic/video-agent-android/compare/v4.0.6...v4.1.2-beta) (2026-03-18)
 ## [4.1.0](https://github.com/newrelic/video-agent-android/compare/v4.0.6...v4.1.0) (2026-03-31)
 
