@@ -52,8 +52,8 @@ public class ObfuscationEngine {
                         try {
                             // quoteReplacement treats '$' and '\' in the replacement as
                             // plain characters, not regex back-references.
-                            value = rule.regex.matcher(value)
-                                              .replaceAll(Matcher.quoteReplacement(rule.replacement));
+                            value = rule.getRegex().matcher(value)
+                                              .replaceAll(Matcher.quoteReplacement(rule.getReplacement()));
                         } catch (Exception e) {
                             NRLog.w("ObfuscationEngine: rule failed on key '"
                                     + entry.getKey() + "': " + e.getMessage());

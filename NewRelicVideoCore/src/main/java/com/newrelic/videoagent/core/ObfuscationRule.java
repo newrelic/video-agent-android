@@ -17,8 +17,8 @@ import java.util.regex.PatternSyntaxException;
 public class ObfuscationRule {
 
     // 'final' in Java == 'const' in JS — these fields can never be reassigned after construction.
-    public final Pattern regex;
-    public final String replacement;
+    private final Pattern regex;
+    private final String replacement;
 
     /**
      * @param pattern     Regex pattern string, e.g. "account-\\d+"
@@ -48,5 +48,13 @@ public class ObfuscationRule {
                 "ObfuscationRule: invalid regex pattern \"" + pattern + "\": " + e.getMessage(), e
             );
         }
+    }
+
+    public Pattern getRegex() {
+        return regex;
+    }
+
+    public String getReplacement() {
+        return replacement;
     }
 }

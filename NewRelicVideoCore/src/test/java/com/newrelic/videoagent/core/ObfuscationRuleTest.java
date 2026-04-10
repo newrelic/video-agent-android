@@ -20,8 +20,8 @@ public class ObfuscationRuleTest {
     public void validRule_compilesSuccessfully() {
         ObfuscationRule rule = new ObfuscationRule("account-\\d+", "ACCOUNT_ID");
 
-        assertNotNull(rule.regex);
-        assertEquals("ACCOUNT_ID", rule.replacement);
+        assertNotNull(rule.getRegex());
+        assertEquals("ACCOUNT_ID", rule.getReplacement());
     }
 
     @Test
@@ -29,8 +29,8 @@ public class ObfuscationRuleTest {
         // Empty string means "delete matches" — a legitimate use case.
         ObfuscationRule rule = new ObfuscationRule("secret-\\w+", "");
 
-        assertNotNull(rule.regex);
-        assertEquals("", rule.replacement);
+        assertNotNull(rule.getRegex());
+        assertEquals("", rule.getReplacement());
     }
 
     @Test
@@ -39,7 +39,7 @@ public class ObfuscationRuleTest {
         // that with Matcher.quoteReplacement(). The rule itself should accept any string.
         ObfuscationRule rule = new ObfuscationRule("price-\\d+", "$PRICE");
 
-        assertEquals("$PRICE", rule.replacement);
+        assertEquals("$PRICE", rule.getReplacement());
     }
 
     @Test
@@ -47,7 +47,7 @@ public class ObfuscationRuleTest {
         // Same as above — '\' is special in replacements but quoteReplacement handles it.
         ObfuscationRule rule = new ObfuscationRule("path-\\w+", "\\REDACTED");
 
-        assertEquals("\\REDACTED", rule.replacement);
+        assertEquals("\\REDACTED", rule.getReplacement());
     }
 
     @Test
@@ -55,10 +55,10 @@ public class ObfuscationRuleTest {
         // A realistic URL masking pattern
         ObfuscationRule rule = new ObfuscationRule("/users/[^\"/]+", "/users/USER_ID");
 
-        assertNotNull(rule.regex);
+        assertNotNull(rule.getRegex());
         // Verify the compiled regex actually matches what we expect
-        assertTrue(rule.regex.matcher("/users/john_doe/profile").find());
-        assertFalse(rule.regex.matcher("/products/shoes").find());
+        assertTrue(rule.getRegex().matcher("/users/john_doe/profile").find());
+        assertFalse(rule.getRegex().matcher("/products/shoes").find());
     }
 
     @Test
@@ -66,9 +66,9 @@ public class ObfuscationRuleTest {
         // Patterns with inline flags like (?i) for case-insensitive
         ObfuscationRule rule = new ObfuscationRule("(?i)token=[^&]+", "token=REDACTED");
 
-        assertNotNull(rule.regex);
-        assertTrue(rule.regex.matcher("TOKEN=abc123").find());
-        assertTrue(rule.regex.matcher("token=abc123").find());
+        assertNotNull(rule.getRegex());
+        assertTrue(rule.getRegex().matcher("TOKEN=abc123").find());
+        assertTrue(rule.getRegex().matcher("token=abc123").find());
     }
 
     // -------------------------------------------------------------------------
@@ -130,17 +130,17 @@ public class ObfuscationRuleTest {
     public void compiledPattern_matchesExpectedInput() {
         ObfuscationRule rule = new ObfuscationRule("account-\\d+", "ACCOUNT_ID");
 
-        assertTrue(rule.regex.matcher("account-83729").matches());
-        assertTrue(rule.regex.matcher("account-1").matches());
-        assertFalse(rule.regex.matcher("account-abc").matches()); // letters, not digits
-        assertFalse(rule.regex.matcher("account-").matches());    // no digits at all
+        assertTrue(rule.getRegex().matcher("account-83729").matches());
+        assertTrue(rule.getRegex().matcher("account-1").matches());
+        assertFalse(rule.getRegex().matcher("account-abc").matches()); // letters, not digits
+        assertFalse(rule.getRegex().matcher("account-").matches());    // no digits at all
     }
 
     @Test
     public void compiledPattern_tokenMasking_matchesExpectedInput() {
         ObfuscationRule rule = new ObfuscationRule("token=[^&\"]+", "token=REDACTED");
 
-        assertTrue(rule.regex.matcher("token=abc123xyz").find());
-        assertFalse(rule.regex.matcher("token=").find()); // empty value — no match
+        assertTrue(rule.getRegex().matcher("token=abc123xyz").find());
+        assertFalse(rule.getRegex().matcher("token=").find()); // empty value — no match
     }
 }
