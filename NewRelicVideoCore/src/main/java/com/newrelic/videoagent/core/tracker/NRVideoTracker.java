@@ -308,6 +308,9 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
             if (state.isStarted) {
                 attr.put("contentBitrate", getActualBitrate());
                 attr.put("contentRenditionBitrate", getRenditionBitrate());
+                attr.put("contentManifestBitrate", getManifestBitrate());
+                attr.put("contentMeasuredBitrate", getMeasuredBitrate());
+                attr.put("contentDownloadBitrate", getDownloadBitrate());
             }
             attr.put("contentRenditionWidth", getRenditionWidth());
             attr.put("contentRenditionHeight", getRenditionHeight());
@@ -1359,6 +1362,33 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
     }
 
     public Long getActualBitrate(){
+        return null;
+    }
+
+    /**
+     * Get manifest (indicated) bitrate in bits per second. The throughput required to play the stream as advertised by the server in the manifest.
+     *
+     * @return Attribute.
+     */
+    public Long getManifestBitrate() {
+        return null;
+    }
+
+    /**
+     * Get measured bitrate in bits per second. The actual, empirical throughput measured across all downloaded media.
+     *
+     * @return Attribute.
+     */
+    public Long getMeasuredBitrate() {
+        return null;
+    }
+
+    /**
+     * Get download bitrate in bits per second.
+     *
+     * @return Attribute.
+     */
+    public Long getDownloadBitrate() {
         return null;
     }
 
