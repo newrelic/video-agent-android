@@ -33,6 +33,9 @@ The video tracker for Google IMA Ads library. It depends on NewRelicVideoCore.
 
 ### Prerequisites
 
+- **Java 11 or higher** is required to build this project. The Android Gradle Plugin (7.4.2+) and New Relic Gradle Plugin (7.0.0+) require Java 11 minimum.
+- **Minimum Android version:** Android 7.0 (API 24). The New Relic Android Agent 7.x requires API 24+.
+
 Install the [New Relic Android Agent](https://docs.newrelic.com/docs/mobile-monitoring/new-relic-mobile-android/install-configure/install-android-apps-gradle-android-studio), and any other needed dependency, like ExoPlayer or Google IMA.
 
 ### Install automatically using JitPack
