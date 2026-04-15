@@ -300,8 +300,8 @@ public class NRVideoTracker extends NRTracker {
                 attr.put("contentBitrate", getActualBitrate());
                 attr.put("contentRenditionBitrate", getRenditionBitrate());
                 attr.put("contentManifestBitrate", getManifestBitrate());
-                attr.put("contentMeasuredBitrate", getMeasuredBitrate());
-                attr.put("contentDownloadBitrate", getDownloadBitrate());
+                attr.put("contentSegmentDownloadBitrate", getMeasuredBitrate());
+                attr.put("contentNetworkDownloadBitrate", getDownloadBitrate());
             }
             attr.put("contentRenditionWidth", getRenditionWidth());
             attr.put("contentRenditionHeight", getRenditionHeight());
