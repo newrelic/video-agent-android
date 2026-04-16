@@ -646,6 +646,148 @@ public class NRVideoTracker extends NRTracker {
             sendVideoEvent(QOE_AGGREGATE, kpiAttributes);
             qoeAggregateAlreadySent = true;
         }
+
+        return null; // Don't generate QOE for this cycle
+    }
+
+    /**
+     * Build QOE event with all standard video tracking attributes.
+     * Thread-safe: Uses cached attributes from last video event instead of
+     * accessing player directly (which requires main thread).
+     *
+     * @return Complete QOE event map with standard attributes
+     */
+    private Map<String, Object> buildQoeEventWithStandardAttributes() {
+        // Start with QOE KPI attributes
+        Map<String, Object> qoeEvent = calculateQOEKpiAttributes();
+
+        // Add filtered cached attributes (match iOS behavior)
+        // Note: Cache is populated by video events (CONTENT_START, HEARTBEAT, etc.) on main thread
+        // This avoids thread safety issues with ExoPlayer which requires main thread access
+        if (cachedStandardAttributes != null) {
+            // Filter attributes to match iOS implementation:
+            // - Keep timeSinceRequested and timeSinceStarted (session context)
+            // - Filter out all other timeSince* attributes (event-specific)
+            // - Filter out bufferType (event-specific)
+            for (Map.Entry<String, Object> entry : cachedStandardAttributes.entrySet()) {
+                String key = entry.getKey();
+
+                // Filter out event-specific timeSince* attributes
+                // Keep only timeSinceRequested and timeSinceStarted for session context
+                if (key.startsWith("timeSince")
+                    && !key.equals("timeSinceRequested")
+                    && !key.equals("timeSinceStarted")) {
+                    continue;  // Skip event-specific timeSince
+                }
+
+                // Filter out buffer-specific attribute
+                if (key.equals("bufferType")) {
+                    continue;  // Skip buffer-specific attribute
+                }
+
+                // Include all other attributes
+                qoeEvent.put(key, entry.getValue());
+            }
+        } else {
+            NRLog.w("QOE: No cached attributes available yet (this is normal for very first QOE before any video events)");
+        }
+
+        // Explicitly ensure session context attributes are present by applying timeSince values
+        // This guarantees timeSinceRequested and timeSinceStarted are always included
+        Map<String, Object> freshTimeSinceAttributes = new HashMap<>();
+        timeSinceTable.applyAttributes(QOE_AGGREGATE, freshTimeSinceAttributes);
+
+        // Extract and add the session context timeSince attributes
+        if (freshTimeSinceAttributes.containsKey("timeSinceRequested")) {
+            qoeEvent.put("timeSinceRequested", freshTimeSinceAttributes.get("timeSinceRequested"));
+        }
+        if (freshTimeSinceAttributes.containsKey("timeSinceStarted")) {
+            qoeEvent.put("timeSinceStarted", freshTimeSinceAttributes.get("timeSinceStarted"));
+        }
+
+        // Log to verify these critical attributes are present
+        if (qoeEvent.containsKey("timeSinceRequested") || qoeEvent.containsKey("timeSinceStarted")) {
+            NRLog.d("QOE session context: timeSinceRequested=" + qoeEvent.get("timeSinceRequested") +
+                    ", timeSinceStarted=" + qoeEvent.get("timeSinceStarted"));
+        } else {
+            NRLog.w("QOE: Session context attributes (timeSinceRequested/timeSinceStarted) not available yet");
+        }
+
+        // Add/override instrumentation attributes (same as NRTracker.sendEvent())
+        qoeEvent.put("agentSession", getAgentSession());
+        qoeEvent.put("instrumentation.provider", "newrelic");
+        qoeEvent.put("instrumentation.name", getInstrumentationName());
+        qoeEvent.put("instrumentation.version", getCoreVersion());
+
+        // Add/override core attributes
+        qoeEvent.put("eventType", "VideoAction");
+        qoeEvent.put("actionName", QOE_AGGREGATE);
+        qoeEvent.put("timestamp", System.currentTimeMillis());
+        qoeEvent.put("sessionId", getAgentSession());
+        qoeEvent.put("viewId", getViewId());
+
+        // Remove null and empty values (same as NRTracker.sendEvent())
+        Iterator<Object> it = qoeEvent.values().iterator();
+        while (it.hasNext()) {
+            Object v = it.next();
+            if (v == null || "".equals(v)) {
+                it.remove();
+            }
+        }
+
+        return qoeEvent;
+    }
+
+    /**
+     * Check if QoE KPI attributes have changed since the last sent QoE event.
+     * Implements dirty check pattern like iOS to prevent sending duplicate QoE with identical values.
+     *
+     * @param currentKpis Current QoE KPI attributes
+     * @return true if KPIs have changed or this is the first QoE, false if identical to last send
+     */
+    private boolean haveQoeKpisChanged(Map<String, Object> currentKpis) {
+        // First QoE always sends
+        if (lastSentQoeKpis == null) {
+            return true;
+        }
+
+        // Compare each KPI attribute
+        // KPI attributes: startupTime, peakBitrate, averageBitrate, totalPlaytime,
+        // totalRebufferingTime, rebufferingRatio, hadStartupError, hadPlaybackError
+        for (String key : currentKpis.keySet()) {
+            Object currentValue = currentKpis.get(key);
+            Object lastValue = lastSentQoeKpis.get(key);
+
+            // If key is missing in last snapshot, consider it changed
+            if (lastValue == null && currentValue != null) {
+                return true;
+            }
+
+            // Compare values (handles Long, Double, Boolean, String)
+            if (currentValue != null && !currentValue.equals(lastValue)) {
+                return true;
+            }
+        }
+
+        // Check if any keys were removed
+        for (String key : lastSentQoeKpis.keySet()) {
+            if (!currentKpis.containsKey(key)) {
+                return true;
+            }
+        }
+
+        // No changes detected
+        return false;
+    }
+
+    /**
+     * Implementation of QoeProvider interface.
+     * Called when provider should be unregistered.
+     */
+    @Override
+    public void unregister() {
+        qoeProviderRegistered = false;
+        NRLog.d("QOE provider unregistered for tracker");
     }
 
     /**
@@ -701,6 +843,12 @@ public class NRVideoTracker extends NRTracker {
 
         // qoeAggregateVersion - Version identifier for QOE calculation algorithm
         kpiAttributes.put("qoeAggregateVersion", "1.0.0");
+
+        // hadStartupErrror - Boolean indicating if error occurred before CONTENT_START
+        if (qoeHadStartupError == null) {
+            qoeHadStartupError = false;
+        }
+        kpiAttributes.put("hadStartupError", qoeHadStartupError);
 
         return kpiAttributes;
     }
