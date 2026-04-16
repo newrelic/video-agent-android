@@ -792,7 +792,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
 
         // Compare each KPI attribute
         // KPI attributes: startupTime, peakBitrate, averageBitrate, totalPlaytime,
-        // totalRebufferingTime, rebufferingRatio, hadStartupFailure, hadPlaybackFailure
+        // totalRebufferingTime, rebufferingRatio, hadStartupError, hadPlaybackError
         for (String key : currentKpis.keySet()) {
             Object currentValue = currentKpis.get(key);
             Object lastValue = lastSentQoeKpis.get(key);
@@ -899,11 +899,11 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
             kpiAttributes.put("startupTime", 0L);
         }
 
-        // hadStartupFailure - Boolean indicating if error occurred before CONTENT_START
-        if (qoeHadStartupFailure == null) {
-            qoeHadStartupFailure = false;
+        // hadStartupError - Boolean indicating if error occurred before CONTENT_START
+        if (qoeHadStartupError == null) {
+            qoeHadStartupError = false;
         }
-        kpiAttributes.put("hadStartupFailure", qoeHadStartupFailure);
+        kpiAttributes.put("hadStartupError", qoeHadStartupError);
 
         return kpiAttributes;
     }
