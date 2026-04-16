@@ -168,7 +168,7 @@ NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
 // QoE events (QOE_AGGREGATE) will now be generated containing:
 // - startupTime, peakBitrate, averageBitrate, totalPlaytime
 // - totalRebufferingTime, rebufferingRatio
-// - hadStartupFailure, hadPlaybackFailure
+// - hadStartupError, hadPlaybackError
 
 // Query QoE data in NRDB:
 // SELECT * FROM VideoAction WHERE actionName = 'QOE_AGGREGATE' SINCE 1 hour ago
@@ -276,8 +276,8 @@ When `enableQoeAggregate` is enabled, the agent generates `QOE_AGGREGATE` events
 | `totalPlaytime` | Long (ms) | Total content playtime excluding pause, buffer, and seek; computed in real-time at harvest |
 | `totalRebufferingTime` | Long (ms) | Total duration of all rebuffering events (excludes initial buffer) |
 | `rebufferingRatio` | Double (%) | Percentage of playtime spent rebuffering: `(totalRebufferingTime / totalPlaytime) * 100` |
-| `hadStartupFailure` | Boolean | `true` if an error occurred before `CONTENT_START` |
-| `hadPlaybackFailure` | Boolean | `true` if an error occurred after `CONTENT_START` |
+| `hadStartupError` | Boolean | `true` if an error occurred before `CONTENT_START` |
+| `hadPlaybackError` | Boolean | `true` if an error occurred after `CONTENT_START` |
 
 #### How QoE Works
 
