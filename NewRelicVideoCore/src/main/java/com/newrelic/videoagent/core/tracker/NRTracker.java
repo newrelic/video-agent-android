@@ -24,7 +24,7 @@ public class NRTracker {
 
     protected final NRVideoConfiguration configuration;
     private final NREventAttributes eventAttributes;
-    private NRTimeSinceTable timeSinceTable;
+    protected NRTimeSinceTable timeSinceTable;
 
     /**
      * Create a new NRTracker with configuration.

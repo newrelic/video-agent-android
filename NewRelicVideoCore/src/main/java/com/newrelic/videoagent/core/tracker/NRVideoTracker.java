@@ -7,9 +7,12 @@ import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.model.NRTimeSince;
 import com.newrelic.videoagent.core.model.NRTrackerState;
 import com.newrelic.videoagent.core.utils.NRLog;
+import com.newrelic.videoagent.core.harvest.QoeProvider;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
@@ -18,8 +21,9 @@ import com.newrelic.videoagent.core.exception.ErrorExceptionHandler;
 
 /**
  * `NRVideoTracker` defines the basic behaviour of a video tracker.
+ * Implements QoeProvider for harvest-time QOE_AGGREGATE generation.
  */
-public class NRVideoTracker extends NRTracker {
+public class NRVideoTracker extends NRTracker implements QoeProvider {
 
 
     private static final int CONTENT_HEARTBEAT_INTERVAL_SEC = 30;
@@ -61,11 +65,13 @@ public class NRVideoTracker extends NRTracker {
     private Long qoeLastRenditionChangeTime;
     private Long qoeTotalBitrateWeightedTime;
     private Long qoeTotalActiveTime;
+    private boolean qoeBitrateTimerPaused;
 
-    // QOE_AGGREGATE harvest cycle tracking fields
-    private boolean hasVideoActionInCurrentCycle = false;
-    private boolean qoeAggregateAlreadySent = false;
-    private Long lastHarvestCycleTimestamp = null;
+    // QOE_AGGREGATE provider fields
+    private boolean qoeProviderRegistered = false;
+    private volatile Map<String, Object> pendingQoeForNextHarvest = null; // For CONTENT_END (volatile for thread safety)
+    private Map<String, Object> lastSentQoeKpis = null; // Snapshot of last sent QoE KPIs for dirty check
+    private volatile Map<String, Object> cachedStandardAttributes = null; // Cached attributes for thread-safe access
 
     /**
      * Create a new NRVideoTracker.
@@ -160,6 +166,7 @@ public class NRVideoTracker extends NRTracker {
         qoeLastRenditionChangeTime = null;
         qoeTotalBitrateWeightedTime = 0L;
         qoeTotalActiveTime = 0L;
+        qoeBitrateTimerPaused = false;
     }
 
     /**
@@ -170,6 +177,8 @@ public class NRVideoTracker extends NRTracker {
     public void dispose() {
         super.dispose();
         stopHeartbeat();
+        // Clean up pending QOE to prevent memory leaks
+        pendingQoeForNextHarvest = null;
     }
 
     /**
@@ -320,6 +329,14 @@ public class NRVideoTracker extends NRTracker {
             trackBitrateFromProcessedAttributes(action, attr);
         }
 
+        // Cache attributes for non-QOE events (for thread-safe QOE generation)
+        // QOE generation runs on harvest background thread but ExoPlayer requires main thread access.
+        // By caching attributes here (called on main thread during video events), QOE can safely
+        // use these attributes without accessing the player directly.
+        if (attr != null && !QOE_AGGREGATE.equals(action)) {
+            cachedStandardAttributes = new HashMap<>(attr);
+        }
+
         return attr;
     }
     public void updatePlaytime() {
@@ -342,9 +359,17 @@ public class NRVideoTracker extends NRTracker {
             if (state.isAd) {
                 sendVideoAdEvent(AD_REQUEST);
             } else {
+                // Register QOE provider at CONTENT_REQUEST (like iOS) so QoE is captured
+                // even if CONTENT_START never happens (e.g., startup error)
+                if (!qoeProviderRegistered && configuration != null && configuration.isQoeAggregateEnabled()) {
+                    if (NRVideo.getInstance() != null && NRVideo.getInstance().getHarvestManager() != null) {
+                        NRVideo.getInstance().getHarvestManager().registerQoeProvider(this);
+                        qoeProviderRegistered = true;
+                        NRLog.d("QOE provider registered at CONTENT_REQUEST");
+                    }
+                }
+
                 sendVideoEvent(CONTENT_REQUEST);
-                // Mark video action for QOE_AGGREGATE once per harvest cycle
-                markVideoActionInCycle();
             }
         }
     }
@@ -375,8 +400,12 @@ public class NRVideoTracker extends NRTracker {
                 hasContentStarted = true;
 
                 sendVideoEvent(CONTENT_START);
-                // Mark video action for QOE_AGGREGATE once per harvest cycle
-                markVideoActionInCycle();
+
+                // Calculate and cache startup time at CONTENT_START (for QOE reporting)
+                calculateAndCacheStartupTime();
+
+                // Resume bitrate timer when content starts playing
+                resumeBitrateTimer();
             }
             playtimeSinceLastEventTimestamp = System.currentTimeMillis();
         }
@@ -396,8 +425,8 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_PAUSE);
             } else {
                 sendVideoEvent(CONTENT_PAUSE);
-                // Send single and latest QOE with this VideoAction event
-                markVideoActionInCycle();
+                // Pause bitrate timer during pause to exclude paused time from average
+                pauseBitrateTimer();
             }
             playtimeSinceLastEventTimestamp = 0L;
         }
@@ -432,8 +461,10 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_RESUME);
             } else {
                 sendVideoEvent(CONTENT_RESUME);
-                // Send single and latest QOE with this VideoAction event
-                markVideoActionInCycle();
+                // Resume bitrate timer when playback resumes (only if not buffering or seeking)
+                if (!state.isBuffering && !state.isSeeking) {
+                    resumeBitrateTimer();
+                }
             }
             if (!state.isBuffering && !state.isSeeking) {
                 playtimeSinceLastEventTimestamp = System.currentTimeMillis();
@@ -454,9 +485,21 @@ public class NRVideoTracker extends NRTracker {
                 }
                 totalAdPlaytime = totalAdPlaytime + totalPlaytime;
             } else {
+                // Build final QOE at CONTENT_END and mark for next harvest cycle
+                if (configuration != null && configuration.isQoeAggregateEnabled() && qoeProviderRegistered) {
+                    // Build final QOE with complete metrics
+                    Map<String, Object> finalQoe = buildQoeEventWithStandardAttributes();
+
+                    // Mark as final QOE so HarvestManager knows to unregister provider
+                    finalQoe.put("isFinalQoe", true);
+
+                    // Store for next harvest cycle (will be sent with priority)
+                    pendingQoeForNextHarvest = finalQoe;
+
+                    NRLog.d("Final QOE_AGGREGATE prepared at CONTENT_END, will send on next harvest cycle");
+                }
+
                 sendVideoEvent(CONTENT_END);
-                // Send single and latest QOE with this VideoAction event
-                markVideoActionInCycle();
             }
 
             stopHeartbeat();
@@ -480,8 +523,8 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_SEEK_START);
             } else {
                 sendVideoEvent(CONTENT_SEEK_START);
-                // Send single and latest QOE with this VideoAction event
-                markVideoActionInCycle();
+                // Pause bitrate timer during seeking to exclude seek time from average
+                pauseBitrateTimer();
             }
             playtimeSinceLastEventTimestamp = 0L;
         }
@@ -496,8 +539,10 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_SEEK_END);
             } else {
                 sendVideoEvent(CONTENT_SEEK_END);
-                // Send single and latest QOE with this VideoAction event
-                markVideoActionInCycle();
+                // Resume bitrate timer when seeking ends (only if not buffering or paused)
+                if (!state.isBuffering && !state.isPaused) {
+                    resumeBitrateTimer();
+                }
             }
             if (!state.isBuffering && !state.isPaused) {
                 playtimeSinceLastEventTimestamp = System.currentTimeMillis();
@@ -518,8 +563,8 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_BUFFER_START);
             } else {
                 sendVideoEvent(CONTENT_BUFFER_START);
-                // Send single and latest QOE with this VideoAction event
-                markVideoActionInCycle();
+                // Pause bitrate timer during buffering to exclude buffering time from average
+                pauseBitrateTimer();
             }
             playtimeSinceLastEventTimestamp = 0L;
         }
@@ -540,8 +585,10 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_BUFFER_END);
             } else {
                 sendVideoEvent(CONTENT_BUFFER_END);
-                // Send single and latest QOE with this VideoAction event
-                markVideoActionInCycle();
+                // Resume bitrate timer when buffering ends (only if not seeking or paused)
+                if (!state.isSeeking && !state.isPaused) {
+                    resumeBitrateTimer();
+                }
             }
             if (!state.isSeeking && !state.isPaused) {
                 playtimeSinceLastEventTimestamp = System.currentTimeMillis();
@@ -566,8 +613,6 @@ public class NRVideoTracker extends NRTracker {
                 sendVideoAdEvent(AD_HEARTBEAT,eventData);
             } else {
                 sendVideoEvent(CONTENT_HEARTBEAT, eventData);
-                // Send single and latest QOE with this VideoAction event
-                markVideoActionInCycle();
             }
         }
         state.chrono.start();
@@ -582,8 +627,6 @@ public class NRVideoTracker extends NRTracker {
             sendVideoAdEvent(AD_RENDITION_CHANGE);
         } else {
             sendVideoEvent(CONTENT_RENDITION_CHANGE);
-            // Send single and latest QOE with this VideoAction event
-            sendQoeAggregate();
         }
     }
 
@@ -594,58 +637,196 @@ public class NRVideoTracker extends NRTracker {
      * This design choice focuses QoE measurement on the primary content viewing experience.
      */
     /**
-     * Mark that a video action occurred in the current harvest cycle.
-     * This will trigger QOE_AGGREGATE to be sent once per cycle.
+     * Implementation of QoeProvider interface.
+     * Called by HarvestManager during harvest to generate QOE_AGGREGATE events.
+     *
+     * @param batch The current harvest batch containing VideoAction events
+     * @param harvestCycleNumber The current harvest cycle number (1-based)
+     * @return QOE_AGGREGATE event map if it should be generated, null otherwise
      */
-    public void markVideoActionInCycle() {
-        if (!state.isAd) { // Only for content, not ads
-            checkAndSendQoeAggregateIfNeeded(); // Check for new cycle first (may reset flags)
-            hasVideoActionInCurrentCycle = true; // Now mark action in current cycle
-            // Check again now that we've marked the action
-            if (hasVideoActionInCurrentCycle && !qoeAggregateAlreadySent) {
-                sendQoeAggregate();
+    @Override
+    public Map<String, Object> generateQoeIfNeeded(List<Map<String, Object>> batch, int harvestCycleNumber) {
+        // Priority 1: Check if there's a pending final QOE from CONTENT_END
+        if (pendingQoeForNextHarvest != null) {
+            Map<String, Object> finalQoe = pendingQoeForNextHarvest;
+            pendingQoeForNextHarvest = null; // Clear after retrieving
+            NRLog.d("Sending pending final QOE_AGGREGATE from CONTENT_END");
+            return finalQoe; // HarvestManager will see "isFinalQoe" flag and unregister provider
+        }
+
+        // Priority 2: Generate regular harvest QOE if conditions are met
+        if (!state.isAd && configuration != null && configuration.isQoeAggregateEnabled()) {
+            // Check if this harvest cycle should send based on interval multiplier
+            int intervalMultiplier = configuration.getQoeAggregateIntervalMultiplier();
+
+            // Formula matches iOS: (harvestCycleNumber - 1) % multiplier == 0
+            // Examples:
+            //   multiplier=1: cycles 1,2,3,4... (every harvest)
+            //   multiplier=2: cycles 1,3,5,7... (every other)
+            //   multiplier=3: cycles 1,4,7,10... (every third)
+            boolean shouldSend = (harvestCycleNumber - 1) % intervalMultiplier == 0;
+
+            if (shouldSend) {
+                // Calculate current QoE KPIs
+                Map<String, Object> currentKpis = calculateQOEKpiAttributes();
+
+                // Dirty check: Only send if KPI values have changed since last send
+                if (haveQoeKpisChanged(currentKpis)) {
+                    // Build QOE event with standard attributes
+                    Map<String, Object> qoeEvent = buildQoeEventWithStandardAttributes();
+
+                    // Update snapshot for next dirty check
+                    lastSentQoeKpis = new HashMap<>(currentKpis);
+
+                    NRLog.d("QOE_AGGREGATE generated for harvest cycle " + harvestCycleNumber + " (KPIs changed)");
+                    return qoeEvent;
+                } else {
+                    NRLog.d("QOE_AGGREGATE skipped for harvest cycle " + harvestCycleNumber + " (no KPI changes)");
+                }
             }
         }
+
+        return null; // Don't generate QOE for this cycle
     }
 
     /**
-     * Check if we need to send QOE_AGGREGATE for the current harvest cycle.
-     * Only sends once per harvest cycle and only if there was a video action.
+     * Build QOE event with all standard video tracking attributes.
+     * Thread-safe: Uses cached attributes from last video event instead of
+     * accessing player directly (which requires main thread).
+     *
+     * @return Complete QOE event map with standard attributes
      */
-    private void checkAndSendQoeAggregateIfNeeded() {
-        long currentTime = System.currentTimeMillis();
-        // Use user-configured harvest cycle
-        long harvestCycleMs = NRVideo.getHarvestCycleSeconds() * 1000L;
-        // Check if we're in a new harvest cycle
-        if (lastHarvestCycleTimestamp == null ||
-                (currentTime - lastHarvestCycleTimestamp) >= harvestCycleMs) {
-            resetHarvestCycleFlags();
-            lastHarvestCycleTimestamp = currentTime;
+    private Map<String, Object> buildQoeEventWithStandardAttributes() {
+        // Start with QOE KPI attributes
+        Map<String, Object> qoeEvent = calculateQOEKpiAttributes();
+
+        // Add filtered cached attributes (match iOS behavior)
+        // Note: Cache is populated by video events (CONTENT_START, HEARTBEAT, etc.) on main thread
+        // This avoids thread safety issues with ExoPlayer which requires main thread access
+        if (cachedStandardAttributes != null) {
+            // Filter attributes to match iOS implementation:
+            // - Keep timeSinceRequested and timeSinceStarted (session context)
+            // - Filter out all other timeSince* attributes (event-specific)
+            // - Filter out bufferType (event-specific)
+            for (Map.Entry<String, Object> entry : cachedStandardAttributes.entrySet()) {
+                String key = entry.getKey();
+
+                // Filter out event-specific timeSince* attributes
+                // Keep only timeSinceRequested and timeSinceStarted for session context
+                if (key.startsWith("timeSince")
+                    && !key.equals("timeSinceRequested")
+                    && !key.equals("timeSinceStarted")) {
+                    continue;  // Skip event-specific timeSince
+                }
+
+                // Filter out buffer-specific attribute
+                if (key.equals("bufferType")) {
+                    continue;  // Skip buffer-specific attribute
+                }
+
+                // Include all other attributes
+                qoeEvent.put(key, entry.getValue());
+            }
+        } else {
+            NRLog.w("QOE: No cached attributes available yet (this is normal for very first QOE before any video events)");
         }
-        // Send QOE_AGGREGATE if we haven't sent it yet and we have video actions
-        if (hasVideoActionInCurrentCycle && !qoeAggregateAlreadySent) {
-            sendQoeAggregate();
+
+        // Explicitly ensure session context attributes are present by applying timeSince values
+        // This guarantees timeSinceRequested and timeSinceStarted are always included
+        Map<String, Object> freshTimeSinceAttributes = new HashMap<>();
+        timeSinceTable.applyAttributes(QOE_AGGREGATE, freshTimeSinceAttributes);
+
+        // Extract and add the session context timeSince attributes
+        if (freshTimeSinceAttributes.containsKey("timeSinceRequested")) {
+            qoeEvent.put("timeSinceRequested", freshTimeSinceAttributes.get("timeSinceRequested"));
         }
+        if (freshTimeSinceAttributes.containsKey("timeSinceStarted")) {
+            qoeEvent.put("timeSinceStarted", freshTimeSinceAttributes.get("timeSinceStarted"));
+        }
+
+        // Log to verify these critical attributes are present
+        if (qoeEvent.containsKey("timeSinceRequested") || qoeEvent.containsKey("timeSinceStarted")) {
+            NRLog.d("QOE session context: timeSinceRequested=" + qoeEvent.get("timeSinceRequested") +
+                    ", timeSinceStarted=" + qoeEvent.get("timeSinceStarted"));
+        } else {
+            NRLog.w("QOE: Session context attributes (timeSinceRequested/timeSinceStarted) not available yet");
+        }
+
+        // Add/override instrumentation attributes (same as NRTracker.sendEvent())
+        qoeEvent.put("agentSession", getAgentSession());
+        qoeEvent.put("instrumentation.provider", "newrelic");
+        qoeEvent.put("instrumentation.name", getInstrumentationName());
+        qoeEvent.put("instrumentation.version", getCoreVersion());
+
+        // Add/override core attributes
+        qoeEvent.put("eventType", "VideoAction");
+        qoeEvent.put("actionName", QOE_AGGREGATE);
+        qoeEvent.put("timestamp", System.currentTimeMillis());
+        qoeEvent.put("sessionId", getAgentSession());
+        qoeEvent.put("viewId", getViewId());
+
+        // Remove null and empty values (same as NRTracker.sendEvent())
+        Iterator<Object> it = qoeEvent.values().iterator();
+        while (it.hasNext()) {
+            Object v = it.next();
+            if (v == null || "".equals(v)) {
+                it.remove();
+            }
+        }
+
+        return qoeEvent;
     }
 
     /**
-     * Reset harvest cycle tracking flags for new cycle
+     * Check if QoE KPI attributes have changed since the last sent QoE event.
+     * Implements dirty check pattern like iOS to prevent sending duplicate QoE with identical values.
+     *
+     * @param currentKpis Current QoE KPI attributes
+     * @return true if KPIs have changed or this is the first QoE, false if identical to last send
      */
-    private void resetHarvestCycleFlags() {
-        hasVideoActionInCurrentCycle = false;
-        qoeAggregateAlreadySent = false;
+    private boolean haveQoeKpisChanged(Map<String, Object> currentKpis) {
+        // First QoE always sends
+        if (lastSentQoeKpis == null) {
+            return true;
+        }
+
+        // Compare each KPI attribute
+        // KPI attributes: startupTime, peakBitrate, averageBitrate, totalPlaytime,
+        // totalRebufferingTime, rebufferingRatio, hadStartupError, hadPlaybackError
+        for (String key : currentKpis.keySet()) {
+            Object currentValue = currentKpis.get(key);
+            Object lastValue = lastSentQoeKpis.get(key);
+
+            // If key is missing in last snapshot, consider it changed
+            if (lastValue == null && currentValue != null) {
+                return true;
+            }
+
+            // Compare values (handles Long, Double, Boolean, String)
+            if (currentValue != null && !currentValue.equals(lastValue)) {
+                return true;
+            }
+        }
+
+        // Check if any keys were removed
+        for (String key : lastSentQoeKpis.keySet()) {
+            if (!currentKpis.containsKey(key)) {
+                return true;
+            }
+        }
+
+        // No changes detected
+        return false;
     }
 
     /**
-     * Send QOE_AGGREGATE event (internal method - called once per cycle)
+     * Implementation of QoeProvider interface.
+     * Called when provider should be unregistered.
      */
-    private void sendQoeAggregate() {
-        if (!state.isAd && configuration != null && configuration.isQoeAggregateEnabled()) {
-            // Only send for content, not ads, and only if QOE aggregate is enabled
-            Map<String, Object> kpiAttributes = calculateQOEKpiAttributes();
-            sendVideoEvent(QOE_AGGREGATE, kpiAttributes);
-            qoeAggregateAlreadySent = true;
-        }
+    @Override
+    public void unregister() {
+        qoeProviderRegistered = false;
+        NRLog.d("QOE provider unregistered for tracker");
     }
 
     /**
@@ -672,10 +853,19 @@ public class NRVideoTracker extends NRTracker {
         }
         kpiAttributes.put("totalRebufferingTime", qoeTotalRebufferingTime);
 
-        // Use elapsedTime (accumulatedVideoWatchTime) instead of totalPlaytime for QOE
-        Long elapsedTime = state.accumulatedVideoWatchTime;
+        // Calculate real-time totalPlaytime (cumulative, not reset like accumulatedVideoWatchTime)
+        // totalPlaytime is updated during video events, but we add time since last event for real-time value
+        Long elapsedTime = totalPlaytime;
         if (elapsedTime == null) {
             elapsedTime = 0L;
+        }
+
+        // If video is playing, add time since last video event update
+        if (state.isPlaying && playtimeSinceLastEventTimestamp > 0) {
+            long timeSinceLastUpdate = System.currentTimeMillis() - playtimeSinceLastEventTimestamp;
+            if (timeSinceLastUpdate > 0) {
+                elapsedTime += timeSinceLastUpdate;
+            }
         }
 
         // rebufferingRatio - Rebuffering time as a percentage of elapsed watch time
@@ -686,7 +876,7 @@ public class NRVideoTracker extends NRTracker {
             kpiAttributes.put("rebufferingRatio", 0.0);
         }
 
-        // totalPlaytime - Use elapsedTime (accumulated video watch time) instead of totalPlaytime
+        // totalPlaytime - Real-time cumulative playtime
         kpiAttributes.put("totalPlaytime", elapsedTime);
 
         // averageBitrate - Time-weighted average bitrate across all content playback
@@ -701,6 +891,19 @@ public class NRVideoTracker extends NRTracker {
 
         // qoeAggregateVersion - Version identifier for QOE calculation algorithm
         kpiAttributes.put("qoeAggregateVersion", "1.0.0");
+
+        // startupTime - Cached value calculated at CONTENT_START
+        if (qoeStartupTime != null && qoeStartupTime >= 0) {
+            kpiAttributes.put("startupTime", qoeStartupTime);
+        } else {
+            kpiAttributes.put("startupTime", 0L);
+        }
+
+        // hadStartupError - Boolean indicating if error occurred before CONTENT_START
+        if (qoeHadStartupError == null) {
+            qoeHadStartupError = false;
+        }
+        kpiAttributes.put("hadStartupError", qoeHadStartupError);
 
         return kpiAttributes;
     }
@@ -734,14 +937,56 @@ public class NRVideoTracker extends NRTracker {
     }
 
     /**
+     * Calculate and cache startup time at CONTENT_START.
+     * This method calculates startup time once and caches it for all subsequent QOE reports.
+     * Called immediately after CONTENT_START event is sent.
+     */
+    private void calculateAndCacheStartupTime() {
+        if (qoeStartupTime != null) {
+            return; // Already calculated
+        }
+
+        // Get the CONTENT_START attributes to extract timing values
+        Map<String, Object> startAttributes = getAttributes(CONTENT_START, null);
+        timeSinceTable.applyAttributes(CONTENT_START, startAttributes);
+
+        Long timeSinceRequested = (Long) startAttributes.get("timeSinceRequested");
+
+        if (timeSinceRequested != null && timeSinceRequested >= 0) {
+            Long totalExclusionTime = 0L;
+
+            // Exclude ad time that occurred during startup period
+            if (startupPeriodAdTime != null && startupPeriodAdTime > 0) {
+                totalExclusionTime += startupPeriodAdTime;
+            }
+
+            // Exclude pause time that occurred during startup period
+            if (startupPeriodPauseTime != null && startupPeriodPauseTime > 0) {
+                totalExclusionTime += startupPeriodPauseTime;
+            }
+
+            // Calculate: startupTime = timeSinceRequested - adTime - pauseTime
+            // Ensure result is non-negative
+            qoeStartupTime = Math.max(timeSinceRequested - totalExclusionTime, 0L);
+
+            NRLog.d("Startup time calculated and cached: " + qoeStartupTime + "ms");
+        } else {
+            qoeStartupTime = 0L;
+        }
+    }
+
+    /**
      * Calculate and add startup time to QOE_AGGREGATE attributes.
      * Called from NRTracker.sendEvent() where timing attributes are already available.
+     * @deprecated This method is kept for backward compatibility but is no longer used
+     * in the harvest-time QOE generation architecture. Use calculateAndCacheStartupTime() instead.
      *
      * @param attributes The QOE_AGGREGATE attributes map to add startup time to
      * @param timeSinceRequested Time since CONTENT_REQUEST event
      * @param timeSinceStarted Time since CONTENT_START event
      * @param timeSinceLastError Time since CONTENT_ERROR event
      */
+    @Deprecated
     public void calculateAndAddStartupTime(Map<String, Object> attributes,
                                            Long timeSinceRequested,
                                            Long timeSinceStarted,
@@ -831,14 +1076,65 @@ public class NRVideoTracker extends NRTracker {
     }
 
     /**
+     * Pause the bitrate timer during non-play states (pause, buffering, seeking).
+     * This ensures that time spent in non-play states is not counted in the
+     * time-weighted average bitrate calculation.
+     */
+    private void pauseBitrateTimer() {
+        if (qoeBitrateTimerPaused) {
+            return; // Already paused, nothing to do
+        }
+
+        // Save the current segment before pausing
+        if (qoeCurrentBitrate != null && qoeLastRenditionChangeTime != null && qoeCurrentBitrate > 0) {
+            long currentTime = System.currentTimeMillis();
+
+            // Ensure valid timestamps
+            if (qoeLastRenditionChangeTime > 0 && currentTime >= qoeLastRenditionChangeTime) {
+                long segmentDuration = currentTime - qoeLastRenditionChangeTime;
+
+                if (segmentDuration > 0) {
+                    // Prevent overflow in multiplication
+                    if (qoeCurrentBitrate <= Long.MAX_VALUE / segmentDuration) {
+                        try {
+                            qoeTotalBitrateWeightedTime = safeAdd(qoeTotalBitrateWeightedTime, qoeCurrentBitrate * segmentDuration);
+                            qoeTotalActiveTime = safeAdd(qoeTotalActiveTime, segmentDuration);
+                        } catch (ArithmeticException e) {
+                            NRLog.w("QoE bitrate accumulation overflow during pause - resetting");
+                            qoeTotalBitrateWeightedTime = 0L;
+                            qoeTotalActiveTime = 0L;
+                        }
+                    }
+                }
+            }
+        }
+
+        qoeBitrateTimerPaused = true;
+    }
+
+    /**
+     * Resume the bitrate timer after exiting non-play states.
+     * Restarts timing from the current moment so paused time is excluded.
+     */
+    private void resumeBitrateTimer() {
+        if (!qoeBitrateTimerPaused) {
+            return; // Already running, nothing to do
+        }
+
+        // Restart the timer from now (exclude the paused time)
+        qoeLastRenditionChangeTime = System.currentTimeMillis();
+        qoeBitrateTimerPaused = false;
+    }
+
+    /**
      * Finalize time-weighted bitrate calculation by including the current segment.
      * Called during QoE calculation to include the time since the last rendition change.
      *
      * @return Time-weighted average bitrate, or null if no data available
      */
     private Long calculateTimeWeightedAverageBitrate() {
-        // Include current segment in calculation
-        if (qoeCurrentBitrate != null && qoeLastRenditionChangeTime != null && qoeCurrentBitrate > 0) {
+        // Include current segment in calculation (only if timer is not paused)
+        if (!qoeBitrateTimerPaused && qoeCurrentBitrate != null && qoeLastRenditionChangeTime != null && qoeCurrentBitrate > 0) {
             long currentTime = System.currentTimeMillis();
 
             // Safety check: ensure valid timestamp
@@ -907,10 +1203,12 @@ public class NRVideoTracker extends NRTracker {
         qoeLastRenditionChangeTime = null;
         qoeTotalBitrateWeightedTime = 0L;
         qoeTotalActiveTime = 0L;
+        qoeBitrateTimerPaused = false;
 
-        // Reset QOE_AGGREGATE harvest cycle tracking fields
-        resetHarvestCycleFlags();
-        lastHarvestCycleTimestamp = null;
+        // Reset QOE provider fields for new view session
+        // NOTE: Don't reset pendingQoeForNextHarvest here - it needs to persist until next harvest
+        // pendingQoeForNextHarvest = null;  // DON'T CLEAR - final QOE needs to be sent on next harvest
+        lastSentQoeKpis = null; // Reset dirty check snapshot for new view session
     }
 
 
@@ -1081,7 +1379,7 @@ public class NRVideoTracker extends NRTracker {
      *
      * @return Attribute.
      */
-    public Long getMeasuredBitrate() {
+    public Long getSegmentDownloadBitrate() {
         return null;
     }
 
@@ -1090,7 +1388,7 @@ public class NRVideoTracker extends NRTracker {
      *
      * @return Attribute.
      */
-    public Long getDownloadBitrate() {
+    public Long getNetworkDownloadBitrate() {
         return null;
     }
 
