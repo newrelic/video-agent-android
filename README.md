@@ -2,400 +2,481 @@
 
 # New Relic Video Agent for Android
 
-The New Relic Video Agent for Android contains multiple modules necessary to instrument video players and send data to New Relic.
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
+The New Relic Video Agent for Android provides comprehensive video analytics for Android applications using ExoPlayer (Media3). Track video events, monitor playback quality, identify errors, and gain deep insights into user engagement and performance — for both mobile and Android TV.
 
 ## Features
 
-- **Comprehensive Video Tracking** - Automatic instrumentation for content playback, buffering, seeking, and errors
-- **Ad Tracking** - Support for Google IMA ad tracking with pre-roll, mid-roll, and post-roll ads
-- **Quality of Experience (QoE) Metrics** - Optional aggregate KPIs including startup time, bitrate, and rebuffering ratio
-- **Configurable Harvest Cycles** - Control data transmission frequency for regular and live streaming content
-- **Crash-Safe Buffering** - Events are persisted and retried on network failures
-- **Obfuscation Rules** - Regex-based masking of sensitive data (user IDs, tokens, account numbers) before events leave the device
+- **Automatic Event Detection** — Captures ExoPlayer lifecycle events automatically without manual instrumentation
+- **QoE Metrics** — Quality of Experience aggregation for startup time, buffering ratio, bitrate, and playback errors
+- **Event Segregation** — Organized event types: `VideoAction`, `VideoAdAction`, `VideoErrorAction`, `VideoCustomAction`
+- **IMA Ads Support** — Built-in Google IMA SDK ad tracking via dedicated ad tracker
+- **Android TV Support** — Auto-detection of Android TV with optimized harvest cycles
+- **Multi-Player Support** — Track multiple simultaneous video players in the same application
+- **Easy Integration** — JitPack dependency or manual AAR/source import
 
-## Modules
+## Table of Contents
 
-There are three modules available:
-
-### NewRelicVideoCore
-
-Contains all the base classes necessary to create trackers and send data to New Relic. It depends on the New Relic Agent.
-
-### NRExoPlayerTracker
-
-The video tracker for ExoPlayer2 player. It depends on NewRelicVideoCore.
-
-### NRIMATracker
-
-The video tracker for Google IMA Ads library. It depends on NewRelicVideoCore.
+- [Installation](#installation)
+  - [Option 1: JitPack (Recommended)](#option-1-install-via-jitpack-recommended)
+  - [Option 2: Manual AAR Files](#option-2-install-manually-using-aar-files)
+  - [Option 3: Source Code](#option-3-install-manually-using-source-code)
+- [Prerequisites](#prerequisites)
+- [Modules](#modules)
+- [Usage](#usage)
+- [Best Practices](#best-practices)
+- [Configuration Options](#configuration-options)
+- [API Reference](#api-reference)
+- [Data Model](#data-model)
+- [Support](#support)
+- [Contribute](#contribute)
+- [License](#license)
 
 ## Installation
 
-### Prerequisites
+### Option 1: Install via JitPack (Recommended)
 
-- **Java 11 or higher** is required to build this project. The Android Gradle Plugin (7.4.2+) and New Relic Gradle Plugin (7.0.0+) require Java 11 minimum.
-- **Minimum Android version:** Android 7.0 (API 24). The New Relic Android Agent 7.x requires API 24+.
+Add the JitPack repository inside your root `build.gradle`:
 
-Install the [New Relic Android Agent](https://docs.newrelic.com/docs/mobile-monitoring/new-relic-mobile-android/install-configure/install-android-apps-gradle-android-studio), and any other needed dependency, like ExoPlayer or Google IMA.
-
-### Install automatically using JitPack
-
-Add the following line inside your root build.gradle:
-
-```
+```groovy
 allprojects {
     repositories {
         ...
-        
-        // Add this line at the end of your repositories
         maven { url 'https://jitpack.io' }
     }
 }
 ```
 
-And inside your app's build.gradle, add the following dependencies:
+Add the dependencies inside your app's `build.gradle`:
 
-```
+```groovy
 dependencies {
-    ...
+    // Required: Core library
+    implementation 'com.github.newrelic.video-agent-android:NewRelicVideoCore:v4.1.0'
 
-    // Add this to install the NewRelicVideoCore (required)
-    implementation 'com.github.newrelic.video-agent-android:NewRelicVideoCore:v4.0.3'
-    
-    // Add this to install the ExoPlayer tracker
-    implementation 'com.github.newrelic.video-agent-android:NRExoPlayerTracker:v4.0.3'
-    
-    // Add this to install the Google IMA library tracker
-    implementation 'com.github.newrelic.video-agent-android:NRIMATracker:v4.0.3'
+    // ExoPlayer (Media3) tracker
+    implementation 'com.github.newrelic.video-agent-android:NRExoPlayerTracker:v4.1.0'
+
+    // Google IMA ad tracker (optional)
+    implementation 'com.github.newrelic.video-agent-android:NRIMATracker:v4.1.0'
 }
 ```
 
-To install an specific version, replace the `master-SNAPSHOT` by a version tag.
+> **Note:** Replace `v4.1.0` with the desired [release version](https://github.com/newrelic/video-agent-android/releases).
 
-### Install manually using AAR files
+### Option 2: Install Manually Using AAR Files
 
 1. Clone this repo.
 2. Open it with Android Studio.
-3. Click on **View > Tool Windows > Gradle** to open the gradle tool window.
-4. In there, unfold **NRVideoProject > Tasks > build** and double-click on **assemble**. This will generate the AAR libraries inside the module's folder **build > outputs > aar**.
-5. In your project, click on **File > New > New Module**,  **Import .JAR/.AAR Package** and then **Next**.
-6. Enter the location of the generated AAR file then click **Finish**.
-7. Repeat steps 5 and 6 with all the AAR files you want to include.
-8. In you app module's build.gradle file, add the following:
+3. Click on **View > Tool Windows > Gradle** to open the Gradle tool window.
+4. Unfold **NRVideoProject > Tasks > build** and double-click **assemble**. This generates AAR files inside each module's `build/outputs/aar/` directory.
+5. In your project, click **File > New > New Module > Import .JAR/.AAR Package** and click **Next**.
+6. Select the generated AAR file and click **Finish**.
+7. Repeat steps 5–6 for each module you need.
+8. Add the dependencies in your app's `build.gradle`:
 
-```
+```groovy
 dependencies {
-	...
-	implementation project(":NewRelicVideoCore")
-	implementation project(":NRExoPlayerTracker")
-	implementation project(':NRIMATracker')
+    implementation project(":NewRelicVideoCore")
+    implementation project(":NRExoPlayerTracker")
+    implementation project(":NRIMATracker")
 }
 ```
 
-### Install manually using source code
+### Option 3: Install Manually Using Source Code
 
 1. Clone this repo.
 2. In your project, click **File > New > Import Module**.
-3. Enter the location of the library module directory (located in the repo you just cloned) then click **Finish**.
-4. Repeat steps 2 and 3 with all the modules you want to include.
-5. In you app module's build.gradle file, add the following:
+3. Select the module directory and click **Finish**.
+4. Repeat for each module you need.
+5. Add the dependencies in your app's `build.gradle`:
 
-```
+```groovy
 dependencies {
-	...
-	implementation project(":NewRelicVideoCore")
-	implementation project(":NRExoPlayerTracker")
-	implementation project(':NRIMATracker')
+    implementation project(":NewRelicVideoCore")
+    implementation project(":NRExoPlayerTracker")
+    implementation project(":NRIMATracker")
 }
 ```
+
+## Prerequisites
+
+Before using the Video Agent, ensure you have:
+
+- **New Relic Account** — Active account with a valid application token
+- **New Relic Android Agent** — [Installed and configured](https://docs.newrelic.com/docs/mobile-monitoring/new-relic-mobile-android/install-configure/install-android-apps-gradle-android-studio) in your project
+- **ExoPlayer / Media3** — `androidx.media3:media3-exoplayer:1.2.0` or later
+- **Google IMA SDK** (optional) — `androidx.media3:media3-exoplayer-ima:1.2.0` if tracking ads
+- **Android minSdk** — API 16 (Android 4.1) or higher
+
+## Modules
+
+The Video Agent is composed of three modules:
+
+| Module | Description | Required |
+|--------|-------------|----------|
+| **NewRelicVideoCore** | Base classes for tracker management, event generation, and data harvesting. Depends on the New Relic Android Agent. | Yes |
+| **NRExoPlayerTracker** | Video tracker for ExoPlayer (Media3). Automatically hooks into player lifecycle events. | Yes (for ExoPlayer) |
+| **NRIMATracker** | Ad tracker for the Google IMA SDK. Captures ad lifecycle events including quartiles, breaks, and errors. | Optional |
+
 ## Usage
 
-To start the video agent with ExoPlayer tracker only:
+### Getting Your Application Token
 
-<details>
-<summary>Java</summary>
-<p>
+Before initializing the Video Agent, obtain your application token:
 
-```Java
-// Step 1: Initialize the NRVideo at main activity. i.e MainActivity.java
-// Basic configuration (QoE disabled by default):
-NRVideoConfiguration config = new NRVideoConfiguration.Builder("application-token")
+1. Log in to [one.newrelic.com](https://one.newrelic.com)
+2. Navigate to the Streaming Video & Ads onboarding flow
+3. Copy your `applicationToken`
+
+### Basic Setup — ExoPlayer Only
+
+```java
+// Step 1: Initialize NRVideo in your main activity (e.g., MainActivity.java)
+NRVideoConfiguration config = new NRVideoConfiguration.Builder("YOUR_APPLICATION_TOKEN")
         .autoDetectPlatform(getApplicationContext())
-        .withHarvestCycle(5*60) // This is in seconds, for ondemand video, please use minimum 5 minutes
+        .withHarvestCycle(5 * 60) // 300 seconds (5 minutes) — recommended for on-demand video
         .build();
 
-// Optional: Enable QoE aggregate metrics:
-// .enableQoeAggregate(true) // Enables QoE KPIs (disabled by default)
-// .withQoeAggregateIntervalMultiplier(2) // Send QoE every 2nd harvest cycle (default: 1)
+NRVideo.newBuilder(getApplicationContext())
+        .withConfiguration(config)
+        .build();
 
-NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
+// Step 2: Initialize the player and register (e.g., VideoPlayer.java)
+ExoPlayer player = new ExoPlayer.Builder(this).build();
 
-//Step 2: Initialize the player(it could have n number of players in your application). i.e VideoPlayer.java
-player = new ExoPlayer.Builder(this).build();
-NRVideoPlayerConfiguration playerConfiguration = new NRVideoPlayerConfiguration("test-player", player, true, customAttr);
-Integer trackerId = NRVideo.addPlayer(playerConfiguration);
+Map<String, Object> customAttrs = new HashMap<>();
+customAttrs.put("contentTitle", "My Video Title");
 
-Integer trackerId = NewRelicVideoAgent.getInstance().start(new NRTrackerExoPlayer(player));
+NRVideoPlayerConfiguration playerConfig =
+        new NRVideoPlayerConfiguration("my-player", player, false, customAttrs);
 
-// Step 4(Optional): Destroy the player on your player activity close. i.e VideoPlayer.java
-// New Relic auto detects the player close, but its advisable to release tracker for a better control.
+Integer trackerId = NRVideo.addPlayer(playerConfig);
+
+// Step 3 (Optional): Release the tracker when done
 @Override
-void onDestroy() {
+protected void onDestroy() {
     NRVideo.releaseTracker(trackerId);
-    player.stop();
+    player.release();
+    super.onDestroy();
 }
 ```
 
-</p>
-</details>
-
-To enable Quality of Experience (QoE) aggregate metrics:
-
-<details>
-<summary>Java</summary>
-<p>
-
-```Java
-// Initialize with QoE enabled
-NRVideoConfiguration config = new NRVideoConfiguration.Builder("application-token")
-        .autoDetectPlatform(getApplicationContext())
-        .withHarvestCycle(5*60) // 5 minutes for on-demand content
-        .enableQoeAggregate(true) // Enable QoE KPIs
-        .withQoeAggregateIntervalMultiplier(1) // Send QoE every harvest cycle (default)
-        .build();
-NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
-
-// QoE events (QOE_AGGREGATE) will now be generated containing:
-// - startupTime, peakBitrate, averageBitrate, totalPlaytime
-// - totalRebufferingTime, rebufferingRatio
-// - hadStartupError, hadPlaybackError
-
-// Query QoE data in NRDB:
-// SELECT * FROM VideoAction WHERE actionName = 'QOE_AGGREGATE' SINCE 1 hour ago
-```
-
-</p>
-</details>
-
-To mask sensitive data using obfuscation rules:
-
-<details>
-<summary>Java</summary>
-<p>
+### Setup with ExoPlayer and IMA Ads
 
 ```java
-import com.newrelic.videoagent.core.ObfuscationRule;
-import java.util.Arrays;
-import java.util.List;
+// Step 1: Initialize NRVideo (same as above)
 
-// Define rules — each rule is a regex pattern and a replacement string.
-// Rules are applied in order on every string attribute of every outgoing event.
-List<ObfuscationRule> obfuscationRules = Arrays.asList(
-    // Mask account IDs:  "account-83729"  →  "ACCOUNT_ID"
-    new ObfuscationRule("account-\\d+", "ACCOUNT_ID"),
-
-    // Mask auth tokens:  "token=abc123xyz"  →  "token=REDACTED"
-    new ObfuscationRule("token=[^&\"]+", "token=REDACTED"),
-
-    // Mask user path segments:  "/users/john_doe"  →  "/users/USER_ID"
-    new ObfuscationRule("/users/[^\"/]+", "/users/USER_ID")
-);
-
-NRVideoConfiguration config = new NRVideoConfiguration.Builder("application-token")
-        .autoDetectPlatform(getApplicationContext())
-        .withHarvestCycle(5 * 60)
-        .withObfuscationRules(obfuscationRules)
+// Step 2: Build the player with IMA ad support
+ExoPlayer player = new ExoPlayer.Builder(this)
+        .setMediaSourceFactory(mediaSourceFactory)
         .build();
 
-NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
-```
+NRVideoPlayerConfiguration playerConfig =
+        new NRVideoPlayerConfiguration("my-player", player, true, null);
 
-</p>
-</details>
+Integer trackerId = NRVideo.addPlayer(playerConfig);
 
-To start the video agent with ExoPlayer and IMA trackers:
+// Step 3: Wire up the IMA ad tracker
+NRTrackerIMA adTracker =
+        (NRTrackerIMA) NewRelicVideoAgent.getInstance().getAdTracker(trackerId);
 
-<details>
-<summary>Java</summary>
-<p>
-
-```Java
-
-//Step 2: Initialize the player(it could have n number of players in your application). i.e VideoPlayer.java
-//... more details on configuring the ads loader
-player = new SimpleExoPlayer.Builder(this).setMediaSourceFactory(mediaSourceFactory).build();
-
-NRVideoPlayerConfiguration playerConfiguration = new NRVideoPlayerConfiguration("test-player-something-else", player, true, null);
-Integer trackerId = NRVideo.addPlayer(playerConfiguration);
-// Get the ads tracker
-adTracker = (NRTrackerIMA) NewRelicVideoAgent.getInstance().getAdTracker(trackerId);
-
-//While building ads loader pass the listeners
 ImaAdsLoader.Builder builder = new ImaAdsLoader.Builder(this);
 builder.setAdErrorListener(adTracker.getAdErrorListener());
 builder.setAdEventListener(adTracker.getAdEventListener());
+
+// Step 4 (Optional): Release on destroy
+@Override
+protected void onDestroy() {
+    NRVideo.releaseTracker(trackerId);
+    player.release();
+    super.onDestroy();
+}
 ```
 
-</p>
-</details>
+## Best Practices
 
-### Configuration Fields
-**`NRVideoConfiguration.java`**
+### 1. Setting `contentTitle`
 
-- **`applicationToken`**  
-  Unique identifier for your application\. Used for authentication and region detection\. Must be a non\-empty string\.
-
-- **`harvestCycleSeconds`**  
-  Interval \(in seconds\) between regular data harvests\. Controls how often data is sent to the New Relic\. Typical values range from 300 to 600 seconds\.
-
-- **`liveHarvestCycleSeconds`**
-  Interval \(in seconds\) for live stream data harvests\. Used for real\-time or near\-real\-time data transmission\. Valid range is 30 to 60 seconds\.
-
-- **`enableQoeAggregate`**
-  Enables Quality of Experience \(QoE\) aggregate metrics collection and reporting\. When enabled, the agent generates `QOE_AGGREGATE` events containing KPIs such as startup time, average bitrate, rebuffering metrics, and playback failures\. **Default: `false`** \(QoE is disabled by default and must be explicitly enabled\)\.
-
-- **`qoeAggregateIntervalMultiplier`**
-  Controls the frequency of QoE aggregate event generation as a multiplier of the harvest cycle\. For example:
-  - `1` = QoE generated every harvest cycle \(cycles 1, 2, 3, 4\.\.\.\)
-  - `2` = QoE generated every other harvest cycle \(cycles 1, 3, 5, 7\.\.\.\)
-  - `3` = QoE generated every third harvest cycle \(cycles 1, 4, 7, 10\.\.\.\)
-  **Default: `1`** \(QoE generated every harvest cycle when enabled\)\. Only applies when `enableQoeAggregate` is `true`\.
-
-- **`obfuscationRules`**
-  A list of `ObfuscationRule` objects applied to every string attribute of every outgoing event immediately before HTTP transmission\. Each rule is a compiled regex pattern and a plain\-string replacement\. Rules run in the order they are declared — the output of one rule feeds into the next\. **Default: empty list** \(no obfuscation\)\.
-
-### Quality of Experience (QoE) Metrics
-
-When `enableQoeAggregate` is enabled, the agent generates `QOE_AGGREGATE` events containing the following KPIs:
-
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `startupTime` | Long (ms) | Time from `CONTENT_REQUEST` to `CONTENT_START`, minus ad time and pause time |
-| `peakBitrate` | Long (bps) | Highest observed bitrate during the session |
-| `averageBitrate` | Long (bps) | Time-weighted average bitrate during active playback (excludes pause, buffer, seek time) |
-| `totalPlaytime` | Long (ms) | Total content playtime excluding pause, buffer, and seek; computed in real-time at harvest |
-| `totalRebufferingTime` | Long (ms) | Total duration of all rebuffering events (excludes initial buffer) |
-| `rebufferingRatio` | Double (%) | Percentage of playtime spent rebuffering: `(totalRebufferingTime / totalPlaytime) * 100` |
-| `hadStartupError` | Boolean | `true` if an error occurred before `CONTENT_START` |
-| `hadPlaybackError` | Boolean | `true` if an error occurred after `CONTENT_START` |
-
-#### How QoE Works
-
-**Architecture**:
-
-1. **Early Registration** - QoE provider registers at `CONTENT_REQUEST` (not `CONTENT_START`) to capture startup failures even if content never starts
-2. **Harvest-Time Generation** - QoE events are generated at harvest time based on real-time metrics, not buffered with regular events
-3. **Dirty Check** - QoE events are only sent when KPI values have changed since the last send, reducing unnecessary data transmission
-4. **Independent Send** - QoE sends independently on qualified harvest cycles regardless of whether other VideoAction events are present
-5. **Bitrate Timer** - Automatically pauses during non-play states (pause, buffer, seek) for accurate time-weighted average bitrate calculation
-6. **Final QoE** - Built eagerly at `CONTENT_END` while tracker state is still valid, ensuring no data loss at session end
-
-**Example Log Output:**
-```
-D/NRVideoTracker: QOE provider registered at CONTENT_REQUEST
-D/NRVideoTracker: QOE_AGGREGATE generated for harvest cycle 1 (KPIs changed)
-D/HarvestManager: QOE_AGGREGATE injected into harvest batch (cycle 1)
-D/NRVideoTracker: QOE_AGGREGATE skipped for harvest cycle 2 (no KPI changes)
-```
-
-### Obfuscation Rules
-
-Obfuscation rules let you mask sensitive data — user IDs, auth tokens, account numbers, PII in URLs — before events are transmitted to New Relic. Rules are applied at send time, so no sensitive data is written to the in-memory buffer, SQLite crash-recovery storage, or the dead-letter retry queue.
-
-#### How it works
-
-1. You define a list of `ObfuscationRule` objects, each with a regex pattern and a replacement string.
-2. Pass the list to `.withObfuscationRules()` on the config builder.
-3. Just before each HTTP transmission, `ObfuscationEngine` iterates every string attribute of every event in the batch and applies the rules in order.
-4. Only string values are processed — integers, longs, booleans, and nulls are passed through unchanged.
-5. The original event objects are never mutated, so failed batches can be retried cleanly without double-obfuscation.
-
-#### `ObfuscationRule` constructor
+The `contentTitle` attribute displays a value if your video metadata contains title information. For best results, explicitly set it during player configuration:
 
 ```java
-new ObfuscationRule(String pattern, String replacement)
+Map<String, Object> customAttrs = new HashMap<>();
+customAttrs.put("contentTitle", "My Video Title");
+
+NRVideoPlayerConfiguration playerConfig =
+        new NRVideoPlayerConfiguration("my-player", player, false, customAttrs);
 ```
+
+### 2. Setting `userId`
+
+Set a user identifier to track video analytics per user:
+
+```java
+// Set userId globally across all trackers
+NRVideo.setUserId("user-12345");
+```
+
+### 3. Adding Custom Attributes
+
+Add custom attributes to improve data aggregation and analysis:
+
+```java
+Map<String, Object> customAttrs = new HashMap<>();
+customAttrs.put("contentTitle", videoMetadata.getTitle());
+customAttrs.put("subscriptionTier", "premium");
+customAttrs.put("contentProvider", "studio-abc");
+customAttrs.put("region", "us-west-2");
+customAttrs.put("cdnProvider", "cloudflare");
+
+NRVideoPlayerConfiguration playerConfig =
+        new NRVideoPlayerConfiguration("my-player", player, false, customAttrs);
+```
+
+You can also set attributes after initialization:
+
+```java
+// Set attribute on a specific content tracker
+NRVideo.setAttribute(trackerId, "contentSeries", "Season 1");
+
+// Set attribute on ad tracker
+NRVideo.setAdAttribute(trackerId, "adCampaign", "spring-promo");
+
+// Set global attribute across all trackers
+NRVideo.setGlobalAttribute("appVersion", "2.1.0");
+```
+
+**Use these attributes in New Relic queries:**
+
+```sql
+-- Analyze by subscription tier
+SELECT count(*) FROM VideoAction WHERE actionName = 'CONTENT_START'
+FACET subscriptionTier SINCE 1 day ago
+
+-- Monitor by region
+SELECT average(contentPlayhead) FROM VideoAction
+FACET region SINCE 1 hour ago
+```
+
+### 4. Gradual Rollout with Feature Flags
+
+When deploying to production, use feature flags to enable the tracker gradually:
+
+```java
+int rolloutPercentage = 5; // Start with 5% of users
+
+boolean shouldEnable = (userId.hashCode() % 100) < rolloutPercentage;
+
+if (shouldEnable) {
+    NRVideoConfiguration config = new NRVideoConfiguration.Builder("YOUR_APPLICATION_TOKEN")
+            .autoDetectPlatform(getApplicationContext())
+            .withHarvestCycle(5 * 60)
+            .build();
+    NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
+}
+```
+
+**Recommended Rollout Schedule:**
+
+| Phase | Percentage | Duration | Validation |
+|-------|-----------|----------|------------|
+| Initial | 5% | 2–3 days | Verify data flowing to New Relic |
+| Early | 15% | 3–5 days | Check data quality and performance |
+| Expansion | 25% | 5–7 days | Validate across device types |
+| Majority | 50% | 1–2 weeks | Monitor at scale |
+| Full | 100% | Ongoing | Complete deployment |
+
+## Configuration Options
+
+### NRVideoConfiguration
+
+| Builder Method | Type | Default | Description |
+|----------------|------|---------|-------------|
+| `Builder(applicationToken)` | `String` | — | **Required.** Your New Relic application token. Used for authentication and region detection. |
+| `.autoDetectPlatform(context)` | `Context` | Mobile | Auto-detect Mobile vs. Android TV platform. |
+| `.withHarvestCycle(seconds)` | `int` | 300 (Mobile) / 180 (TV) | Interval in seconds between data harvests. For on-demand video, use a minimum of 300 seconds. |
+| `.enableLogging()` | — | Disabled | Enable debug logging for development. |
+| `.enableQoeAggregate(enabled)` | `boolean` | `false` | Enable Quality of Experience event aggregation (`QOE_AGGREGATE` events). |
+| `.withMemoryOptimization()` | — | Disabled | Optimize for low-memory devices. |
+
+### NRVideoPlayerConfiguration
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `pattern` | `String` | A Java regex pattern string. Compiled eagerly — an invalid pattern throws `IllegalArgumentException` at construction time. |
-| `replacement` | `String` | The string to substitute for each match. Use `""` to delete matches. `$` and `\` are treated as plain characters, not back-references. |
+| `playerName` | `String` | Unique identifier for the video player. Used to distinguish between multiple players. |
+| `player` | `ExoPlayer` | The ExoPlayer instance to track. |
+| `isAdEnabled` | `boolean` | Set `true` if the player has an IMA ads loader; `false` otherwise. |
+| `customAttributes` | `Map<String, Object>` | Custom attributes to attach to all events from this player. |
 
-#### Common patterns
+### Custom Attribute Limits
 
-| What to mask | Pattern | Replacement |
-|---|---|---|
-| Numeric account IDs | `account-\\d+` | `ACCOUNT_ID` |
-| Auth / bearer tokens | `token=[^&\"]+` | `token=REDACTED` |
-| User path segments | `/users/[^\"/]+` | `/users/USER_ID` |
-| Email addresses | `[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}` | `EMAIL_REDACTED` |
-| UUIDs | `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}` | `UUID_REDACTED` |
+Limits for custom attributes added to default mobile events:
 
-#### Rule ordering
+- **Attributes:** 128 maximum
+- **String attributes:** 4 KB maximum length (empty string values are not accepted)
 
-Rules are applied left-to-right. The output of rule N becomes the input of rule N+1. Order matters when one rule's replacement could match a later rule's pattern.
+> **Note:** There are special keywords reserved for default attributes documented in [DATAMODEL.md](./DATAMODEL.md). Please do not use these as custom attribute names, as they will be dropped by the agent.
+
+### Live Stream Configuration
+
+For live streams, the agent automatically uses a shorter harvest cycle (30–60 seconds) for near-real-time data transmission. The `liveHarvestCycleSeconds` is configured internally based on content type.
+
+## API Reference
+
+### `NRVideo` (Primary API)
+
+#### `NRVideo.addPlayer(playerConfig)`
+Register a player with the Video Agent. Returns a `trackerId` for future reference.
 
 ```java
-// Rule 1 turns "/john" into "/USER", then Rule 2 sees "/USER_profile" and masks it.
-new ObfuscationRule("john", "USER"),
-new ObfuscationRule("USER_profile", "PROFILE")
-// Result: "/john_profile" → "/USER_profile" → "/PROFILE"
+Integer trackerId = NRVideo.addPlayer(playerConfig);
 ```
 
-#### Edge cases
+#### `NRVideo.releaseTracker(trackerId)`
+Release a tracker when the player is destroyed.
 
-| Situation | Behaviour |
-|-----------|-----------|
-| No rules configured | No-op — zero overhead, original list returned as-is |
-| Pattern matches nothing | Value is passed through unchanged |
-| Empty replacement `""` | Matched content is deleted |
-| `$` or `\` in replacement | Treated as plain characters (not regex back-references) |
-| Integer / Long / Boolean value | Skipped — only `String` values are processed |
-| `null` value | Skipped — no NullPointerException |
-| Invalid regex pattern | `IllegalArgumentException` thrown at `new ObfuscationRule(...)` construction — fails fast at startup, not silently at harvest time |
-| `null` replacement | `IllegalArgumentException` thrown at construction |
-| HTTP send fails → dead-letter retry | Original (unobfuscated) events are retried; obfuscation is re-applied correctly on the retry pass |
+```java
+NRVideo.releaseTracker(trackerId);
+```
 
-**`NRVideoPlayerConfiguration.java`**
+#### `NRVideo.setUserId(userId)`
+Set a unique identifier for the current user across all trackers.
 
-- **`playerName`**  
-  Unique identifier for the video player\. Used to distinguish between multiple players in the same application\. Must be a non\-empty string\.
-- **`player`**  
-  The video player instance to be tracked\. Must implement the `Player` interface from ExoPlayer\.
-- **`isAdEnabled`**  
-  Indicates whether the video player has Ad compatibility\. Set to `true` for player having ads loader capability else `false`.
+```java
+NRVideo.setUserId("user-12345");
+```
 
-## Documentation
+#### `NRVideo.setAttribute(trackerId, key, value)`
+Set a custom attribute on a specific content tracker.
 
-To generate the javadocs, open the project in Android Studio and then go to `Tools > Generate JavaDoc...`, select `Whole Project`, then select the `Output directory` and click `OK`.
+```java
+NRVideo.setAttribute(trackerId, "contentSeries", "Season 1");
+```
 
-For more detail on the Events and Data Model generated by Video Agent for Android and for advanced concepts such as creating custom trackers, reference the [Advanced Topics](advanced.md) manual.
+#### `NRVideo.setGlobalAttribute(key, value)`
+Set a custom attribute across all active trackers.
 
-## Examples
+```java
+NRVideo.setGlobalAttribute("appVersion", "2.1.0");
+```
 
-The `app` folder contains a usage example that shows the basics of video tracking using ExoPlayer.
+#### `NRVideo.recordCustomEvent(attributes)`
+Record a custom event across all trackers.
 
-## Testing
+```java
+Map<String, Object> attrs = new HashMap<>();
+attrs.put("actionName", "VideoBookmarked");
+attrs.put("bookmarkPosition", player.getCurrentPosition());
+NRVideo.recordCustomEvent(attrs);
+```
 
-The `Test` folder contains the test apps.
+#### `NRVideo.recordCustomEvent(attributes, trackerId)`
+Record a custom event on a specific tracker. Requires an `actionName` key.
+
+```java
+Map<String, Object> attrs = new HashMap<>();
+attrs.put("actionName", "QualityChanged");
+attrs.put("newQuality", "1080p");
+NRVideo.recordCustomEvent(attrs, trackerId);
+```
+
+### `NRTrackerExoPlayer` (ExoPlayer Tracker)
+
+#### `tracker.setDroppedFrameAggregationEnabled(enabled)`
+Enable or disable dropped frame aggregation (5-second window, max 50 events).
+
+```java
+NRTrackerExoPlayer tracker =
+        (NRTrackerExoPlayer) NewRelicVideoAgent.getInstance().getContentTracker(trackerId);
+tracker.setDroppedFrameAggregationEnabled(true);
+```
+
+### Example: Complete Integration
+
+```java
+// --- MainActivity.java ---
+NRVideoConfiguration config = new NRVideoConfiguration.Builder("YOUR_APPLICATION_TOKEN")
+        .autoDetectPlatform(getApplicationContext())
+        .withHarvestCycle(5 * 60)
+        .enableLogging()           // Enable for development
+        .enableQoeAggregate(true)  // Enable QoE metrics
+        .build();
+
+NRVideo.newBuilder(getApplicationContext())
+        .withConfiguration(config)
+        .build();
+
+NRVideo.setUserId("user-12345");
+
+// --- VideoPlayer.java ---
+ExoPlayer player = new ExoPlayer.Builder(this).build();
+
+Map<String, Object> customAttrs = new HashMap<>();
+customAttrs.put("contentTitle", "Big Buck Bunny");
+customAttrs.put("contentProvider", "studio-abc");
+
+NRVideoPlayerConfiguration playerConfig =
+        new NRVideoPlayerConfiguration("main-player", player, false, customAttrs);
+
+Integer trackerId = NRVideo.addPlayer(playerConfig);
+
+// Enable dropped frame tracking
+NRTrackerExoPlayer tracker =
+        (NRTrackerExoPlayer) NewRelicVideoAgent.getInstance().getContentTracker(trackerId);
+tracker.setDroppedFrameAggregationEnabled(true);
+
+// Cleanup
+@Override
+protected void onDestroy() {
+    NRVideo.releaseTracker(trackerId);
+    player.release();
+    super.onDestroy();
+}
+```
+
+## Data Model
+
+The Video Agent captures comprehensive video analytics across four event types:
+
+- **VideoAction** — Playback lifecycle events (request, start, pause, resume, buffer, seek, rendition changes, heartbeats)
+- **VideoAdAction** — Ad lifecycle events (request, start, end, quartiles, breaks, clicks)
+- **VideoErrorAction** — Error events (playback failures, ad errors, crashes)
+- **VideoCustomAction** — Custom events defined by your application
+
+**Full Documentation:** See [DATAMODEL.md](./DATAMODEL.md) for the complete event and attribute reference, and [Advanced Topics](./advanced.md) for creating custom trackers.
 
 ## Support
 
-New Relic has open-sourced this project. This project is provided AS-IS WITHOUT WARRANTY OR DEDICATED SUPPORT. Issues and contributions should be reported to the project here on GitHub.
+Should you need assistance with New Relic products, you are in good hands with several support channels.
 
-We encourage you to bring your experiences and questions to the [Explorers Hub](https://discuss.newrelic.com) where our community members collaborate on solutions and new ideas.
+If the issue has been confirmed as a bug or is a feature request, please file a GitHub issue.
 
-## Contributing
+### Support Channels
 
-We encourage your contributions to improve New Relic Video Agent! Keep in mind when you submit your pull request, you'll need to sign the CLA via the click-through using CLA-Assistant. You only have to sign the CLA one time per project. If you have any questions, or to execute our corporate CLA, required if your contribution is on behalf of a company, please drop us an email at opensource@newrelic.com.
+- [New Relic Documentation](https://docs.newrelic.com): Comprehensive guidance for using our platform
+- [New Relic Community](https://discuss.newrelic.com): The best place to engage in troubleshooting questions
+- [New Relic University](https://learn.newrelic.com): A range of online training for New Relic users of every level
+- [New Relic Technical Support](https://support.newrelic.com): 24/7/365 ticketed support. Read more about our [Technical Support Offerings](https://docs.newrelic.com/docs/licenses/license-information/general-usage-licenses/support-plan)
 
-**A note about vulnerabilities**
+## Contribute
+
+We encourage your contributions to improve the Video Agent for Android! Keep in mind that when you submit your pull request, you'll need to sign the CLA via the click-through using CLA-Assistant. You only have to sign the CLA one time per project.
+
+If you have any questions, or to execute our corporate CLA (which is required if your contribution is on behalf of a company), drop us an email at opensource@newrelic.com.
+
+For more details on how best to contribute, see [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+### A note about vulnerabilities
 
 As noted in our [security policy](../../security/policy), New Relic is committed to the privacy and security of our customers and their data. We believe that providing coordinated disclosure by security researchers and engaging with the security community are important means to achieve our security goals.
 
-If you believe you have found a security vulnerability in this project or any of New Relic's products or websites, we welcome and greatly appreciate you reporting it to New Relic through [HackerOne](https://hackerone.com/newrelic).
+If you believe you have found a security vulnerability in this project or any of New Relic's products or websites, we welcome and greatly appreciate you reporting it to New Relic through our [bug bounty program](https://docs.newrelic.com/docs/security/security-privacy/information-security/report-security-vulnerabilities/).
+
+If you would like to contribute to this project, review [these guidelines](./CONTRIBUTING.md).
+
+To all contributors, we thank you! Without your contribution, this project would not be what it is today.
 
 ## License
 
-New Relic Video Agent is licensed under the [Apache 2.0](http://apache.org/licenses/LICENSE-2.0.txt) License.
- 
+The Video Agent for Android is licensed under the [Apache 2.0](http://apache.org/licenses/LICENSE-2.0.txt) License.
