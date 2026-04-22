@@ -1,3 +1,27 @@
+## [4.1.1](https://github.com/newrelic/video-agent-android/compare/v4.1.0...v4.1.1) (2026-04-22)
+
+### Bug Fixes
+
+* Add Obfuscation Rules Feature ([f756c78](https://github.com/newrelic/video-agent-android/commit/f756c78884842e32c553e3a2038a47047b4b6b5e))
+* Added qoeHarvestCycle ([aa4940c](https://github.com/newrelic/video-agent-android/commit/aa4940c801a781a2ff7f20a7fa5b78068ad6d67b))
+* Added qoeHarvestCycle ([0218d31](https://github.com/newrelic/video-agent-android/commit/0218d317ef4ad5af90a9b03be0e5580eb4b4f03e))
+* Added timeSinceRequested, timeSinceStarted to qoe event payload ([1f627cf](https://github.com/newrelic/video-agent-android/commit/1f627cf06a7023fde878c0db5a8a57098f94825c))
+* Adding QoeProvider ([ed48dee](https://github.com/newrelic/video-agent-android/commit/ed48deea85e71299e4a8132176571734a6508cf1))
+* Addressing review comment ([785a2fd](https://github.com/newrelic/video-agent-android/commit/785a2fd0c5a550e7c89e044a5d398a245a0bd5c9))
+* Changed architecture of QOE ([7913826](https://github.com/newrelic/video-agent-android/commit/79138264e77cee91318192184b05421221922282))
+* fallback for ad bitrate ([3077faa](https://github.com/newrelic/video-agent-android/commit/3077faad473c135c51a25cda8e11dede2d5724f5))
+* Final QOE event at content end ([f151a21](https://github.com/newrelic/video-agent-android/commit/f151a21e0f7cc202bda80be2118c620932f7a011))
+* Fixed build issue ([1cb695c](https://github.com/newrelic/video-agent-android/commit/1cb695c5663d8a9e21fac6dd5ebacc5eb6318dc1))
+* Thread-safe QOE generation and real-time totalPlaytime calculation ([e53e6f7](https://github.com/newrelic/video-agent-android/commit/e53e6f74755a69c9874054a264c40a617d47f05f))
+* Thread-safe QOE generation using attribute caching ([43d21cd](https://github.com/newrelic/video-agent-android/commit/43d21cd6d80148a1c70bb3c23cc06b5a44631dfb))
+* Thread-safe QOE with real-time metrics and immediate final QOE ([a506f66](https://github.com/newrelic/video-agent-android/commit/a506f6685f398f5087d5b81481f3546d10f96080))
+* Update bitrate name ([928d3af](https://github.com/newrelic/video-agent-android/commit/928d3aff5345ea2278999b605ba2818a3f6412e6))
+* Update function name ([42a842e](https://github.com/newrelic/video-agent-android/commit/42a842ee592c2ec03dd3a355dac2c1084a302ba0))
+* Update name to contentSegmentDownloadBitrate, contentNetworkDownloadBitrate ([e1a3dc9](https://github.com/newrelic/video-agent-android/commit/e1a3dc9551b9cb5bbea5de13d900462635d8bf2d))
+* Update ReadMe ([d02ee40](https://github.com/newrelic/video-agent-android/commit/d02ee40e7ef0cce495712e26b37a24bc5dd73775))
+* Updated calculation of Startup time, Average bitrate ([371da00](https://github.com/newrelic/video-agent-android/commit/371da00df9bde031a67864315baf82f895ed3fe2))
+* Updated harvestCycle to AtomicInteger ([0d550d2](https://github.com/newrelic/video-agent-android/commit/0d550d2bb3dc0e030276ba1f05543aff694c8708))
+* Updated the condition of when the QOE events are sent and updated readme ([f307de9](https://github.com/newrelic/video-agent-android/commit/f307de99bc3abac4185389ebb8f1cc2f26ea5457))
 ## [4.1.2-beta](https://github.com/newrelic/video-agent-android/compare/v4.0.6...v4.1.2-beta) (2026-03-18)
 ## [4.1.0](https://github.com/newrelic/video-agent-android/compare/v4.0.6...v4.1.0) (2026-03-31)
 
