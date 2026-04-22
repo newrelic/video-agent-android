@@ -309,8 +309,8 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                 attr.put("contentBitrate", getActualBitrate());
                 attr.put("contentRenditionBitrate", getRenditionBitrate());
                 attr.put("contentManifestBitrate", getManifestBitrate());
-                attr.put("contentSegmentDownloadBitrate", getMeasuredBitrate());
-                attr.put("contentNetworkDownloadBitrate", getDownloadBitrate());
+                attr.put("contentSegmentDownloadBitrate", getSegmentDownloadBitrate());
+                attr.put("contentNetworkDownloadBitrate", getNetworkDownloadBitrate());
             }
             attr.put("contentRenditionWidth", getRenditionWidth());
             attr.put("contentRenditionHeight", getRenditionHeight());
