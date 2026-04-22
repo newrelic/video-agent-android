@@ -54,6 +54,14 @@ public final class NRVideo {
         return 60; // Default harvest cycle
     }
 
+    /**
+     * Get the HarvestManager instance for QOE provider registration
+     * @return HarvestManager instance, or null if not initialized
+     */
+    public HarvestManager getHarvestManager() {
+        return harvestManager;
+    }
+
     public static Integer addPlayer(NRVideoPlayerConfiguration config) {
         if (!isInitialized()) {
             NRLog.w("NRVideo not initialized - cannot add player");

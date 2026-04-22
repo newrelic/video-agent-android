@@ -45,8 +45,8 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | contentIsLive            | True if the video is live.                                                                                                                         |
 | contentBitrate           | Average bitrate (in bits) of the video.                                                                                                            |
 | contentManifestBitrate   | Indicated Bitrate: The throughput, in bits per second, required to play the stream as advertised by the server in the manifest.                     |
-| contentMeasuredBitrate   | Observed Bitrate: The actual, empirical throughput measured in bits per second across all downloaded media.                                         |
-| contentDownloadBitrate   | The actual download throughput in bits per second.                                                                                                 |
+| contentSegmentDownloadBitrate   | Observed Bitrate: The actual, empirical throughput measured in bits per second across all downloaded media.                                         |
+| contentNetworkDownloadBitrate   | The actual download throughput in bits per second.                                                                                                 |
 | contentRenditionName     | Name of the rendition (e.g., 1080p).                                                                                                               |
 | contentRenditionBitrate  | Target Bitrate of the rendition.                                                                                                                   |
 | contentRenditionHeight   | Rendition actual Height (before re-scaling).                                                                                                       |
