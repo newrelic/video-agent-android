@@ -50,7 +50,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
 
     protected ExoPlayer player;
 
-    protected long bitrateEstimate;
+    protected long segmentDownloadBitrate;
     protected int lastHeight;
     protected int lastWidth;
     protected List<Uri> playlist;
@@ -58,7 +58,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     protected String renditionChangeShift;
     protected long actualBitrate;
     protected long renditionBitrate;
-    protected long downloadBitrate;
+    protected long networkDownloadBitrate;
     private static final long DEFAULT_AGGREGATION_WINDOW_MS = 5000; // 5 seconds
     private static final int MAX_EVENTS_PER_AGGREGATE = 50;
     private volatile boolean droppedFrameAggregationEnabled = true;
@@ -200,7 +200,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      * @return Attribute.
      */
     public Long getBitrate() {
-        return bitrateEstimate;
+        return segmentDownloadBitrate;
     }
 
     public Long getActualBitrate() {
@@ -224,8 +224,8 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      *
      * @return Attribute.
      */
-    public Long getMeasuredBitrate() {
-        return bitrateEstimate;
+    public Long getSegmentDownloadBitrate() {
+        return segmentDownloadBitrate;
     }
 
     /**
@@ -233,9 +233,9 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      *
      * @return Attribute.
      */
-    public Long getDownloadBitrate() {
-        if (downloadBitrate > 0) {
-            return downloadBitrate;
+    public Long getNetworkDownloadBitrate() {
+        if (networkDownloadBitrate > 0) {
+            return networkDownloadBitrate;
         }
         return null;
     }
@@ -436,13 +436,13 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     }
 
     private void resetState() {
-        bitrateEstimate = 0;
+        segmentDownloadBitrate = 0;
         lastWindow = 0;
         lastWidth = 0;
         lastHeight = 0;
         actualBitrate = 0;
         renditionBitrate = 0;
-        downloadBitrate = 0;
+        networkDownloadBitrate = 0;
     }
 
     /**
@@ -768,7 +768,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
 
             // Calculate download bitrate from bytes transferred and duration
             if (loadEventInfo.bytesLoaded > 0 && loadEventInfo.loadDurationMs > 0) {
-                this.downloadBitrate = (loadEventInfo.bytesLoaded * 8 * 1000) / loadEventInfo.loadDurationMs;
+                this.networkDownloadBitrate = (loadEventInfo.bytesLoaded * 8 * 1000) / loadEventInfo.loadDurationMs;
             }
         }
     }
@@ -777,7 +777,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     public void onBandwidthEstimate(@NonNull AnalyticsListener.EventTime eventTime, int totalLoadTimeMs, long totalBytesLoaded, long bitrateEstimate) {
         NRLog.d("onBandwidthEstimate analytics");
 
-        this.bitrateEstimate = bitrateEstimate;
+        this.segmentDownloadBitrate = bitrateEstimate;
     }
 
     @Override
