@@ -4,10 +4,13 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import androidx.media3.common.Metadata;
 import androidx.media3.common.Player;
+import androidx.media3.common.Timeline;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.hls.HlsManifest;
 import androidx.media3.exoplayer.hls.playlist.HlsMediaPlaylist;
+import androidx.media3.extractor.metadata.emsg.EventMessage;
 
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.mediatailor.utils.ManifestParser;
@@ -17,39 +20,40 @@ import com.newrelic.videoagent.mediatailor.utils.NetworkUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * AWS MediaTailor Ad Tracker for ExoPlayer
  *
- * Tracks ads from AWS MediaTailor SSAI streams (HLS/DASH)
+ * Tracks ads from AWS MediaTailor SSAI streams (HLS/DASH).
  *
- * Features:
- * - Client-side ad detection from manifest markers (CUE-OUT/CUE-IN)
- * - Pod-level tracking (multiple ads within one break)
- * - VOD and Live stream support
- * - Tracking API metadata enrichment
+ * Detection pipeline:
+ * 1. ExoPlayer manifest hook (primary, zero extra HTTP) via player.getCurrentManifest()
+ *    - HLS: VHS-style detection using segment URL + discontinuity sequence
+ *    - LIVE: event-driven via onTimelineChanged() instead of polling
+ * 2. DASH SCTE-35 emsg via onMetadata() callback
+ * 3. HTTP manifest fetch as fallback
+ * 4. Tracking API enrichment with tolerance-based deduplication
  */
 public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Listener {
 
     private static final String TAG = "NRMediaTailorTracker";
+    private static final String MT_SEGMENT_PATTERN = MediaTailorConstants.MT_SEGMENT_PATTERN;
 
-    // Import constants from utility class
-    private static final String STREAM_TYPE_VOD = MediaTailorConstants.STREAM_TYPE_VOD;
+    private static final String STREAM_TYPE_VOD  = MediaTailorConstants.STREAM_TYPE_VOD;
     private static final String STREAM_TYPE_LIVE = MediaTailorConstants.STREAM_TYPE_LIVE;
-    private static final String MANIFEST_TYPE_HLS = MediaTailorConstants.MANIFEST_TYPE_HLS;
+    private static final String MANIFEST_TYPE_HLS  = MediaTailorConstants.MANIFEST_TYPE_HLS;
     private static final String MANIFEST_TYPE_DASH = MediaTailorConstants.MANIFEST_TYPE_DASH;
-    private static final long LIVE_POLL_INTERVAL_MS = MediaTailorConstants.DEFAULT_LIVE_TRACKING_POLL_INTERVAL_MS;
-    private static final int TRACKING_TIMEOUT_MS = MediaTailorConstants.DEFAULT_TRACKING_API_TIMEOUT_MS;
+    private static final int  TRACKING_TIMEOUT_MS  = MediaTailorConstants.DEFAULT_TRACKING_API_TIMEOUT_MS;
+    private static final long TIME_UPDATE_INTERVAL_MS = MediaTailorConstants.DEFAULT_TIME_UPDATE_INTERVAL_MS;
+
+    // Disposal guard — set first in dispose(), checked at top of all async callbacks
+    private final AtomicBoolean isDisposed = new AtomicBoolean(false);
 
     protected ExoPlayer player;
 
@@ -64,460 +68,366 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
     private List<AdBreak> adSchedule = new ArrayList<>();
     private AdBreak currentAdBreak;
     private AdPod currentAdPod;
-    private boolean hasEndedContent = false;
 
     // Configuration
-    private boolean enableManifestParsing = true;
-    private boolean enableTrackingAPI = true;
+    private boolean enableManifestParsing = MediaTailorConstants.DEFAULT_ENABLE_MANIFEST_PARSING;
+    private boolean enableTrackingAPI     = MediaTailorConstants.DEFAULT_ENABLE_TRACKING_API;
 
-    // Handlers and timers
-    private Handler handler;
-    private Runnable pollManifestRunnable;
+    // Handlers and runnables
+    private Handler  handler;
     private Runnable pollTrackingRunnable;
     private Runnable timeUpdateRunnable;
 
-    // Time update monitoring (equivalent to videoJS timeupdate event)
-    private static final long TIME_UPDATE_INTERVAL_MS = MediaTailorConstants.DEFAULT_TIME_UPDATE_INTERVAL_MS;
+    // Live poll interval — updated dynamically from HLS targetDurationUs
+    private long livePollIntervalMs = MediaTailorConstants.DEFAULT_LIVE_TRACKING_POLL_INTERVAL_MS;
+
+    // -------------------------------------------------------------------------
+    // Static factory helper
+    // -------------------------------------------------------------------------
 
     /**
-     * Checks if tracker should be used for this player source
+     * Returns true if the player's current media item is a MediaTailor URL.
+     * Called via reflection by NRVideo.addPlayer() to auto-detect SSAI streams.
      */
     public static boolean isUsing(ExoPlayer player) {
-        if (player == null || player.getCurrentMediaItem() == null) {
+        if (player == null || player.getCurrentMediaItem() == null
+                || player.getCurrentMediaItem().localConfiguration == null) {
             return false;
         }
         String uri = player.getCurrentMediaItem().localConfiguration.uri.toString();
-        return uri != null && uri.contains(".mediatailor.");
+        return uri.contains(MediaTailorConstants.MT_URL_PATTERN);
     }
 
-    /**
-     * Constructor
-     */
+    // -------------------------------------------------------------------------
+    // Constructors
+    // -------------------------------------------------------------------------
+
     public NRTrackerMediaTailor() {
         handler = new Handler(Looper.getMainLooper());
     }
 
-    /**
-     * Constructor with player
-     */
     public NRTrackerMediaTailor(ExoPlayer player) {
         this();
         setPlayer(player);
     }
 
-    /**
-     * Set player and initialize tracking
-     */
+    // -------------------------------------------------------------------------
+    // NRVideoTracker lifecycle
+    // -------------------------------------------------------------------------
+
     @Override
     public void setPlayer(Object player) {
         Log.d(TAG, "setPlayer() called");
         this.player = (ExoPlayer) player;
 
-        if (this.player.getCurrentMediaItem() != null) {
+        if (this.player.getCurrentMediaItem() != null
+                && this.player.getCurrentMediaItem().localConfiguration != null) {
             this.mediaTailorEndpoint = this.player.getCurrentMediaItem().localConfiguration.uri.toString();
-            this.manifestType = detectManifestType(this.mediaTailorEndpoint);
-            this.trackingUrl = extractTrackingUrl(this.mediaTailorEndpoint);
-            this.sessionId = extractSessionId(this.mediaTailorEndpoint);
+            this.manifestType  = detectManifestType(this.mediaTailorEndpoint);
+            this.trackingUrl   = extractTrackingUrl(this.mediaTailorEndpoint);
+            this.sessionId     = NetworkUtils.extractSessionId(this.mediaTailorEndpoint);
 
-            Log.d(TAG, "MediaTailor tracker initialized");
-            Log.d(TAG, "Manifest type: " + manifestType);
-            Log.d(TAG, "Session ID: " + sessionId);
-            Log.d(TAG, "Tracking URL: " + trackingUrl);
-            Log.d(TAG, "Current player state: " + this.player.getPlaybackState());
+            Log.d(TAG, "MediaTailor tracker initialized — manifestType=" + manifestType
+                    + " sessionId=" + sessionId + " trackingUrl=" + trackingUrl);
 
             registerListeners();
 
-            // If player is already ready, initialize tracking immediately
+            // Handle case where player is already READY before setPlayer() was called
             if (this.player.getPlaybackState() == Player.STATE_READY && streamType == null) {
-                Log.d(TAG, "Player already in READY state, initializing tracking now");
-                long duration = this.player.getDuration();
-                streamType = (duration == androidx.media3.common.C.TIME_UNSET) ? STREAM_TYPE_LIVE : STREAM_TYPE_VOD;
-                Log.d(TAG, "Stream type detected: " + streamType);
+                long dur = this.player.getDuration();
+                streamType = (dur == androidx.media3.common.C.TIME_UNSET)
+                        ? STREAM_TYPE_LIVE : STREAM_TYPE_VOD;
+                Log.d(TAG, "Player already READY, streamType=" + streamType);
                 initializeTracking();
             }
         } else {
-            Log.w(TAG, "No current media item available when setPlayer() called");
+            Log.w(TAG, "No current media item when setPlayer() called");
         }
 
         super.setPlayer(player);
     }
 
-    /**
-     * Register player event listeners
-     */
     @Override
     public void registerListeners() {
         if (player != null) {
             player.addListener(this);
-            Log.d(TAG, "Event listeners registered");
-
-            // Start time update monitoring (equivalent to videoJS timeupdate event)
             startTimeUpdateMonitoring();
+            Log.d(TAG, "Listeners registered");
         }
     }
 
-    /**
-     * Unregister player event listeners
-     */
     @Override
     public void unregisterListeners() {
         if (player != null) {
             player.removeListener(this);
             stopTimeUpdateMonitoring();
-            stopLivePolling();
+            stopTrackingPolling();
         }
     }
 
-    /**
-     * Detect manifest type from URL
-     */
-    private String detectManifestType(String url) {
-        if (url.contains(".m3u8")) {
-            return MANIFEST_TYPE_HLS;
-        } else if (url.contains(".mpd") || url.contains("/dash")) {
-            return MANIFEST_TYPE_DASH;
-        }
-        return MANIFEST_TYPE_HLS; // Default to HLS
-    }
+    // -------------------------------------------------------------------------
+    // Player.Listener callbacks
+    // -------------------------------------------------------------------------
 
-    /**
-     * Extract tracking URL from sessionized MediaTailor URL
-     */
-    private String extractTrackingUrl(String url) {
-        // Extract sessionId from URL
-        Pattern pattern = Pattern.compile("aws\\.sessionId=([^&]+)");
-        Matcher matcher = pattern.matcher(url);
-
-        if (matcher.find()) {
-            String sessionId = matcher.group(1);
-
-            // Extract base URL and construct tracking URL
-            // Format: https://{cloudfront-id}.mediatailor.{region}.amazonaws.com/v1/tracking/{account-id}/{config}/{sessionId}
-            Pattern urlPattern = Pattern.compile("(https://[^/]+)/v1/(?:master|dash)/([^/]+)/([^/]+)/");
-            Matcher urlMatcher = urlPattern.matcher(url);
-
-            if (urlMatcher.find()) {
-                String baseUrl = urlMatcher.group(1);
-                String accountId = urlMatcher.group(2);
-                String config = urlMatcher.group(3);
-
-                return baseUrl + "/v1/tracking/" + accountId + "/" + config + "/" + sessionId;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Extract sessionId from URL
-     */
-    private String extractSessionId(String url) {
-        Pattern pattern = Pattern.compile("aws\\.sessionId=([^&]+)");
-        Matcher matcher = pattern.matcher(url);
-
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-
-        return null;
-    }
-
-    /**
-     * Player listener: On playback state changed
-     */
     @Override
     public void onPlaybackStateChanged(int playbackState) {
-        Log.d(TAG, "onPlaybackStateChanged: " + playbackState + " (streamType=" + streamType + ")");
+        if (isDisposed.get()) return;
+        Log.d(TAG, "onPlaybackStateChanged: " + playbackState);
 
         if (playbackState == Player.STATE_READY && streamType == null) {
-            // Detect stream type based on duration
-            long duration = player.getDuration();
-            streamType = (duration == androidx.media3.common.C.TIME_UNSET) ? STREAM_TYPE_LIVE : STREAM_TYPE_VOD;
-
-            Log.d(TAG, "Stream type detected: " + streamType + " (duration=" + duration + ")");
-
-            // Initialize tracking based on stream type
+            long dur = player.getDuration();
+            streamType = (dur == androidx.media3.common.C.TIME_UNSET)
+                    ? STREAM_TYPE_LIVE : STREAM_TYPE_VOD;
+            Log.d(TAG, "Stream type detected: " + streamType);
             initializeTracking();
-        } else if (playbackState == Player.STATE_ENDED) {
-            // Player reached end - ad break should have already been exited in onTimeUpdate
-            // This is a safety fallback in case the timing check missed it
-            if (currentAdBreak != null) {
-                Log.d(TAG, "Player ended with active ad break (fallback) - exiting now");
-                exitAdBreak();
-            }
-        }
-    }
-
-    /**
-     * Initialize tracking based on stream type
-     */
-    private void initializeTracking() {
-        Log.d(TAG, "Initializing " + manifestType.toUpperCase() + " " + streamType.toUpperCase() + " tracking");
-
-        if (streamType.equals(STREAM_TYPE_VOD)) {
-            setupVODTracking();
-        } else {
-            setupLiveTracking();
-        }
-    }
-
-    /**
-     * Setup VOD tracking (single parse, no polling)
-     */
-    private void setupVODTracking() {
-        Log.d(TAG, "VOD mode: Single manifest parse");
-
-        // Parse manifest for ad breaks
-        parseManifestForAds();
-
-        // Fetch tracking metadata if available
-        if (trackingUrl != null && enableTrackingAPI) {
-            fetchTrackingMetadata();
-        }
-    }
-
-    /**
-     * Setup Live tracking (continuous polling)
-     */
-    private void setupLiveTracking() {
-        Log.d(TAG, "Live mode: Continuous polling");
-
-        // Initial parse
-        parseManifestForAds();
-
-        // Start polling for new ads
-        pollManifestRunnable = new Runnable() {
-            @Override
-            public void run() {
-                parseManifestForAds();
-                handler.postDelayed(this, LIVE_POLL_INTERVAL_MS);
-            }
-        };
-        handler.postDelayed(pollManifestRunnable, LIVE_POLL_INTERVAL_MS);
-
-        // Poll tracking API if available
-        if (trackingUrl != null && enableTrackingAPI) {
-            pollTrackingRunnable = new Runnable() {
-                @Override
-                public void run() {
-                    fetchTrackingMetadata();
-                    handler.postDelayed(this, LIVE_POLL_INTERVAL_MS);
-                }
-            };
-            handler.postDelayed(pollTrackingRunnable, LIVE_POLL_INTERVAL_MS);
-        }
-    }
-
-    /**
-     * Stop live polling timers
-     */
-    private void stopLivePolling() {
-        if (pollManifestRunnable != null) {
-            handler.removeCallbacks(pollManifestRunnable);
-            pollManifestRunnable = null;
-        }
-
-        if (pollTrackingRunnable != null) {
-            handler.removeCallbacks(pollTrackingRunnable);
-            pollTrackingRunnable = null;
-        }
-    }
-
-    /**
-     * Start time update monitoring (equivalent to videoJS timeupdate event)
-     * This is the PRIMARY ad detection mechanism - checks currentTime vs ad schedule
-     */
-    private void startTimeUpdateMonitoring() {
-        if (timeUpdateRunnable != null) {
-            return; // Already started
-        }
-
-        Log.d(TAG, "Starting time update monitoring (checking every " + TIME_UPDATE_INTERVAL_MS + "ms)");
-
-        timeUpdateRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (player != null && player.isPlaying()) {
-                    onTimeUpdate();
-                }
-                handler.postDelayed(this, TIME_UPDATE_INTERVAL_MS);
-            }
-        };
-
-        handler.postDelayed(timeUpdateRunnable, TIME_UPDATE_INTERVAL_MS);
-    }
-
-    /**
-     * Stop time update monitoring
-     */
-    private void stopTimeUpdateMonitoring() {
-        if (timeUpdateRunnable != null) {
-            handler.removeCallbacks(timeUpdateRunnable);
-            timeUpdateRunnable = null;
-            Log.d(TAG, "Stopped time update monitoring");
-        }
-    }
-
-    /**
-     * Called periodically to check for ad break transitions (like videoJS timeupdate)
-     * This is the CORE ad detection logic
-     */
-    private void onTimeUpdate() {
-        double currentTime = player.getCurrentPosition() / 1000.0;
-        AdBreak activeBreak = findActiveAdBreak(currentTime);
-
-        // Debug logging every 5 seconds
-        if (adSchedule.size() > 0 && Math.floor(currentTime) % 5 == 0 && Math.floor(currentTime * 10) % 10 == 0) {
-            Log.d(TAG, String.format("TimeUpdate: %.2fs, Active break: %s, Schedule count: %d",
-                    currentTime,
-                    activeBreak != null ? activeBreak.id : "none",
-                    adSchedule.size()));
-        }
-
-        // Check if we're near the end of the stream and in an ad break
-        // Exit ad break BEFORE content ends to maintain correct viewId
-        if (currentAdBreak != null && streamType.equals(STREAM_TYPE_VOD)) {
-            long duration = player.getDuration();
-            long currentPosition = player.getCurrentPosition();
-            // If we're within 100ms of the end, exit the ad break now
-            if (duration != androidx.media3.common.C.TIME_UNSET &&
-                currentPosition >= duration - 100) {
-                Log.d(TAG, "Near end of stream - exiting ad break before CONTENT_END");
-                exitAdBreak();
-                return;
-            }
-        }
-
-        if (activeBreak != null) {
-            // === INSIDE AD BREAK ===
-            if (!activeBreak.hasFiredStart) {
-                enterAdBreak(activeBreak);
-            }
-
-            // Check for pod transitions within break
-            if (currentAdBreak != null) {
-                checkPodTransition(activeBreak, currentTime);
-            }
-        } else if (currentAdBreak != null) {
-            // === EXITING AD BREAK ===
+        } else if (playbackState == Player.STATE_ENDED && currentAdBreak != null) {
             exitAdBreak();
         }
     }
 
     /**
-     * Parse HLS manifest for ad breaks using SCTE-35 markers
-     * Delegates to ManifestParser utility class
+     * Fires on every LIVE HLS manifest refresh — replaces HTTP polling for manifest parsing.
      */
-    private void parseManifestForAds() {
-        if (!enableManifestParsing || manifestType == null || !manifestType.equals(MANIFEST_TYPE_HLS)) {
-            Log.d(TAG, "Manifest parsing disabled or not HLS");
-            return;
+    @Override
+    public void onTimelineChanged(Timeline timeline, int reason) {
+        if (isDisposed.get()) return;
+        if (reason == Player.TIMELINE_CHANGE_REASON_SOURCE_UPDATE) {
+            Log.d(TAG, "Timeline update (LIVE refresh) — re-parsing ExoPlayer manifest");
+            tryExoPlayerManifestParse();
+        }
+    }
+
+    /**
+     * Fires for in-band metadata events — handles DASH SCTE-35 emsg boxes.
+     */
+    @Override
+    public void onMetadata(Metadata metadata) {
+        if (isDisposed.get()) return;
+        for (int i = 0; i < metadata.length(); i++) {
+            Metadata.Entry entry = metadata.get(i);
+            if (entry instanceof EventMessage) {
+                handleScte35Emsg((EventMessage) entry);
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Tracking initialization
+    // -------------------------------------------------------------------------
+
+    private void initializeTracking() {
+        Log.d(TAG, "Initializing " + manifestType + " " + streamType + " tracking");
+
+        // Primary: ExoPlayer manifest hook (zero extra HTTP)
+        tryExoPlayerManifestParse();
+
+        if (trackingUrl != null && enableTrackingAPI) {
+            fetchTrackingMetadata();
+            if (STREAM_TYPE_LIVE.equals(streamType)) {
+                startTrackingPolling();
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // ExoPlayer manifest hook (primary HLS detection path)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Primary ad detection path — reads the already-parsed manifest from ExoPlayer's
+     * internal pipeline via player.getCurrentManifest(). Falls back to HTTP fetch
+     * if ExoPlayer manifest is unavailable or yields no breaks.
+     */
+    private void tryExoPlayerManifestParse() {
+        if (!enableManifestParsing || player == null) return;
+
+        Object manifest = player.getCurrentManifest();
+
+        if (manifest instanceof HlsManifest) {
+            HlsMediaPlaylist playlist = ((HlsManifest) manifest).mediaPlaylist;
+            if (playlist != null && !playlist.segments.isEmpty()) {
+                Log.d(TAG, "Parsing HLS via ExoPlayer manifest (segments=" + playlist.segments.size() + ")");
+                List<AdBreak> detected = detectAdsFromExoPlayerHls(playlist);
+                if (!detected.isEmpty()) {
+                    adSchedule = ManifestParser.mergeAdSchedules(adSchedule, detected);
+                    Log.d(TAG, "ExoPlayer HLS: " + detected.size()
+                            + " break(s) detected, schedule=" + adSchedule.size());
+                    return; // Success — skip HTTP fallback
+                }
+            }
         }
 
-        if (mediaTailorEndpoint == null) {
-            Log.w(TAG, "No manifest URL available for parsing");
-            return;
+        // Fallback: HTTP manifest fetch for HLS
+        if (MANIFEST_TYPE_HLS.equals(manifestType)) {
+            parseManifestFromHttp();
+        }
+        // DASH ad detection is event-driven via onMetadata() / handleScte35Emsg()
+    }
+
+    /**
+     * VHS-style HLS ad detection using segment URL pattern + discontinuity sequence.
+     * Detects MediaTailor-stitched ad segments directly without requiring CUE markers.
+     * Equivalent to VideoJS's VHS discontinuity detection.
+     *
+     * Also updates livePollIntervalMs from the playlist's targetDurationUs.
+     */
+    private List<AdBreak> detectAdsFromExoPlayerHls(HlsMediaPlaylist playlist) {
+        List<AdBreak> adBreaks = new ArrayList<>();
+        if (playlist == null || playlist.segments.isEmpty()) return adBreaks;
+
+        // Update live poll interval dynamically from HLS target duration
+        if (playlist.targetDurationUs > 0) {
+            livePollIntervalMs = playlist.targetDurationUs / 1000L;
         }
 
-        new Thread(() -> {
-            try {
-                Log.d(TAG, "Fetching and parsing HLS manifest: " + mediaTailorEndpoint);
+        AdBreak currentBreak = null;
+        AdPod   currentPod   = null;
+        int     prevDiscSeq  = -1;
 
-                // Fetch manifest using NetworkUtils
-                String manifestText = NetworkUtils.fetchText(mediaTailorEndpoint, TRACKING_TIMEOUT_MS);
+        for (HlsMediaPlaylist.Segment seg : playlist.segments) {
+            double startSec    = seg.relativeStartTimeUs / 1_000_000.0;
+            double durationSec = seg.durationUs / 1_000_000.0;
+            boolean isMt      = seg.url != null && seg.url.contains(MT_SEGMENT_PATTERN);
+            boolean discontin = prevDiscSeq != -1
+                    && seg.relativeDiscontinuitySequence != prevDiscSeq;
 
-                if (manifestText != null) {
-                    // Check if this is a master playlist (contains variant streams)
-                    if (ManifestParser.isMasterPlaylist(manifestText)) {
-                        Log.d(TAG, "Master playlist detected - fetching variant stream for SCTE-35 markers");
-
-                        // Extract first variant stream URL
-                        String variantUrl = ManifestParser.extractFirstVariantUrl(manifestText, mediaTailorEndpoint);
-
-                        if (variantUrl != null) {
-                            // Fetch the variant playlist (contains SCTE-35 markers)
-                            String variantText = NetworkUtils.fetchText(variantUrl, TRACKING_TIMEOUT_MS);
-
-                            if (variantText != null) {
-                                // Parse the variant playlist for ads
-                                parseMediaPlaylist(variantText);
-                            } else {
-                                Log.w(TAG, "Failed to fetch variant playlist");
-                            }
-                        } else {
-                            Log.w(TAG, "Could not extract variant URL from master playlist");
-                        }
-                    } else {
-                        // This is already a media playlist - parse directly
-                        Log.d(TAG, "Media playlist detected - parsing for SCTE-35 markers");
-                        parseMediaPlaylist(manifestText);
-                    }
-                } else {
-                    Log.w(TAG, "Failed to fetch manifest");
+            if (isMt) {
+                if (currentBreak == null) {
+                    currentBreak = new AdBreak();
+                    currentBreak.id = "avail-exo-" + startSec;
+                    currentBreak.startTime = startSec;
+                    currentBreak.source = MediaTailorConstants.AD_SOURCE_VHS_DISCONTINUITY;
                 }
 
+                if (currentPod == null || discontin) {
+                    if (currentPod != null) {
+                        currentPod.endTime = startSec;
+                        currentBreak.pods.add(currentPod);
+                    }
+                    currentPod = new AdPod();
+                    currentPod.startTime = startSec;
+                    currentPod.duration = 0;
+                }
+
+                currentPod.duration += durationSec;
+                currentBreak.endTime = startSec + durationSec;
+
+            } else {
+                if (currentBreak != null) {
+                    if (currentPod != null) {
+                        currentPod.endTime = currentBreak.endTime;
+                        currentBreak.pods.add(currentPod);
+                        currentPod = null;
+                    }
+                    currentBreak.duration = currentBreak.endTime - currentBreak.startTime;
+                    if (currentBreak.duration >= MediaTailorConstants.MIN_AD_DURATION) {
+                        adBreaks.add(currentBreak);
+                    }
+                    currentBreak = null;
+                }
+            }
+
+            prevDiscSeq = seg.relativeDiscontinuitySequence;
+        }
+
+        // Handle ad break that extends to the end of the segment list (common in LIVE)
+        if (currentBreak != null) {
+            if (currentPod != null) {
+                currentPod.endTime = currentBreak.endTime;
+                currentBreak.pods.add(currentPod);
+            }
+            currentBreak.duration = currentBreak.endTime - currentBreak.startTime;
+            if (currentBreak.duration >= MediaTailorConstants.MIN_AD_DURATION) {
+                adBreaks.add(currentBreak);
+            }
+        }
+
+        return adBreaks;
+    }
+
+    /**
+     * Handle DASH SCTE-35 EventMessage (emsg) delivered via onMetadata().
+     */
+    private void handleScte35Emsg(EventMessage emsg) {
+        if (emsg.schemeIdUri == null) return;
+        String scheme = emsg.schemeIdUri.toLowerCase();
+        if (!scheme.contains("scte35") && !scheme.contains("scte-35")) return;
+
+        double startSec    = emsg.presentationTimeUs / 1_000_000.0;
+        double durationSec = emsg.durationMs / 1000.0;
+
+        Log.d(TAG, String.format("DASH SCTE-35 emsg: start=%.2fs dur=%.2fs scheme=%s",
+                startSec, durationSec, emsg.schemeIdUri));
+
+        if (durationSec < MediaTailorConstants.MIN_AD_DURATION) return;
+
+        AdBreak adBreak = new AdBreak();
+        adBreak.id = "avail-emsg-" + startSec;
+        adBreak.startTime = startSec;
+        adBreak.duration = durationSec;
+        adBreak.endTime = startSec + durationSec;
+        adBreak.source = MediaTailorConstants.AD_SOURCE_DASH_EMSG;
+
+        List<AdBreak> emsgBreaks = new ArrayList<>();
+        emsgBreaks.add(adBreak);
+        adSchedule = ManifestParser.mergeAdSchedules(adSchedule, emsgBreaks);
+        Log.d(TAG, "DASH emsg merged, schedule=" + adSchedule.size());
+    }
+
+    // -------------------------------------------------------------------------
+    // HTTP manifest fallback
+    // -------------------------------------------------------------------------
+
+    /**
+     * HTTP manifest fetch — fallback when ExoPlayer manifest hook yields no ad breaks.
+     * Handles master → variant resolution transparently.
+     */
+    private void parseManifestFromHttp() {
+        if (!enableManifestParsing || mediaTailorEndpoint == null) return;
+
+        new Thread(() -> {
+            if (isDisposed.get()) return;
+            try {
+                Log.d(TAG, "HTTP fallback: fetching " + mediaTailorEndpoint);
+                String text = NetworkUtils.fetchText(mediaTailorEndpoint, TRACKING_TIMEOUT_MS);
+                if (text == null) return;
+
+                String target = text;
+                if (ManifestParser.isMasterPlaylist(text)) {
+                    String variantUrl = ManifestParser.extractFirstVariantUrl(text, mediaTailorEndpoint);
+                    if (variantUrl != null) {
+                        target = NetworkUtils.fetchText(variantUrl, TRACKING_TIMEOUT_MS);
+                    }
+                }
+
+                if (target != null) {
+                    List<AdBreak> httpBreaks = ManifestParser.parseHLSManifest(target);
+                    if (!httpBreaks.isEmpty()) {
+                        adSchedule = ManifestParser.mergeAdSchedules(adSchedule, httpBreaks);
+                        Log.d(TAG, "HTTP manifest: " + httpBreaks.size() + " break(s)");
+                    }
+                }
             } catch (Exception e) {
-                Log.e(TAG, "Error parsing manifest", e);
+                Log.e(TAG, "HTTP manifest fallback error", e);
             }
         }).start();
     }
 
-    /**
-     * Parse media playlist for SCTE-35 markers
-     */
-    private void parseMediaPlaylist(String manifestText) {
-        // Parse using ManifestParser
-        List<AdBreak> manifestAdBreaks = ManifestParser.parseHLSManifest(manifestText);
+    // -------------------------------------------------------------------------
+    // Tracking API
+    // -------------------------------------------------------------------------
 
-        if (manifestAdBreaks.size() > 0) {
-            Log.d(TAG, "Parsed " + manifestAdBreaks.size() + " ad break(s) from manifest");
-
-            // Merge with existing schedule (from tracking API)
-            adSchedule = ManifestParser.mergeAdSchedules(adSchedule, manifestAdBreaks);
-        } else {
-            Log.d(TAG, "No ad breaks found in manifest");
-        }
-    }
-
-    /**
-     * Fetch tracking metadata from MediaTailor Tracking API
-     */
     private void fetchTrackingMetadata() {
-        if (trackingUrl == null) {
-            Log.d(TAG, "No tracking URL available");
-            return;
-        }
+        if (trackingUrl == null) return;
 
         new Thread(() -> {
+            if (isDisposed.get()) return;
             try {
-                Log.d(TAG, "Fetching tracking metadata from: " + trackingUrl);
-
-                URL url = new URL(trackingUrl);
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(TRACKING_TIMEOUT_MS);
-                connection.setReadTimeout(TRACKING_TIMEOUT_MS);
-
-                int responseCode = connection.getResponseCode();
-
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-                    StringBuilder response = new StringBuilder();
-                    String line;
-
-                    while ((line = reader.readLine()) != null) {
-                        response.append(line);
-                    }
-                    reader.close();
-
-                    // Parse tracking data
-                    processTrackingMetadata(response.toString());
-                } else {
-                    Log.w(TAG, "Tracking API returned code: " + responseCode);
+                Log.d(TAG, "Fetching tracking API: " + trackingUrl);
+                String response = NetworkUtils.fetchText(trackingUrl, TRACKING_TIMEOUT_MS);
+                if (response != null) {
+                    processTrackingResponse(response);
                 }
-
-                connection.disconnect();
-
             } catch (Exception e) {
                 Log.e(TAG, "Error fetching tracking metadata", e);
             }
@@ -525,94 +435,138 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
     }
 
     /**
-     * Process tracking metadata from API
+     * Parse Tracking API avails and merge into ad schedule using deduplication.
+     * Fixes the original bug where avails were blindly appended without dedup.
      */
-    private void processTrackingMetadata(String jsonData) {
+    private void processTrackingResponse(String jsonData) {
+        if (isDisposed.get()) return;
         try {
             JSONObject data = new JSONObject(jsonData);
+            if (!data.has("avails")) return;
 
-            if (data.has("avails")) {
-                JSONArray avails = data.getJSONArray("avails");
-                Log.d(TAG, "Received " + avails.length() + " avail(s) from tracking API");
+            JSONArray avails = data.getJSONArray("avails");
+            Log.d(TAG, "Tracking API: " + avails.length() + " avail(s)");
 
-                for (int i = 0; i < avails.length(); i++) {
-                    JSONObject avail = avails.getJSONObject(i);
+            List<AdBreak> apiBreaks = new ArrayList<>();
 
-                    // Parse avail data
-                    double startTime = avail.optDouble("startTimeInSeconds", 0);
-                    double duration = avail.optDouble("durationInSeconds", 0);
-                    String availId = avail.optString("availId", "");
+            for (int i = 0; i < avails.length(); i++) {
+                JSONObject avail = avails.getJSONObject(i);
+                double startTime = avail.optDouble("startTimeInSeconds", 0);
+                double duration  = avail.optDouble("durationInSeconds", 0);
 
-                    Log.d(TAG, String.format("Parsing avail %d: startTime=%.2fs, duration=%.2fs",
-                            i, startTime, duration));
+                AdBreak adBreak = new AdBreak();
+                adBreak.id = avail.optString("availId", "avail-" + i);
+                adBreak.startTime = startTime;
+                adBreak.duration  = duration;
+                adBreak.endTime   = startTime + duration;
+                adBreak.source    = MediaTailorConstants.AD_SOURCE_TRACKING_API;
 
-                    // Create ad break
-                    AdBreak adBreak = new AdBreak();
-                    adBreak.id = availId;
-                    adBreak.startTime = startTime;
-                    adBreak.duration = duration;
-                    adBreak.endTime = startTime + duration;
-                    adBreak.source = "tracking-api";
-
-                    // Parse ads within avail
-                    if (avail.has("ads")) {
-                        JSONArray ads = avail.getJSONArray("ads");
-
-                        for (int j = 0; j < ads.length(); j++) {
-                            JSONObject ad = ads.getJSONObject(j);
-
-                            double adStartTime = ad.optDouble("startTimeInSeconds", 0);  // Absolute time from stream start
-                            double adDuration = ad.optDouble("durationInSeconds", 0);
-
-                            Log.d(TAG, String.format("  Parsing ad %d: startTime=%.2fs, duration=%.2fs, title=%s",
-                                    j, adStartTime, adDuration, ad.optString("adTitle", "")));
-
-                            AdPod pod = new AdPod();
-                            pod.title = ad.optString("adTitle", "");
-                            pod.creativeId = ad.optString("creativeId", "");
-                            pod.startTime = adStartTime;  // Use absolute time directly (not offset!)
-                            pod.duration = adDuration;
-                            pod.endTime = pod.startTime + pod.duration;
-
-                            adBreak.pods.add(pod);
-                        }
-                    }
-
-                    // Add to schedule
-                    adSchedule.add(adBreak);
-                }
-
-                // Sort by start time (using Collections.sort for API 16+ compatibility)
-                java.util.Collections.sort(adSchedule, new java.util.Comparator<AdBreak>() {
-                    @Override
-                    public int compare(AdBreak a, AdBreak b) {
-                        return Double.compare(a.startTime, b.startTime);
-                    }
-                });
-
-                Log.d(TAG, "Ad schedule updated: " + adSchedule.size() + " ad break(s)");
-
-                // Log detailed schedule for debugging
-                for (int i = 0; i < adSchedule.size(); i++) {
-                    AdBreak ab = adSchedule.get(i);
-                    Log.d(TAG, String.format("  Break %d: %.2fs-%.2fs (%.2fs) - %d pods",
-                            i, ab.startTime, ab.endTime, ab.duration, ab.pods.size()));
-                    for (int j = 0; j < ab.pods.size(); j++) {
-                        AdPod pod = ab.pods.get(j);
-                        Log.d(TAG, String.format("    Pod %d: '%s' %.2fs-%.2fs (%.2fs)",
-                                j, pod.title, pod.startTime, pod.endTime, pod.duration));
+                if (avail.has("ads")) {
+                    JSONArray ads = avail.getJSONArray("ads");
+                    for (int j = 0; j < ads.length(); j++) {
+                        JSONObject ad = ads.getJSONObject(j);
+                        AdPod pod = new AdPod();
+                        pod.title      = ad.optString("adTitle", "");
+                        pod.creativeId = ad.optString("creativeId", "");
+                        pod.startTime  = ad.optDouble("startTimeInSeconds", 0);
+                        pod.duration   = ad.optDouble("durationInSeconds", 0);
+                        pod.endTime    = pod.startTime + pod.duration;
+                        adBreak.pods.add(pod);
                     }
                 }
+
+                apiBreaks.add(adBreak);
             }
 
+            // Use mergeAdSchedules() to deduplicate against manifest-detected breaks
+            adSchedule = ManifestParser.mergeAdSchedules(adSchedule, apiBreaks);
+            Log.d(TAG, "Tracking API merged, schedule=" + adSchedule.size() + " break(s)");
+
         } catch (Exception e) {
-            Log.e(TAG, "Error processing tracking metadata", e);
+            Log.e(TAG, "Error processing tracking response", e);
+        }
+    }
+
+    private void startTrackingPolling() {
+        if (pollTrackingRunnable != null) return;
+        pollTrackingRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (isDisposed.get()) return;
+                fetchTrackingMetadata();
+                handler.postDelayed(this, livePollIntervalMs);
+            }
+        };
+        handler.postDelayed(pollTrackingRunnable, livePollIntervalMs);
+        Log.d(TAG, "Tracking poll started (interval=" + livePollIntervalMs + "ms)");
+    }
+
+    private void stopTrackingPolling() {
+        if (pollTrackingRunnable != null) {
+            handler.removeCallbacks(pollTrackingRunnable);
+            pollTrackingRunnable = null;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Time update monitoring (ad enter/exit/quartile detection)
+    // -------------------------------------------------------------------------
+
+    private void startTimeUpdateMonitoring() {
+        if (timeUpdateRunnable != null) return;
+        timeUpdateRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!isDisposed.get()) {
+                    if (player != null && player.isPlaying()) {
+                        onTimeUpdate();
+                    }
+                    handler.postDelayed(this, TIME_UPDATE_INTERVAL_MS);
+                }
+            }
+        };
+        handler.postDelayed(timeUpdateRunnable, TIME_UPDATE_INTERVAL_MS);
+    }
+
+    private void stopTimeUpdateMonitoring() {
+        if (timeUpdateRunnable != null) {
+            handler.removeCallbacks(timeUpdateRunnable);
+            timeUpdateRunnable = null;
         }
     }
 
     /**
-     * Find active ad break for current time
+     * Core ad detection loop — checks player position against ad schedule.
+     * Equivalent to the VideoJS timeupdate handler in mt.js.
      */
+    private void onTimeUpdate() {
+        double currentTime = player.getCurrentPosition() / 1000.0;
+
+        // Safety: exit ad break before CONTENT_END fires for VOD
+        if (currentAdBreak != null && STREAM_TYPE_VOD.equals(streamType)) {
+            long dur = player.getDuration();
+            if (dur != androidx.media3.common.C.TIME_UNSET
+                    && player.getCurrentPosition() >= dur - 100) {
+                Log.d(TAG, "Near end of VOD — pre-emptively exiting ad break");
+                exitAdBreak();
+                return;
+            }
+        }
+
+        AdBreak activeBreak = findActiveAdBreak(currentTime);
+
+        if (activeBreak != null) {
+            if (!activeBreak.hasFiredStart) {
+                enterAdBreak(activeBreak);
+            }
+            if (currentAdBreak != null) {
+                checkPodTransition(activeBreak, currentTime);
+            }
+        } else if (currentAdBreak != null) {
+            exitAdBreak();
+        }
+    }
+
     private AdBreak findActiveAdBreak(double currentTime) {
         for (AdBreak adBreak : adSchedule) {
             if (currentTime >= adBreak.startTime && currentTime < adBreak.endTime) {
@@ -622,72 +576,43 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         return null;
     }
 
-    /**
-     * Enter ad break
-     */
+    // -------------------------------------------------------------------------
+    // Ad break lifecycle
+    // -------------------------------------------------------------------------
+
     private void enterAdBreak(AdBreak adBreak) {
         currentAdBreak = adBreak;
         getState().isAd = true;
-
-        // Determine ad position
-        int breakIndex = adSchedule.indexOf(adBreak);
-        String adPosition = determineAdPosition(breakIndex, adSchedule.size());
-        currentAdBreak.adPosition = adPosition;
-
-        Log.d(TAG, "Entering ad break: " + adBreak.id + " at position " + adPosition);
-
-        // Send AD_BREAK_START
+        adBreak.adPosition = determineAdPosition(adSchedule.indexOf(adBreak), adSchedule.size());
+        Log.d(TAG, "AD_BREAK_START id=" + adBreak.id + " pos=" + adBreak.adPosition);
         sendAdBreakStart();
-
         adBreak.hasFiredStart = true;
     }
 
-    /**
-     * Exit ad break
-     */
     private void exitAdBreak() {
         if (currentAdPod != null) {
             sendEnd();
             currentAdPod = null;
         }
-
-        Log.d(TAG, "Exiting ad break: " + currentAdBreak.id);
-
-        // Send AD_BREAK_END
+        Log.d(TAG, "AD_BREAK_END id=" + currentAdBreak.id);
         sendAdBreakEnd();
         currentAdBreak.hasFiredEnd = true;
         currentAdBreak = null;
-
         getState().isAd = false;
     }
 
-    /**
-     * Check for pod transitions within ad break and track quartiles
-     */
     private void checkPodTransition(AdBreak adBreak, double currentTime) {
-        // Debug logging
-        if (Math.floor(currentTime * 4) % 4 == 0) { // Log every 250ms aligned
-            Log.d(TAG, String.format("checkPodTransition: time=%.2fs, break=%s (%.2fs-%.2fs), %d pods, currentPod=%s",
-                    currentTime, adBreak.id, adBreak.startTime, adBreak.endTime,
-                    adBreak.pods.size(), currentAdPod != null ? currentAdPod.title : "null"));
-        }
-
         if (adBreak.pods.isEmpty()) {
-            // No pods - treat entire break as single ad
+            // No pod metadata — treat entire break as a single ad
             if (!adBreak.hasFiredAdStart) {
-                Log.d(TAG, "→ AD_START (no pods)");
                 sendRequest();
                 sendStart();
                 adBreak.hasFiredAdStart = true;
             }
-
-            // Track quartiles for entire break
-            double adProgress = currentTime - adBreak.startTime;
-            trackQuartiles(adBreak, adProgress);
+            trackQuartiles(adBreak, currentTime - adBreak.startTime);
             return;
         }
 
-        // Find active pod
         AdPod activePod = null;
         for (AdPod pod : adBreak.pods) {
             if (currentTime >= pod.startTime && currentTime < pod.endTime) {
@@ -697,102 +622,86 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         }
 
         if (activePod != null && currentAdPod != activePod) {
-            // Transition to new pod
             if (currentAdPod != null) {
-                Log.d(TAG, "→ AD_END (pod transition)");
                 sendEnd();
             }
-
             currentAdPod = activePod;
-            Log.d(TAG, "→ AD_START (new pod): " + activePod.title);
-
             sendRequest();
             sendStart();
             activePod.hasFiredStart = true;
+            Log.d(TAG, "AD_START pod=" + activePod.title);
         }
 
-        // Track quartiles for active pod
         if (currentAdPod != null) {
-            double podProgress = currentTime - currentAdPod.startTime;
-            trackQuartiles(currentAdPod, podProgress);
+            trackQuartiles(currentAdPod, currentTime - currentAdPod.startTime);
         }
     }
 
-    /**
-     * Track quartile events for active ad/pod (like videoJS)
-     */
     private void trackQuartiles(Object adObject, double progress) {
         double duration;
-        boolean[] fired = new boolean[3];
+        boolean firedQ1, firedQ2, firedQ3;
 
         if (adObject instanceof AdPod) {
             AdPod pod = (AdPod) adObject;
             duration = pod.duration;
-            fired[0] = pod.hasFiredQ1;
-            fired[1] = pod.hasFiredQ2;
-            fired[2] = pod.hasFiredQ3;
+            firedQ1  = pod.hasFiredQ1;
+            firedQ2  = pod.hasFiredQ2;
+            firedQ3  = pod.hasFiredQ3;
         } else {
-            AdBreak adBreak = (AdBreak) adObject;
-            duration = adBreak.duration;
-            fired[0] = adBreak.hasFiredQ1;
-            fired[1] = adBreak.hasFiredQ2;
-            fired[2] = adBreak.hasFiredQ3;
+            AdBreak ab = (AdBreak) adObject;
+            duration = ab.duration;
+            firedQ1  = ab.hasFiredQ1;
+            firedQ2  = ab.hasFiredQ2;
+            firedQ3  = ab.hasFiredQ3;
         }
 
         if (duration <= 0) return;
 
-        // Q1 - 25%
-        if (!fired[0] && progress >= duration * 0.25) {
-            Log.d(TAG, "→ AD_QUARTILE 25%");
+        if (!firedQ1 && progress >= duration * MediaTailorConstants.QUARTILE_Q1) {
             sendAdQuartile();
-            if (adObject instanceof AdPod) {
-                ((AdPod) adObject).hasFiredQ1 = true;
-            } else {
-                ((AdBreak) adObject).hasFiredQ1 = true;
-            }
+            if (adObject instanceof AdPod) ((AdPod) adObject).hasFiredQ1 = true;
+            else ((AdBreak) adObject).hasFiredQ1 = true;
         }
-
-        // Q2 - 50%
-        if (!fired[1] && progress >= duration * 0.50) {
-            Log.d(TAG, "→ AD_QUARTILE 50%");
+        if (!firedQ2 && progress >= duration * MediaTailorConstants.QUARTILE_Q2) {
             sendAdQuartile();
-            if (adObject instanceof AdPod) {
-                ((AdPod) adObject).hasFiredQ2 = true;
-            } else {
-                ((AdBreak) adObject).hasFiredQ2 = true;
-            }
+            if (adObject instanceof AdPod) ((AdPod) adObject).hasFiredQ2 = true;
+            else ((AdBreak) adObject).hasFiredQ2 = true;
         }
-
-        // Q3 - 75%
-        if (!fired[2] && progress >= duration * 0.75) {
-            Log.d(TAG, "→ AD_QUARTILE 75%");
+        if (!firedQ3 && progress >= duration * MediaTailorConstants.QUARTILE_Q3) {
             sendAdQuartile();
-            if (adObject instanceof AdPod) {
-                ((AdPod) adObject).hasFiredQ3 = true;
-            } else {
-                ((AdBreak) adObject).hasFiredQ3 = true;
-            }
+            if (adObject instanceof AdPod) ((AdPod) adObject).hasFiredQ3 = true;
+            else ((AdBreak) adObject).hasFiredQ3 = true;
         }
     }
 
-    /**
-     * Determine ad position (pre-roll, mid-roll, post-roll)
-     */
     private String determineAdPosition(int index, int total) {
-        if (index == 0) {
-            return "pre-roll";
-        } else if (index == total - 1 && streamType.equals(STREAM_TYPE_VOD)) {
-            return "post-roll";
-        } else {
-            return "mid-roll";
-        }
+        if (index == 0) return "pre-roll";
+        if (index == total - 1 && STREAM_TYPE_VOD.equals(streamType)) return "post-roll";
+        return "mid-roll";
     }
 
-    // Tracker metadata overrides
+    // -------------------------------------------------------------------------
+    // URL utilities
+    // -------------------------------------------------------------------------
+
+    private String detectManifestType(String url) {
+        if (url.contains(".m3u8")) return MANIFEST_TYPE_HLS;
+        if (url.contains(".mpd") || url.contains("/dash")) return MANIFEST_TYPE_DASH;
+        return MANIFEST_TYPE_HLS;
+    }
+
+    private String extractTrackingUrl(String url) {
+        String sid = NetworkUtils.extractSessionId(url);
+        return (sid != null) ? NetworkUtils.buildTrackingUrl(url, sid) : null;
+    }
+
+    // -------------------------------------------------------------------------
+    // NRVideoTracker overrides
+    // -------------------------------------------------------------------------
 
     @Override
     public String getTrackerName() {
-        return "aws-media-tailor";
+        return "mediatailor";
     }
 
     @Override
@@ -812,12 +721,8 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
 
     @Override
     public String getTitle() {
-        if (currentAdPod != null && currentAdPod.title != null) {
-            return currentAdPod.title;
-        }
-        if (currentAdBreak != null && currentAdBreak.id != null) {
-            return currentAdBreak.id;
-        }
+        if (currentAdPod != null && currentAdPod.title != null) return currentAdPod.title;
+        if (currentAdBreak != null && currentAdBreak.id != null) return currentAdBreak.id;
         return null;
     }
 
@@ -828,47 +733,40 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
 
     @Override
     public Long getDuration() {
-        if (currentAdPod != null) {
-            return (long) (currentAdPod.duration * 1000);
-        }
-        if (currentAdBreak != null) {
-            return (long) (currentAdBreak.duration * 1000);
-        }
+        if (currentAdPod != null)   return (long) (currentAdPod.duration * 1000);
+        if (currentAdBreak != null) return (long) (currentAdBreak.duration * 1000);
         return null;
     }
 
     @Override
     public Map<String, Object> getAttributes(String action, Map<String, Object> attributes) {
         Map<String, Object> attr = super.getAttributes(action, attributes);
-
-        // Add MediaTailor-specific attributes
-        if (sessionId != null) {
-            attr.put("sessionId", sessionId);
-        }
-
+        if (sessionId != null) attr.put("sessionId", sessionId);
         if (currentAdBreak != null && currentAdBreak.adPosition != null) {
             attr.put("adPosition", currentAdBreak.adPosition);
         }
-
-        attr.put("adIntegration", "AWS MediaTailor");
-        attr.put("streamType", streamType);
-
+        attr.put("adPartner", MediaTailorConstants.AD_PARTNER);
+        if (streamType != null) attr.put("streamType", streamType);
         return attr;
     }
 
     /**
-     * Cleanup
+     * Clean up all resources. Sets isDisposed flag first to stop all async callbacks.
      */
     public void dispose() {
-        Log.d(TAG, "Disposing MediaTailorAdsTracker");
-        stopLivePolling();
+        isDisposed.set(true);
+        Log.d(TAG, "Disposing NRTrackerMediaTailor");
+        stopTimeUpdateMonitoring();
+        stopTrackingPolling();
         unregisterListeners();
     }
 
-    // Inner classes for ad scheduling
+    // -------------------------------------------------------------------------
+    // Inner classes
+    // -------------------------------------------------------------------------
 
     /**
-     * Represents an ad break (avail)
+     * Represents an ad break (MediaTailor avail).
      */
     public static class AdBreak {
         public String id;
@@ -877,17 +775,17 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         public double endTime;
         public String source;
         public String adPosition;
-        public boolean hasFiredStart = false;
-        public boolean hasFiredEnd = false;
+        public boolean hasFiredStart  = false;
+        public boolean hasFiredEnd    = false;
         public boolean hasFiredAdStart = false;
-        public boolean hasFiredQ1 = false;
-        public boolean hasFiredQ2 = false;
-        public boolean hasFiredQ3 = false;
+        public boolean hasFiredQ1     = false;
+        public boolean hasFiredQ2     = false;
+        public boolean hasFiredQ3     = false;
         public List<AdPod> pods = new ArrayList<>();
     }
 
     /**
-     * Represents an individual ad within a break (pod)
+     * Represents an individual ad within a break.
      */
     public static class AdPod {
         public String title;
@@ -896,8 +794,8 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         public double duration;
         public double endTime;
         public boolean hasFiredStart = false;
-        public boolean hasFiredQ1 = false;
-        public boolean hasFiredQ2 = false;
-        public boolean hasFiredQ3 = false;
+        public boolean hasFiredQ1   = false;
+        public boolean hasFiredQ2   = false;
+        public boolean hasFiredQ3   = false;
     }
 }

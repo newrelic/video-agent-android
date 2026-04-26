@@ -2,6 +2,10 @@ package com.newrelic.videoagent.mediatailor.utils;
 
 import android.util.Log;
 
+import androidx.media3.exoplayer.dash.manifest.DashManifest;
+import androidx.media3.exoplayer.dash.manifest.EventStream;
+import androidx.media3.exoplayer.dash.manifest.Period;
+
 import com.newrelic.videoagent.mediatailor.tracker.NRTrackerMediaTailor.AdBreak;
 import com.newrelic.videoagent.mediatailor.tracker.NRTrackerMediaTailor.AdPod;
 
@@ -236,25 +240,64 @@ public class ManifestParser {
     }
 
     /**
-     * Parse DASH manifest for SCTE-35 EventStream markers
-     * TODO: Implement DASH manifest parsing
-     * Based on videoJS mt.js:573-685
+     * Parse DASH manifest for SCTE-35 EventStream markers using ExoPlayer's pre-parsed object.
+     * Iterates periods → eventStreams, filters SCTE-35 scheme URIs, and builds AdBreak list.
      *
-     * @param xmlText The DASH manifest content (.mpd)
+     * @param manifest The ExoPlayer-parsed DashManifest
      * @return List of detected ad breaks
      */
-    public static List<AdBreak> parseDASHManifest(String xmlText) {
+    public static List<AdBreak> parseDashManifest(DashManifest manifest) {
         List<AdBreak> adBreaks = new ArrayList<>();
+        if (manifest == null) return adBreaks;
 
-        // TODO: Implement DASH parsing
-        // 1. Parse XML using Android XML parser
-        // 2. Find <EventStream> elements with SCTE-35 schemeIdUri
-        // 3. Extract <Event> elements with presentationTime, duration, id
-        // 4. Convert timescale to seconds
-        // 5. Create AdBreak objects from events
+        for (int p = 0; p < manifest.getPeriodCount(); p++) {
+            Period period = manifest.getPeriod(p);
+            long periodStartMs = manifest.getPeriodDurationMs(p) >= 0
+                    ? (long) (period.startMs) : 0;
 
-        Log.w(TAG, "DASH manifest parsing not yet implemented");
+            for (EventStream eventStream : period.eventStreams) {
+                String scheme = eventStream.schemeIdUri != null
+                        ? eventStream.schemeIdUri.toLowerCase() : "";
+                if (!scheme.contains("scte35") && !scheme.contains("scte-35")) continue;
+
+                Log.d(TAG, "DASH EventStream SCTE-35 schemeId=" + eventStream.schemeIdUri
+                        + " events=" + eventStream.presentationTimesUs.length);
+
+                for (int e = 0; e < eventStream.presentationTimesUs.length; e++) {
+                    double startSec = (periodStartMs * 1000L + eventStream.presentationTimesUs[e])
+                            / 1_000_000.0;
+                    double durationSec = eventStream.durationMs / 1000.0;
+
+                    if (durationSec < MediaTailorConstants.MIN_AD_DURATION) continue;
+
+                    AdBreak adBreak = new AdBreak();
+                    adBreak.id = "avail-dash-evs-" + startSec;
+                    adBreak.startTime = startSec;
+                    adBreak.duration  = durationSec;
+                    adBreak.endTime   = startSec + durationSec;
+                    adBreak.source    = MediaTailorConstants.AD_SOURCE_DASH_EVENT_STREAM;
+                    adBreaks.add(adBreak);
+
+                    Log.d(TAG, String.format("  DASH EventStream ad break: %.2fs-%.2fs",
+                            startSec, adBreak.endTime));
+                }
+            }
+        }
+
         return adBreaks;
+    }
+
+    /**
+     * Parse DASH manifest XML text for SCTE-35 EventStream markers.
+     * @deprecated Prefer parseDashManifest(DashManifest) which uses ExoPlayer's pre-parsed object.
+     *
+     * @param xmlText The DASH manifest content (.mpd)
+     * @return List of detected ad breaks (empty — use parseDashManifest(DashManifest) instead)
+     */
+    @Deprecated
+    public static List<AdBreak> parseDASHManifest(String xmlText) {
+        Log.w(TAG, "parseDASHManifest(String) is deprecated — use parseDashManifest(DashManifest)");
+        return new ArrayList<>();
     }
 
     /**

@@ -5,7 +5,7 @@ plugins {
 android {
     compileSdkVersion 33
     defaultConfig {
-        minSdkVersion 16
+        minSdkVersion 21
         targetSdkVersion 33
         versionCode 1
         versionName "1.0.0"
@@ -27,8 +27,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
     namespace 'com.newrelic.videoagent.mediatailor'
 }
@@ -36,8 +36,9 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.2.0'
     implementation 'com.google.android.material:material:1.2.1'
     implementation project(path: ':NewRelicVideoCore')
-    implementation 'androidx.media3:media3-exoplayer:1.1.0'
-    implementation 'androidx.media3:media3-exoplayer-hls:1.1.0'
+    implementation 'androidx.media3:media3-exoplayer:1.2.0'
+    implementation 'androidx.media3:media3-exoplayer-hls:1.2.0'
+    implementation 'androidx.media3:media3-exoplayer-dash:1.2.0'
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.robolectric:robolectric:4.10.3'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
