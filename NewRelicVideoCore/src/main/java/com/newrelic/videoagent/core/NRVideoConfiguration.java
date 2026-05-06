@@ -32,6 +32,8 @@ public final class NRVideoConfiguration {
         regions.put("STAGING", "STAGING");
         regions.put("DEV", "STAGING");
         regions.put("TEST", "STAGING");
+        regions.put("JP", "JP");
+        regions.put("JAPAN", "JP");
         REGION_MAPPINGS = regions; // Immutable reference
     }
 

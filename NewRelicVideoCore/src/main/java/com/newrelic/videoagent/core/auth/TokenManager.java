@@ -173,6 +173,8 @@ public final class TokenManager {
                 return "https://mobile-collector.ap.newrelic.com/mobile/v5/connect";
             case "GOV":
                 return "https://mobile-collector.gov.newrelic.com/mobile/v5/connect";
+            case "JP":
+                return "https://mobile-collector.jp.nr-data.net/mobile/v5/connect";
             default:
                 return "https://mobile-collector.newrelic.com/mobile/v5/connect";
         }
