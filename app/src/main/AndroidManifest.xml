@@ -5,6 +5,7 @@
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.NRVideoProject">
@@ -14,6 +15,11 @@
             android:theme="@style/Theme.NRVideoProject.NoActionBar"
             android:exported="false"></activity>
         <activity android:name=".VideoPlayer" android:exported="false" />
+        <activity
+            android:name=".VideoPlayerMediaTailor"
+            android:label="@string/title_activity_video_player_mediatailor"
+            android:theme="@style/Theme.NRVideoProject.NoActionBar"
+            android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
