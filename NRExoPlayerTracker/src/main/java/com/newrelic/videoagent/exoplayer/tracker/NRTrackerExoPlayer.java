@@ -698,7 +698,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         } else {
             NRLog.d("\tVideo Paused");
 
-            if (getState().isPlaying && !player.isPlayingAd()) {
+            if (getState().isStarted && !getState().isPaused && !player.isPlayingAd()) {
                 sendPause();
             }
         }
