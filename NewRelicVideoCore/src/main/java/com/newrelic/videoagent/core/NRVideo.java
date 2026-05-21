@@ -71,14 +71,21 @@ public final class NRVideo {
         // Create content tracker with ExoPlayer instance
         NRTracker contentTracker = createContentTracker(instance.configuration);
         NRTracker adsTracker = null;
-        if (config.isAdEnabled()) {
-            adsTracker = createAdTracker(instance.configuration);
-            NRLog.d("add tracker is added");
+        NRVideoPlayerConfiguration.AdTrackerType adType = config.getAdTrackerType();
+        if (adType != NRVideoPlayerConfiguration.AdTrackerType.NONE) {
+            adsTracker = createAdTracker(instance.configuration, adType);
+            NRLog.d("ad tracker created: " + adType);
         }
 
         // Now start the tracker system
         Integer trackerId = NewRelicVideoAgent.getInstance().start(contentTracker, adsTracker);
         ((NRVideoTracker) contentTracker).setPlayer(config.getPlayer());
+        // MediaTailor needs the ExoPlayer reference to register Player.Listener;
+        // IMA does not (it wires via AdEventListener externally).
+        if (adsTracker instanceof NRVideoTracker
+                && adType == NRVideoPlayerConfiguration.AdTrackerType.MEDIA_TAILOR) {
+            ((NRVideoTracker) adsTracker).setPlayer(config.getPlayer());
+        }
         NRLog.i("NRVideo initialization completed successfully with tracker ID: " + trackerId + " and player name:" + config.getPlayerName());
         if (config.getCustomAttributes() != null && !config.getCustomAttributes().isEmpty()) {
             for (Map.Entry<String, Object> entry : config.getCustomAttributes().entrySet()) {
@@ -284,20 +291,39 @@ public final class NRVideo {
         }
     }
 
-    private static NRTracker createAdTracker(NRVideoConfiguration config) {
+    private static NRTracker createAdTracker(NRVideoConfiguration config,
+                                              NRVideoPlayerConfiguration.AdTrackerType type) {
+        String className;
+        switch (type) {
+            case MEDIA_TAILOR:
+                className = "com.newrelic.videoagent.mediatailor.tracker.NRTrackerMediaTailor";
+                break;
+            case IMA:
+            default:
+                className = "com.newrelic.videoagent.ima.tracker.NRTrackerIMA";
+                break;
+        }
         try {
-            // Always use IMA tracker for ads with configuration
-            Class<?> imaTrackerClass = Class.forName("com.newrelic.videoagent.ima.tracker.NRTrackerIMA");
-            return (NRTracker) imaTrackerClass.getConstructor(NRVideoConfiguration.class).newInstance(config);
+            Class<?> clazz = Class.forName(className);
+            return (NRTracker) clazz.getConstructor(NRVideoConfiguration.class).newInstance(config);
         } catch (Exception e) {
-            // Fallback to deprecated constructor for backward compatibility
+            // Fallback to no-arg ctor for backward compatibility
             try {
-                Class<?> imaTrackerClass = Class.forName("com.newrelic.videoagent.ima.tracker.NRTrackerIMA");
-                return (NRTracker) imaTrackerClass.newInstance();
+                Class<?> clazz = Class.forName(className);
+                return (NRTracker) clazz.newInstance();
             } catch (Exception fallbackException) {
+                NRLog.w("Failed to load ad tracker " + className + ": " + fallbackException);
                 return null;
             }
         }
+    }
+
+    /**
+     * @deprecated Kept for source compatibility — routes to IMA.
+     */
+    @Deprecated
+    private static NRTracker createAdTracker(NRVideoConfiguration config) {
+        return createAdTracker(config, NRVideoPlayerConfiguration.AdTrackerType.IMA);
     }
 
     /**

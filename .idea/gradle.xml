@@ -4,13 +4,15 @@
   <component name="GradleSettings">
     <option name="linkedExternalProjectsSettings">
       <GradleProjectSettings>
+        <option name="testRunner" value="CHOOSE_PER_TEST" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
-        <option name="gradleJvm" value="homebrew-17" />
+        <option name="gradleJvm" value="jbr-21" />
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/NRExoPlayerTracker" />
             <option value="$PROJECT_DIR$/NRIMATracker" />
+            <option value="$PROJECT_DIR$/NRMediaTailorTracker" />
             <option value="$PROJECT_DIR$/NewRelicVideoCore" />
             <option value="$PROJECT_DIR$/app" />
           </set>

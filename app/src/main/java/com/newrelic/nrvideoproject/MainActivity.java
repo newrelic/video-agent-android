@@ -16,6 +16,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     Switch adsSwitch;
     Switch qoeSwitch;
+    Switch mediaTailorSwitch;
     int counter = 0;
     NRVideoConfiguration config;
 
@@ -24,7 +25,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onCreate(savedInstanceState);
         NRVideoConfiguration config = new NRVideoConfiguration.Builder(BuildConfig.NR_APPLICATION_TOKEN)
                 .autoDetectPlatform(getApplicationContext())
-                .withHarvestCycle(60)
+                .withHarvestCycle(30)
                 .enableLogging()
                 .enableQoeAggregate(BuildConfig.QOE_AGGREGATE_DEFAULT)
                 .build();
@@ -33,6 +34,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         adsSwitch = findViewById(R.id.ads_switch);
         qoeSwitch = findViewById(R.id.qoe_switch);
+        mediaTailorSwitch = findViewById(R.id.mediatailor_switch);
 
         // Initialize QOE switch with current configuration state
         qoeSwitch.setChecked(config.isQoeAggregateEnabled());
@@ -85,11 +87,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     Class getVideoActivity() {
+        if (mediaTailorSwitch.isChecked()) {
+            return VideoPlayerMediaTailor.class;
+        }
         if (adsSwitch.isChecked()) {
             return VideoPlayerAds.class;
         }
-        else {
-            return VideoPlayer.class;
-        }
+        return VideoPlayer.class;
     }
 }
