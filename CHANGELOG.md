@@ -1,3 +1,12 @@
+## [4.2.0](https://github.com/newrelic/video-agent-android/compare/v4.1.1...v4.2.0) (2026-05-21)
+
+### Features
+
+* **mediatailor:** add AWS MediaTailor SSAI tracker for DASH + HLS ([caf8f7c](https://github.com/newrelic/video-agent-android/commit/caf8f7cd7c718cd6c480aef50afe377d62419857))
+
+### Bug Fixes
+
+* **sample:** remove trust-all SSL bypass in MediaTailor sample ([92ad555](https://github.com/newrelic/video-agent-android/commit/92ad555c5243c052a5fedf2c1c4cd2d02242c82b))
 ## [Unreleased]
 
 ### Features
