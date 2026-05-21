@@ -24,17 +24,8 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
-
-import javax.net.ssl.HostnameVerifier;
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSession;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 
 /**
  * Sample that drives a MediaTailor SSAI stream end-to-end:
@@ -99,13 +90,10 @@ public class VideoPlayerMediaTailor extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_video_player_mediatailor);
 
-        // DEBUG-ONLY: relax SSL trust so content segments served from a
-        // Cloudflare quick-tunnel (or any host whose cert chain isn't in the
-        // emulator's trust store) can be fetched. This installs a global
-        // trust-all socket factory — do not ship this.
-        if (BuildConfig.DEBUG) {
-            installTrustAllSsl();
-        }
+        // For debug-time cert relaxation (e.g. testing through a Cloudflare
+        // quick-tunnel or a local proxy with a user-installed root CA), rely
+        // on res/xml/network_security_config.xml's <debug-overrides>, which
+        // trusts user CAs only in debug builds. Do not bypass SSL in code.
 
         String protocol = getIntent().getStringExtra("protocol");
         if (protocol == null || protocol.isEmpty()) protocol = DEFAULT_PROTOCOL;
@@ -181,33 +169,6 @@ public class VideoPlayerMediaTailor extends AppCompatActivity {
         player.setMediaItem(MediaItem.fromUri(Uri.parse(manifestUrl)));
         player.setPlayWhenReady(true);
         player.prepare();
-    }
-
-    // ── DEBUG-ONLY SSL relaxation ────────────────────────────────────────────
-
-    private static boolean sslInstalled = false;
-
-    private static void installTrustAllSsl() {
-        if (sslInstalled) return;
-        try {
-            TrustManager[] trustAll = new TrustManager[] {
-                new X509TrustManager() {
-                    @Override public void checkClientTrusted(X509Certificate[] chain, String authType) {}
-                    @Override public void checkServerTrusted(X509Certificate[] chain, String authType) {}
-                    @Override public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
-                }
-            };
-            SSLContext sc = SSLContext.getInstance("TLS");
-            sc.init(null, trustAll, new SecureRandom());
-            HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
-            HttpsURLConnection.setDefaultHostnameVerifier(new HostnameVerifier() {
-                @Override public boolean verify(String hostname, SSLSession session) { return true; }
-            });
-            sslInstalled = true;
-            Log.w(TAG, "DEBUG SSL trust-all installed — do not ship this");
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to install trust-all SSL", e);
-        }
     }
 
     // ── explicit session init ────────────────────────────────────────────────
