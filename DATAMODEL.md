@@ -214,6 +214,14 @@ Quality of Experience aggregate attributes sent with `CONTENT_END` events.
 | `averageBitrate` | Long | Time-weighted average bitrate (bps) |
 | `hadPlaybackError` | Boolean | Error occurred during playback |
 | `totalPlaytime` | Long | Actual viewing time (ms) |
+| `avgDownloadRate` | Long | Mean of every observed network download throughput sample during content (bps). Omitted when no sample was observed. |
+| `minDownloadRate` | Long | Minimum observed network download throughput sample during content (bps). Omitted when no sample was observed. |
+| `maxDownloadRate` | Long | Maximum observed network download throughput sample during content (bps). Omitted when no sample was observed. |
+| `totalSwitchUps` | Long | Count of content rendition changes whose new bitrate was higher than the previous rendition. |
+| `totalSwitchDowns` | Long | Count of content rendition changes whose new bitrate was lower than the previous rendition. |
+| `totalTimeSwitchedDown` | Long | Total time spent at a content rendition below the session's all-time max rendition (ms). Includes any open interval at emit time. |
+| `totalPauseTime` | Long | Total content pause duration (ms). Includes any currently-open pause at emit time. |
+| `totalVariantsPlayed` | Long | Count of distinct content rendition bitrates observed during the session. |
 | `qoeAggregateVersion` | String | Algorithm version (e.g. "1.0.0") |
 
 ### VideoCustomAction

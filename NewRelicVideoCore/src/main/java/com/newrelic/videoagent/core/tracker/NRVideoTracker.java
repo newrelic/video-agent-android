@@ -1,6 +1,7 @@
 package com.newrelic.videoagent.core.tracker;
 
 import android.os.Handler;
+import android.os.SystemClock;
 
 import com.newrelic.videoagent.core.NRVideo;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
@@ -10,11 +11,14 @@ import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.core.harvest.QoeProvider;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static com.newrelic.videoagent.core.NRDef.*;
 import com.newrelic.videoagent.core.exception.ErrorExceptionHandler;
@@ -66,6 +70,38 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
     private Long qoeTotalBitrateWeightedTime;
     private Long qoeTotalActiveTime;
     private boolean qoeBitrateTimerPaused;
+
+    // QoE — Group A: download rate (network)
+    private long qoeDlSum;
+    private long qoeDlCount;
+    private Long qoeDlMin;
+    private long qoeDlMax;
+
+    // QoE — Group B: rendition switch counters
+    private long qoeSwitchUps;
+    private long qoeSwitchDowns;
+
+    // QoE — internal anchor for "switched-down" interval; not emitted on the wire.
+    // Holds the highest "rendition signal" observed (pixels when the player reports W/H,
+    // bitrate otherwise — see renditionSignal()). 0 = nothing observed yet.
+    private long qoeMaxRendition;
+
+    // QoE — previous rendition bitrate; baseline for the up/down/none shift used by Group B counters
+    private Long qoePrevRenditionForShift;
+
+    // QoE — Group D: time-weighted "switched down" interval
+    private long qoeTimeSwitchedDown;
+    private Long qoeReducedSinceMs;
+
+    // QoE — Group E: pause accumulator (independent of existing pause/playtime)
+    private long qoeTotalPauseTime;
+    private Long qoePauseStartMs;
+
+    // QoE — Group F: distinct variants played, keyed by the rendition signal (pixels first,
+    // bitrate fallback). Pixel-keyed identity is robust to DASH manifests whose Format.bitrate
+    // is uniform across resolutions — the failure mode this aggregator was hitting.
+    private final Set<Long> qoePlayedRenditions =
+            Collections.newSetFromMap(new ConcurrentHashMap<Long, Boolean>());
 
     // QOE_AGGREGATE provider fields
     private boolean qoeProviderRegistered = false;
@@ -167,6 +203,21 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         qoeTotalBitrateWeightedTime = 0L;
         qoeTotalActiveTime = 0L;
         qoeBitrateTimerPaused = false;
+
+        // QoE additional KPI accumulators (Groups A/B/D/E/F)
+        qoeDlSum = 0L;
+        qoeDlCount = 0L;
+        qoeDlMin = null;
+        qoeDlMax = 0L;
+        qoeSwitchUps = 0L;
+        qoeSwitchDowns = 0L;
+        qoeMaxRendition = 0L;
+        qoePrevRenditionForShift = null;
+        qoeTimeSwitchedDown = 0L;
+        qoeReducedSinceMs = null;
+        qoeTotalPauseTime = 0L;
+        qoePauseStartMs = null;
+        qoePlayedRenditions.clear();
     }
 
     /**
@@ -328,6 +379,10 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         if (!state.isAd && !QOE_AGGREGATE.equals(action)) {
             trackBitrateFromProcessedAttributes(action, attr);
         }
+        // QoE: seed initial rendition into played-variants set / max-rendition anchor (§5.2)
+        if (!state.isAd && CONTENT_START.equals(action)) {
+            onQoeContentStart();
+        }
 
         // Cache attributes for non-QOE events (for thread-safe QOE generation)
         // QOE generation runs on harvest background thread but ExoPlayer requires main thread access.
@@ -427,6 +482,8 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                 sendVideoEvent(CONTENT_PAUSE);
                 // Pause bitrate timer during pause to exclude paused time from average
                 pauseBitrateTimer();
+                // QoE: open pause interval for totalPauseTime accumulator (§5.5)
+                onQoePause();
             }
             playtimeSinceLastEventTimestamp = 0L;
         }
@@ -465,6 +522,8 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                 if (!state.isBuffering && !state.isSeeking) {
                     resumeBitrateTimer();
                 }
+                // QoE: close pause interval for totalPauseTime accumulator (§5.5)
+                onQoeResume();
             }
             if (!state.isBuffering && !state.isSeeking) {
                 playtimeSinceLastEventTimestamp = System.currentTimeMillis();
@@ -485,6 +544,9 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                 }
                 totalAdPlaytime = totalAdPlaytime + totalPlaytime;
             } else {
+                // QoE: flush open intervals so the final emit sees closed totals (§5.6 / §5.0 rule 8)
+                onQoeViewEnd();
+
                 // Build final QOE at CONTENT_END and mark for next harvest cycle
                 if (configuration != null && configuration.isQoeAggregateEnabled() && qoeProviderRegistered) {
                     // Build final QOE with complete metrics
@@ -905,6 +967,29 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         }
         kpiAttributes.put("hadStartupError", qoeHadStartupError);
 
+        // Additional QoE KPIs (Groups A/B/D/E/F) — §5.7 snapshot, never mutates accumulators.
+        // Group A: omit avg/min/max when no download-rate sample arrived (§7 invariant 10).
+        if (qoeDlCount > 0) {
+            long avgDownloadRate = Math.round((double) qoeDlSum / (double) qoeDlCount);
+            kpiAttributes.put("avgDownloadRate", avgDownloadRate);
+            kpiAttributes.put("minDownloadRate", qoeDlMin);
+            kpiAttributes.put("maxDownloadRate", qoeDlMax);
+        }
+
+        // Group B: counters (0 is a valid value).
+        kpiAttributes.put("totalSwitchUps", qoeSwitchUps);
+        kpiAttributes.put("totalSwitchDowns", qoeSwitchDowns);
+
+        // Groups D & E: snapshot any open interval into the emitted total without mutating state.
+        long nowMs = SystemClock.elapsedRealtime();
+        long openReducedMs = (qoeReducedSinceMs == null) ? 0L : nowMs - qoeReducedSinceMs;
+        long openPauseMs   = (qoePauseStartMs   == null) ? 0L : nowMs - qoePauseStartMs;
+        kpiAttributes.put("totalTimeSwitchedDown", qoeTimeSwitchedDown + openReducedMs);
+        kpiAttributes.put("totalPauseTime",        qoeTotalPauseTime   + openPauseMs);
+
+        // Group F: distinct variants played (cast to long for cross-platform parity).
+        kpiAttributes.put("totalVariantsPlayed", (long) qoePlayedRenditions.size());
+
         return kpiAttributes;
     }
 
@@ -1184,7 +1269,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
      * Reset QoE metrics when starting a new view session.
      * This ensures that QoE KPIs are isolated per view ID.
      */
-    private void resetQoeMetrics() {
+    void resetQoeMetrics() {
         qoePeakBitrate = null;
         qoeHadPlaybackError = false;
         qoeHadStartupError = false;
@@ -1204,6 +1289,21 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         qoeTotalBitrateWeightedTime = 0L;
         qoeTotalActiveTime = 0L;
         qoeBitrateTimerPaused = false;
+
+        // Reset QoE additional KPI accumulators (Groups A/B/D/E/F)
+        qoeDlSum = 0L;
+        qoeDlCount = 0L;
+        qoeDlMin = null;
+        qoeDlMax = 0L;
+        qoeSwitchUps = 0L;
+        qoeSwitchDowns = 0L;
+        qoeMaxRendition = 0L;
+        qoePrevRenditionForShift = null;
+        qoeTimeSwitchedDown = 0L;
+        qoeReducedSinceMs = null;
+        qoeTotalPauseTime = 0L;
+        qoePauseStartMs = null;
+        qoePlayedRenditions.clear();
 
         // Reset QOE provider fields for new view session
         // NOTE: Don't reset pendingQoeForNextHarvest here - it needs to persist until next harvest
@@ -1416,6 +1516,16 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
      * @return Attribute.
      */
     public Long getRenditionHeight() {
+        return null;
+    }
+
+    /**
+     * Get the published rendition-change shift ("up" / "down" / "none" / null).
+     * Override hook so the QoE aggregator can read the shift the tracker has chosen for
+     * the current CONTENT_RENDITION_CHANGE without depending on map-decoration order.
+     * Default null = no signal; the QoE algorithm then derives shift from bitrate delta.
+     */
+    public String getRenditionShift() {
         return null;
     }
 
@@ -1730,7 +1840,35 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
      * @param action The action being processed
      * @param processedAttributes Fully processed attributes including contentBitrate
      */
-    private void trackBitrateFromProcessedAttributes(String action, Map<String, Object> processedAttributes) {
+    void trackBitrateFromProcessedAttributes(String action, Map<String, Object> processedAttributes) {
+        // QoE Group A — every event with contentNetworkDownloadBitrate populated counts as a
+        // sample (§5.3 / DECISIONS D11: plain mean over every sample, not deduped).
+        Long downloadRate = extractBitrateValue(processedAttributes.get("contentNetworkDownloadBitrate"));
+        if (downloadRate != null) {
+            onQoeDownloadRateSample(downloadRate);
+        }
+
+        // QoE Groups B/D/F — fire on each rendition change after the event is sent.
+        // Prefer the published "shift" attribute when the tracker provides one (e.g.
+        // NRTrackerExoPlayer derives it from VideoSize, which can flip independently of
+        // contentRenditionBitrate). Width/height are passed through so the §5 algorithm
+        // can use a composite (bitrate, width, height) identity — robust to DASH manifests
+        // whose Format.bitrate is uniform across renditions.
+        if (CONTENT_RENDITION_CHANGE.equals(action)) {
+            Long newRendition = extractBitrateValue(processedAttributes.get("contentRenditionBitrate"));
+            Long newWidth     = extractBitrateValue(processedAttributes.get("contentRenditionWidth"));
+            Long newHeight    = extractBitrateValue(processedAttributes.get("contentRenditionHeight"));
+            // Read shift via the override hook, not the map. The "shift" attr is added by
+            // derived getAttributes overrides AFTER super.getAttributes returns — by which
+            // time this QoE hook has already run and would see null. The hook avoids that.
+            String shift = selectQoeShift(getRenditionShift(),
+                    qoePrevRenditionForShift, newRendition);
+            onQoeRenditionChange(shift, newRendition, newWidth, newHeight);
+            if (newRendition != null && newRendition > 0 && !state.isAd) {
+                qoePrevRenditionForShift = newRendition;
+            }
+        }
+
         Long currentBitrate = extractBitrateValue(processedAttributes.get("contentBitrate"));
         if (currentBitrate == null || currentBitrate <= 0) {
             return;
@@ -1783,6 +1921,168 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         // QoE bitrate tracking completed
     }
 
+    // ====================================================================
+    // QoE additional KPI hooks (cross-agent reference algorithm §5).
+    // Content-only: every hook returns early on state.isAd.
+    // Clock: SystemClock.elapsedRealtime() per spec §5.0 rule 1.
+    // ====================================================================
+
+    void onQoeContentStart() {
+        if (state.isAd) return;
+        long signal = renditionSignal(getRenditionBitrate(), getRenditionWidth(), getRenditionHeight());
+        if (signal > 0) {
+            qoePlayedRenditions.add(signal);
+            if (signal > qoeMaxRendition) qoeMaxRendition = signal;
+        }
+        Long b = getRenditionBitrate();
+        if (b != null && b > 0) qoePrevRenditionForShift = b;
+    }
+
+    /**
+     * Pick the rendition identity for §5 algorithm input. Pixels (width × height) when the
+     * player reports both — the most reliable "this rendition is different" signal across
+     * ABR ladders, and crucially robust to DASH manifests whose Format.bitrate is uniform
+     * across resolutions. Falls back to bitrate when resolution is unavailable so audio-only
+     * or partially-instrumented streams still drive Group B/D/F.
+     */
+    static long renditionSignal(Long bitrate, Long width, Long height) {
+        if (width != null && height != null && width > 0 && height > 0) {
+            return width * height;
+        }
+        return (bitrate == null || bitrate <= 0) ? 0L : bitrate;
+    }
+
+    /**
+     * Map a previous → new rendition transition to the §5.4 tri-state shift.
+     * Returns null when the previous baseline is unknown so Group B counters stay 0
+     * for that first transition (still increments distinct-variants and updates Group D).
+     */
+    static String computeQoeRenditionShift(Long prev, Long next) {
+        if (next == null || next <= 0 || prev == null || prev <= 0) return null;
+        if (next.longValue() > prev.longValue()) return "up";
+        if (next.longValue() < prev.longValue()) return "down";
+        return "none";
+    }
+
+    /**
+     * Pick the shift to feed §5.4. Published shift wins when present (matches what the
+     * platform already considers a switch — videoSize on ExoPlayer); otherwise fall back
+     * to a bitrate-derived shift so non-ExoPlayer trackers still drive Group B counters.
+     */
+    static String selectQoeShift(Object publishedShift, Long prev, Long next) {
+        if (publishedShift instanceof String) {
+            String s = (String) publishedShift;
+            if ("up".equals(s) || "down".equals(s) || "none".equals(s)) return s;
+        }
+        return computeQoeRenditionShift(prev, next);
+    }
+
+    void onQoeDownloadRateSample(Long rate) {
+        if (state.isAd || rate == null || rate <= 0) return;
+        try {
+            qoeDlSum = safeAdd(qoeDlSum, rate);
+            qoeDlCount++;
+        } catch (ArithmeticException e) {
+            NRLog.w("QoE download-rate accumulation overflow");
+            return;
+        }
+        qoeDlMin = (qoeDlMin == null) ? rate : Math.min(qoeDlMin, rate);
+        if (rate > qoeDlMax) qoeDlMax = rate;
+    }
+
+    /** Bitrate-only convenience used by existing call sites and tests. */
+    void onQoeRenditionChange(String shift, Long newBitrate) {
+        onQoeRenditionChange(shift, newBitrate, null, null);
+    }
+
+    void onQoeRenditionChange(String shift, Long newBitrate, Long newWidth, Long newHeight) {
+        if (state.isAd) return;
+        long signal = renditionSignal(newBitrate, newWidth, newHeight);
+        if (signal <= 0) return;
+
+        if ("up".equals(shift))   qoeSwitchUps++;
+        if ("down".equals(shift)) qoeSwitchDowns++;
+
+        qoePlayedRenditions.add(signal);
+
+        long t = SystemClock.elapsedRealtime();
+
+        if (qoeReducedSinceMs != null && signal >= qoeMaxRendition) {
+            try {
+                qoeTimeSwitchedDown = safeAdd(qoeTimeSwitchedDown, t - qoeReducedSinceMs);
+            } catch (ArithmeticException e) {
+                NRLog.w("QoE switched-down accumulation overflow");
+            }
+            qoeReducedSinceMs = null;
+        }
+
+        if (signal > qoeMaxRendition) qoeMaxRendition = signal;
+
+        if (signal < qoeMaxRendition && qoeReducedSinceMs == null) {
+            qoeReducedSinceMs = t;
+        }
+    }
+
+    void onQoePause() {
+        if (state.isAd) return;
+        qoePauseStartMs = SystemClock.elapsedRealtime();
+    }
+
+    void onQoeResume() {
+        if (state.isAd || qoePauseStartMs == null) return;
+        try {
+            qoeTotalPauseTime = safeAdd(qoeTotalPauseTime,
+                    SystemClock.elapsedRealtime() - qoePauseStartMs);
+        } catch (ArithmeticException e) {
+            NRLog.w("QoE total-pause-time accumulation overflow");
+        }
+        qoePauseStartMs = null;
+    }
+
+    void onQoeViewEnd() {
+        long t = SystemClock.elapsedRealtime();
+        if (qoePauseStartMs != null) {
+            try {
+                qoeTotalPauseTime = safeAdd(qoeTotalPauseTime, t - qoePauseStartMs);
+            } catch (ArithmeticException e) {
+                NRLog.w("QoE total-pause-time flush overflow");
+            }
+            qoePauseStartMs = null;
+        }
+        if (qoeReducedSinceMs != null) {
+            try {
+                qoeTimeSwitchedDown = safeAdd(qoeTimeSwitchedDown, t - qoeReducedSinceMs);
+            } catch (ArithmeticException e) {
+                NRLog.w("QoE switched-down flush overflow");
+            }
+            qoeReducedSinceMs = null;
+        }
+    }
+
+    // Package-private accessor for unit tests to assert the emitted KPI payload directly.
+    Map<String, Object> qoeKpiAttributesForTest() {
+        return calculateQOEKpiAttributes();
+    }
+
+    // Package-private snapshot of the QoE accumulator's internal state, used by tests to
+    // assert the §5.8 transition table and §5.0 rule 9 reset coverage.
+    Map<String, Object> qoeAccumulatorSnapshotForTest() {
+        Map<String, Object> snap = new HashMap<>();
+        snap.put("dlSum", qoeDlSum);
+        snap.put("dlCount", qoeDlCount);
+        snap.put("dlMin", qoeDlMin);
+        snap.put("dlMax", qoeDlMax);
+        snap.put("switchUps", qoeSwitchUps);
+        snap.put("switchDowns", qoeSwitchDowns);
+        snap.put("maxRendition", qoeMaxRendition);
+        snap.put("prevRenditionForShift", qoePrevRenditionForShift);
+        snap.put("timeSwitchedDown", qoeTimeSwitchedDown);
+        snap.put("reducedSinceMs", qoeReducedSinceMs);
+        snap.put("totalPauseTime", qoeTotalPauseTime);
+        snap.put("pauseStartMs", qoePauseStartMs);
+        snap.put("playedRenditionsSize", qoePlayedRenditions.size());
+        return snap;
+    }
 
     public void sendVideoErrorEvent(String action, Map<String, Object> attributes) {
         updatePlaytime();
