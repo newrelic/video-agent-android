@@ -952,7 +952,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         }
 
         // qoeAggregateVersion - Version identifier for QOE calculation algorithm
-        kpiAttributes.put("qoeAggregateVersion", "1.0.0");
+        kpiAttributes.put("qoeAggregateVersion", "1.1.0");
 
         // startupTime - Cached value calculated at CONTENT_START
         if (qoeStartupTime != null && qoeStartupTime >= 0) {
@@ -988,7 +988,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         kpiAttributes.put("totalPauseTime",        qoeTotalPauseTime   + openPauseMs);
 
         // Group F: distinct variants played (cast to long for cross-platform parity).
-        kpiAttributes.put("totalVariantsPlayed", (long) qoePlayedRenditions.size());
+        kpiAttributes.put("totalRenditions", (long) qoePlayedRenditions.size());
 
         return kpiAttributes;
     }

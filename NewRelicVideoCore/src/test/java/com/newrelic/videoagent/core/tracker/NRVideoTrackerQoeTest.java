@@ -342,7 +342,7 @@ public class NRVideoTrackerQoeTest {
         tracker.onQoeRenditionChange("down", 1_000_000L); // already in set
         tracker.onQoeRenditionChange("up", 2_000_000L);   // already in set
 
-        long count = (Long) tracker.qoeKpiAttributesForTest().get("totalVariantsPlayed");
+        long count = (Long) tracker.qoeKpiAttributesForTest().get("totalRenditions");
         assertEquals(2L, count);
     }
 
@@ -385,7 +385,7 @@ public class NRVideoTrackerQoeTest {
 
         Map<String, Object> kpis = tracker.qoeKpiAttributesForTest();
         assertEquals("two distinct resolutions despite stuck bitrate",
-                2L, kpis.get("totalVariantsPlayed"));
+                2L, kpis.get("totalRenditions"));
         assertEquals(1L, kpis.get("totalSwitchUps"));
         assertEquals(1L, kpis.get("totalSwitchDowns"));
     }
@@ -397,7 +397,7 @@ public class NRVideoTrackerQoeTest {
         tracker.onQoeRenditionChange("none", 1_000_000L, 1280L, 720L);
         tracker.onQoeRenditionChange("up",   2_000_000L, 1280L, 720L);
 
-        long count = (Long) tracker.qoeKpiAttributesForTest().get("totalVariantsPlayed");
+        long count = (Long) tracker.qoeKpiAttributesForTest().get("totalRenditions");
         assertEquals(1L, count);
         assertEquals(1L, tracker.qoeKpiAttributesForTest().get("totalSwitchUps"));
     }
@@ -408,7 +408,7 @@ public class NRVideoTrackerQoeTest {
         tracker.onQoeRenditionChange("none", 1_500_000L, 1280L, 720L);
         tracker.onQoeRenditionChange("none", 1_500_000L, 1280L, 720L);
 
-        long count = (Long) tracker.qoeKpiAttributesForTest().get("totalVariantsPlayed");
+        long count = (Long) tracker.qoeKpiAttributesForTest().get("totalRenditions");
         assertEquals(1L, count);
     }
 
@@ -522,13 +522,13 @@ public class NRVideoTrackerQoeTest {
         assertTrue(kpis.containsKey("totalSwitchDowns"));
         assertTrue(kpis.containsKey("totalTimeSwitchedDown"));
         assertTrue(kpis.containsKey("totalPauseTime"));
-        assertTrue(kpis.containsKey("totalVariantsPlayed"));
+        assertTrue(kpis.containsKey("totalRenditions"));
 
         assertEquals(0L, kpis.get("totalSwitchUps"));
         assertEquals(0L, kpis.get("totalSwitchDowns"));
         assertEquals(0L, kpis.get("totalTimeSwitchedDown"));
         assertEquals(0L, kpis.get("totalPauseTime"));
-        assertEquals(0L, kpis.get("totalVariantsPlayed"));
+        assertEquals(0L, kpis.get("totalRenditions"));
     }
 
     // ====================================================================
@@ -553,7 +553,7 @@ public class NRVideoTrackerQoeTest {
 
         assertEquals(2L, kpis.get("totalSwitchUps"));
         assertEquals(1L, kpis.get("totalSwitchDowns"));
-        assertEquals(2L, kpis.get("totalVariantsPlayed"));
+        assertEquals(2L, kpis.get("totalRenditions"));
         long switchedDown = (Long) kpis.get("totalTimeSwitchedDown");
         assertTrue("expected ~2_000 ms switched-down, got " + switchedDown,
                 switchedDown >= 2_000 && switchedDown < 4_000);
