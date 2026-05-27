@@ -252,11 +252,6 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         return null;
     }
 
-    /**
-     * Expose the latest rendition-change shift (set in onVideoSizeChanged just before
-     * sendRenditionChange). The QoE aggregator reads this directly so it doesn't depend
-     * on the order in which getAttributes overrides decorate the attribute map.
-     */
     @Override
     public String getRenditionShift() {
         return renditionChangeShift;

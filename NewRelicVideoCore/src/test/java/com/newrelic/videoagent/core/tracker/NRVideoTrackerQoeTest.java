@@ -64,7 +64,7 @@ public class NRVideoTrackerQoeTest {
 
         Map<String, Object> snap = tracker.qoeAccumulatorSnapshotForTest();
         assertEquals(2_000_000L, snap.get("maxRendition"));
-        assertNull("no reduced interval should be open", snap.get("reducedSinceMs"));
+        assertNull("no switched-down interval should be open", snap.get("switchedDownStartMs"));
         assertEquals(0L, snap.get("timeSwitchedDown"));
         assertEquals(1L, snap.get("switchUps"));
         assertEquals(0L, snap.get("switchDowns"));
@@ -82,7 +82,7 @@ public class NRVideoTrackerQoeTest {
 
         Map<String, Object> snap = tracker.qoeAccumulatorSnapshotForTest();
         assertEquals(6_000_000L, snap.get("maxRendition"));
-        assertNull(snap.get("reducedSinceMs"));
+        assertNull(snap.get("switchedDownStartMs"));
         long elapsed = (Long) snap.get("timeSwitchedDown");
         assertTrue("expected ~2_000 ms accumulated, got " + elapsed,
                 elapsed >= 2_000 && elapsed < 5_000);
@@ -100,7 +100,7 @@ public class NRVideoTrackerQoeTest {
         Map<String, Object> after = tracker.qoeAccumulatorSnapshotForTest();
         assertEquals(before.get("maxRendition"), after.get("maxRendition"));
         assertEquals(before.get("timeSwitchedDown"), after.get("timeSwitchedDown"));
-        assertNull(after.get("reducedSinceMs"));
+        assertNull(after.get("switchedDownStartMs"));
     }
 
     @Test
@@ -114,7 +114,7 @@ public class NRVideoTrackerQoeTest {
 
         Map<String, Object> snap = tracker.qoeAccumulatorSnapshotForTest();
         assertEquals(5_000_000L, snap.get("maxRendition"));
-        assertNull(snap.get("reducedSinceMs"));
+        assertNull(snap.get("switchedDownStartMs"));
         long elapsed = (Long) snap.get("timeSwitchedDown");
         assertTrue("expected ~1_000 ms accumulated, got " + elapsed,
                 elapsed >= 1_000 && elapsed < 4_000);
@@ -129,7 +129,7 @@ public class NRVideoTrackerQoeTest {
 
         Map<String, Object> snap = tracker.qoeAccumulatorSnapshotForTest();
         assertEquals(5_000_000L, snap.get("maxRendition"));
-        assertNotNull("a reduced interval should now be open", snap.get("reducedSinceMs"));
+        assertNotNull("a switched-down interval should now be open", snap.get("switchedDownStartMs"));
         assertEquals(0L, snap.get("timeSwitchedDown"));
     }
 
@@ -139,12 +139,12 @@ public class NRVideoTrackerQoeTest {
         tracker.onQoeContentStart();
 
         tracker.onQoeRenditionChange("down", 3_000_000L); // open at t0
-        Object reducedT0 = tracker.qoeAccumulatorSnapshotForTest().get("reducedSinceMs");
+        Object reducedT0 = tracker.qoeAccumulatorSnapshotForTest().get("switchedDownStartMs");
         SystemClock.sleep(500);
         tracker.onQoeRenditionChange("down", 1_500_000L); // still below max, prev open
 
         Map<String, Object> snap = tracker.qoeAccumulatorSnapshotForTest();
-        assertEquals("interval start should not be reopened", reducedT0, snap.get("reducedSinceMs"));
+        assertEquals("interval start should not be reopened", reducedT0, snap.get("switchedDownStartMs"));
         assertEquals("no time accumulated yet — interval still open", 0L, snap.get("timeSwitchedDown"));
         assertEquals("max stays at the all-time high", 5_000_000L, snap.get("maxRendition"));
     }
@@ -160,7 +160,7 @@ public class NRVideoTrackerQoeTest {
         tracker.onQoeRenditionChange("down", 1_000_000L); // open reduced
         tracker.onQoePause();                              // open pause
 
-        Object reducedBefore = tracker.qoeAccumulatorSnapshotForTest().get("reducedSinceMs");
+        Object reducedBefore = tracker.qoeAccumulatorSnapshotForTest().get("switchedDownStartMs");
         Object pauseBefore   = tracker.qoeAccumulatorSnapshotForTest().get("pauseStartMs");
 
         SystemClock.sleep(750);
@@ -172,7 +172,7 @@ public class NRVideoTrackerQoeTest {
         assertTrue("emit should reflect open pause interval", emittedPause >= 750);
 
         Map<String, Object> snapAfter = tracker.qoeAccumulatorSnapshotForTest();
-        assertEquals("reducedSinceMs must not move", reducedBefore, snapAfter.get("reducedSinceMs"));
+        assertEquals("switchedDownStartMs must not move", reducedBefore, snapAfter.get("switchedDownStartMs"));
         assertEquals("pauseStartMs must not move", pauseBefore, snapAfter.get("pauseStartMs"));
         assertEquals("timeSwitchedDown accumulator must not advance on emit",
                 0L, snapAfter.get("timeSwitchedDown"));
@@ -239,7 +239,7 @@ public class NRVideoTrackerQoeTest {
         long firstPause   = (Long) tracker.qoeAccumulatorSnapshotForTest().get("totalPauseTime");
         assertTrue("first flush captured the reduced interval", firstReduced >= 400);
         assertTrue("first flush captured the pause interval", firstPause >= 400);
-        assertNull(tracker.qoeAccumulatorSnapshotForTest().get("reducedSinceMs"));
+        assertNull(tracker.qoeAccumulatorSnapshotForTest().get("switchedDownStartMs"));
         assertNull(tracker.qoeAccumulatorSnapshotForTest().get("pauseStartMs"));
 
         SystemClock.sleep(400);
@@ -267,7 +267,7 @@ public class NRVideoTrackerQoeTest {
         Map<String, Object> snap = tracker.qoeAccumulatorSnapshotForTest();
         assertEquals(0L, snap.get("switchUps"));
         assertEquals(0L, snap.get("switchDowns"));
-        assertEquals(0L, snap.get("dlCount"));
+        assertEquals(0L, snap.get("downloadRateCount"));
         assertNull(snap.get("pauseStartMs"));
         assertEquals(0, snap.get("playedRenditionsSize"));
     }
@@ -293,10 +293,10 @@ public class NRVideoTrackerQoeTest {
     public void downloadRate_sameValueRepeatedCountsEachSample() {
         for (int i = 0; i < 10; i++) tracker.onQoeDownloadRateSample(1_500_000L);
         Map<String, Object> snap = tracker.qoeAccumulatorSnapshotForTest();
-        assertEquals(10L, snap.get("dlCount"));
-        assertEquals(15_000_000L, snap.get("dlSum"));
-        assertEquals(1_500_000L, snap.get("dlMin"));
-        assertEquals(1_500_000L, snap.get("dlMax"));
+        assertEquals(10L, snap.get("downloadRateCount"));
+        assertEquals(15_000_000L, snap.get("downloadRateSum"));
+        assertEquals(1_500_000L, snap.get("downloadRateMin"));
+        assertEquals(1_500_000L, snap.get("downloadRateMax"));
     }
 
     @Test
@@ -327,7 +327,7 @@ public class NRVideoTrackerQoeTest {
         tracker.onQoeDownloadRateSample(0L);
         tracker.onQoeDownloadRateSample(-42L);
         Map<String, Object> snap = tracker.qoeAccumulatorSnapshotForTest();
-        assertEquals(0L, snap.get("dlCount"));
+        assertEquals(0L, snap.get("downloadRateCount"));
     }
 
     // ====================================================================
@@ -581,9 +581,9 @@ public class NRVideoTrackerQoeTest {
 
         // Sanity: state is non-trivial before reset
         Map<String, Object> dirty = tracker.qoeAccumulatorSnapshotForTest();
-        assertTrue((Long) dirty.get("dlCount") > 0);
+        assertTrue((Long) dirty.get("downloadRateCount") > 0);
         assertTrue((Long) dirty.get("switchDowns") > 0);
-        assertNotNull(dirty.get("reducedSinceMs"));
+        assertNotNull(dirty.get("switchedDownStartMs"));
         assertNotNull(dirty.get("pauseStartMs"));
 
         tracker.resetQoeMetrics();
@@ -595,16 +595,16 @@ public class NRVideoTrackerQoeTest {
 
     private Map<String, Object> freshSnapshot() {
         Map<String, Object> e = new HashMap<>();
-        e.put("dlSum", 0L);
-        e.put("dlCount", 0L);
-        e.put("dlMin", null);
-        e.put("dlMax", 0L);
+        e.put("downloadRateSum", 0L);
+        e.put("downloadRateCount", 0L);
+        e.put("downloadRateMin", null);
+        e.put("downloadRateMax", 0L);
         e.put("switchUps", 0L);
         e.put("switchDowns", 0L);
         e.put("maxRendition", 0L);
         e.put("prevRenditionForShift", null);
         e.put("timeSwitchedDown", 0L);
-        e.put("reducedSinceMs", null);
+        e.put("switchedDownStartMs", null);
         e.put("totalPauseTime", 0L);
         e.put("pauseStartMs", null);
         e.put("playedRenditionsSize", 0);
