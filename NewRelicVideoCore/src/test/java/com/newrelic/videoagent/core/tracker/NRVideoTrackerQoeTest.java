@@ -17,16 +17,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-/**
- * Unit tests for the additional QoE KPIs added to {@link NRVideoTracker}.
- *
- * Covers the cross-agent reference algorithm from the spec:
- *   §5.8 Group D transition table (all 6 cells)
- *   §5.0 rule 5: snapshot-not-mutate on emit
- *   §5.0 rule 6: pause × rendition interaction
- *   §5.0 rule 9: exhaustive per-view reset
- *   §7 invariants 1, 2, 4, 7, 10
- */
 @RunWith(RobolectricTestRunner.class)
 public class NRVideoTrackerQoeTest {
 
@@ -51,7 +41,7 @@ public class NRVideoTrackerQoeTest {
     }
 
     // ====================================================================
-    // §5.8 Group D transition table — all 6 cells.
+    // transition table — all 6 cells.
     // ====================================================================
 
     @Test
@@ -150,7 +140,7 @@ public class NRVideoTrackerQoeTest {
     }
 
     // ====================================================================
-    // §5.0 rule 5 — emitQoe() must NOT mutate intervals (heartbeat snapshot).
+    // emitQoe() must NOT mutate intervals (heartbeat snapshot).
     // ====================================================================
 
     @Test
@@ -197,7 +187,7 @@ public class NRVideoTrackerQoeTest {
     }
 
     // ====================================================================
-    // §5.0 rule 6 — switched-down timer continues while paused.
+    // switched-down timer continues while paused.
     // ====================================================================
 
     @Test
@@ -223,7 +213,7 @@ public class NRVideoTrackerQoeTest {
     }
 
     // ====================================================================
-    // §5.6 / §7 invariant 4 — view end flushes intervals exactly once.
+    // invariant 4 — view end flushes intervals exactly once.
     // ====================================================================
 
     @Test
@@ -252,8 +242,8 @@ public class NRVideoTrackerQoeTest {
     }
 
     // ====================================================================
-    // §7 invariant 1 — ad-scoped events are no-ops.
-    // §7 invariant 2 — null/zero rendition never enters accumulators.
+    // ad-scoped events are no-ops.
+    // null/zero rendition never enters accumulators.
     // ====================================================================
 
     @Test
@@ -560,7 +550,7 @@ public class NRVideoTrackerQoeTest {
     }
 
     // ====================================================================
-    // §5.0 rule 9 — exhaustive per-view reset (whole-state equality).
+    // exhaustive per-view reset (whole-state equality).
     // ====================================================================
 
     @Test
