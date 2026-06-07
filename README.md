@@ -9,7 +9,7 @@ The New Relic Video Agent for Android provides comprehensive video analytics for
 ## Features
 
 - **Automatic Event Detection** — Captures ExoPlayer lifecycle events automatically without manual instrumentation
-- **QoE Metrics** — Quality of Experience aggregation for startup time, buffering ratio, bitrate, and playback errors
+- **QoE Metrics** — Quality of Experience aggregation for startup time, buffering ratio, bitrate, download throughput, rendition switches, pause time, and playback errors
 - **Event Segregation** — Organized event types: `VideoAction`, `VideoAdAction`, `VideoErrorAction`, `VideoCustomAction`
 - **IMA Ads Support** — Built-in Google IMA SDK ad tracking via dedicated ad tracker
 - **Android TV Support** — Auto-detection of Android TV with optimized harvest cycles
