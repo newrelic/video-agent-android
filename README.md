@@ -348,6 +348,7 @@ if (shouldEnable) {
 | `.withHarvestCycle(seconds)` | `int` | 300 (Mobile) / 180 (TV) | Interval in seconds between data harvests. For on-demand video, use a minimum of 300 seconds. |
 | `.enableLogging()` | — | Disabled | Enable debug logging for development. |
 | `.enableQoeAggregate(enabled)` | `boolean` | `false` | Enable Quality of Experience event aggregation (`QOE_AGGREGATE` events). |
+| `.withQoeAggregateIntervalMultiplier(multiplier)` | `int` | `1` | Controls how often `QOE_AGGREGATE` events are emitted relative to the harvest cycle. `1` = every harvest cycle, `2` = every other cycle, `3` = every third, etc. The first and last harvest cycles always emit a `QOE_AGGREGATE` event regardless of this value. |
 | `.withMemoryOptimization()` | — | Disabled | Optimize for low-memory devices. |
 
 ### NRVideoPlayerConfiguration
