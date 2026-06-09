@@ -639,21 +639,33 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         logOnPlayerStateChanged(player.getPlayWhenReady(), playbackState);
     }
 
+    /**
+     * Returns true when the linked ad tracker reports an active ad break
+     * (SSAI case — {@code player.isPlayingAd()} stays false for server-side
+     * stitched ads, so we also consult the paired ad tracker's state).
+     */
+    private boolean isLinkedAdBreakActive() {
+        if (!(linkedTracker instanceof NRVideoTracker)) return false;
+        return ((NRVideoTracker) linkedTracker).getState().isAdBreak;
+    }
+
     private void logOnPlayerStateChanged(boolean playWhenReady, int playbackState) {
         NRLog.d("onPlayerStateChanged, payback state = " + playbackState + " {");
+
+        boolean inAd = player.isPlayingAd() || isLinkedAdBreakActive();
 
         if (playbackState == Player.STATE_READY) {
             NRLog.d("\tVideo Is Ready");
 
-            if (getState().isBuffering) {
+            if (getState().isBuffering && !inAd) {
                 sendBufferEnd();
             }
 
-            if (getState().isSeeking) {
+            if (getState().isSeeking && !inAd) {
                 sendSeekEnd();
             }
 
-            if (getState().isRequested && !getState().isStarted) {
+            if (getState().isRequested && !getState().isStarted && !inAd) {
                 sendStart();
             }
         } else if (playbackState == Player.STATE_ENDED) {
@@ -674,7 +686,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
                 sendRequest();
             }
 
-            if (!getState().isBuffering && !player.isPlayingAd()) {
+            if (!getState().isBuffering && !inAd) {
                 sendBufferStart();
             }
         }
@@ -682,13 +694,13 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         if (playWhenReady && playbackState == Player.STATE_READY) {
             NRLog.d("\tVideo Playing");
 
-            if (getState().isRequested && !getState().isStarted) {
+            if (getState().isRequested && !getState().isStarted && !inAd) {
                 sendStart();
-            } else if (getState().isPaused && !player.isPlayingAd()) {
+            } else if (getState().isPaused && !inAd) {
                 sendResume();
             } else if (!getState().isRequested && !getState().isStarted) {
-                NRLog.d("LAST CHANCE TO SEND REQUEST START. isPlayingAd = " + player.isPlayingAd());
-                if (!player.isPlayingAd()) {
+                NRLog.d("LAST CHANCE TO SEND REQUEST START. inAd = " + inAd);
+                if (!inAd) {
                     sendRequest();
                     sendStart();
                 }
@@ -709,7 +721,12 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     @Override
     public void onPlayerError(@NonNull PlaybackException error) {
         NRLog.d("onPlayerError");
-        sendError(error);
+        if (isLinkedAdBreakActive()) {
+            // SSAI ad break active — attribute the error to the ad, not content.
+            ((NRVideoTracker) linkedTracker).sendError(error);
+        } else {
+            sendError(error);
+        }
     }
 
     // ExoPlayer AnalyticsListener
@@ -719,7 +736,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         if (reason == Player.DISCONTINUITY_REASON_SEEK) {
             NRLog.d("onSeekStarted analytics");
 
-            if (!getState().isSeeking) {
+            if (!getState().isSeeking && !isLinkedAdBreakActive()) {
                 sendSeekStart();
             }
         }
@@ -740,7 +757,11 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     @Override
     public void onLoadError(@NonNull EventTime eventTime, @NonNull LoadEventInfo loadEventInfo, @NonNull MediaLoadData mediaLoadData, @NonNull IOException error, boolean wasCanceled) {
         NRLog.d("onLoadError analytics");
-        sendError(error);
+        if (isLinkedAdBreakActive()) {
+            ((NRVideoTracker) linkedTracker).sendError(error);
+        } else {
+            sendError(error);
+        }
     }
 
     @Override
@@ -794,7 +815,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         int height = videoSize.height;
         NRLog.d("onVideoSizeChanged analytics, H = " + height + " W = " + width);
 
-        if (player.isPlayingAd()) return;
+        if (player.isPlayingAd() || isLinkedAdBreakActive()) return;
 
         long currMul = (long) width * height;
         long lastMul = (long) lastWidth * lastHeight;

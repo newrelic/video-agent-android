@@ -1,3 +1,25 @@
+## [4.2.0](https://github.com/newrelic/video-agent-android/compare/v4.1.1...v4.2.0) (2026-05-21)
+
+### Features
+
+* **mediatailor:** add AWS MediaTailor SSAI tracker for DASH + HLS ([caf8f7c](https://github.com/newrelic/video-agent-android/commit/caf8f7cd7c718cd6c480aef50afe377d62419857))
+
+### Bug Fixes
+
+* **sample:** remove trust-all SSL bypass in MediaTailor sample ([92ad555](https://github.com/newrelic/video-agent-android/commit/92ad555c5243c052a5fedf2c1c4cd2d02242c82b))
+## [Unreleased]
+
+### Features
+
+* **NRMediaTailorTracker** — new optional AAR module for AWS Elemental MediaTailor SSAI.
+  * Supports **DASH** (multi-period BaseURL detection + single-period SCTE‑35 EventStream) and **HLS** (segment URL + discontinuity-driven pod splitting).
+  * Implicit and explicit session-init flows (POST `/v1/session/…`); recovers `sessionId` from DASH `<Location>` when the client-side URI doesn't carry it.
+  * VOD and Live — tracking API polled once for VOD, on every manifest refresh for Live.
+  * Rich VAST metadata on `VideoAdAction` events emitted by `NRTrackerMediaTailor` (identified by `trackerName = "NRMTracker"`): `adSystem`, `vastAdId`, `creativeSequence`, `skipOffset`, `adProgramDateTime`, `availProgramDateTime`, `isBumper`, `nonLinearAvailsCount`. These attributes are **not** populated by `NRTrackerIMA`.
+  * `notifyAdSkipped()` API for skippable-ad UX integrations.
+* **NRVideoPlayerConfiguration.AdTrackerType** — `NONE` / `IMA` / `MEDIA_TAILOR` replaces the boolean `isAdEnabled` (legacy ctor preserved). `NRVideo.addPlayer` switches the ad-tracker slot accordingly.
+* **NRTrackerExoPlayer** — new `isLinkedAdBreakActive()` gate suppresses stray `CONTENT_PAUSE` / `CONTENT_RESUME` / `CONTENT_BUFFER_*` / `CONTENT_START` / `CONTENT_RENDITION_CHANGE` / `CONTENT_SEEK_START` events during SSAI ad breaks, and routes error callbacks (`onPlayerError`, `onLoadError`) to the ad tracker as `AD_ERROR` when one is active.
+
 ## [4.1.1](https://github.com/newrelic/video-agent-android/compare/v4.1.0...v4.1.1) (2026-04-22)
 
 ### Bug Fixes

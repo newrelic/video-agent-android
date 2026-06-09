@@ -95,6 +95,8 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 
 ### VideoAdAction
 
+> **About `(MediaTailor)` attributes below:** attributes tagged with *(MediaTailor)* are populated **only** on events emitted by `NRTrackerMediaTailor` (i.e. when the player is registered with `AdTrackerType.MEDIA_TAILOR`). They are **not** present on events from `NRTrackerIMA`. Filter NRQL by `trackerName = 'NRMTracker'` to scope queries to MediaTailor-only ad events.
+
 | Attribute Name           | Definition                                                                                                                                         |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | actionName               | The specific action being performed in the video player, such as play, pause, resume, content buffering, etc.                                      |
@@ -125,7 +127,15 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | adQuartile               | Quartile of the ad. 0 before first, 1 after first quartile, 2 after midpoint, 3 after third quartile, 4 when completed.                            |
 | adPosition               | The position of the ad.                                                                                                                            |
 | adCreativeId             | The creative ID of the ad.                                                                                                                         |
-| adPartner                | The ad partner, e.g., ima, freewheel.                                                                                                              |
+| adPartner                | The ad partner, e.g., ima, freewheel, aws-mediatailor.                                                                                             |
+| adSystem                 | *(MediaTailor)* The ad-server name returned in the VAST response — e.g., `GDFP`, `FreeWheel`, `SpringServe`, `Publica`.                            |
+| vastAdId                 | *(MediaTailor)* Hierarchical VAST ad identifier, useful for tracing back to ad-server logs.                                                       |
+| creativeSequence         | *(MediaTailor)* 1-based index of the creative within the ad pod.                                                                                   |
+| skipOffset               | *(MediaTailor)* `HH:MM:SS` offset after which the ad is skippable. Absent when the ad is non-skippable.                                            |
+| adProgramDateTime        | *(MediaTailor)* Wall-clock time the ad began in the personalized MPD/playlist. Useful for correlating live-stream events with ad-server logs.     |
+| availProgramDateTime     | *(MediaTailor)* Wall-clock time of the avail (ad break) containing this ad.                                                                        |
+| isBumper                 | *(MediaTailor)* `true` when the ad was served by a MediaTailor bumper configuration rather than a normal ad avail.                                |
+| nonLinearAvailsCount     | *(MediaTailor)* Number of non-linear (overlay / banner / companion) avails returned by the tracking API for this session. Non-zero means the app may want to render companion banners.  |
 | isBackgroundEvent        | If the player is hidden by another window.                                                                                                         |
 | bufferType               | When buffer starts, i.e., initial, seek, pause & connection.                                                                                       |
 | asn                      | Autonomous System Number: a unique number identifying a group of IP networks that serves the content to the end user.                              |
@@ -157,6 +167,7 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | AD_BREAK_END        | Ad break ended.                                                                             |
 | AD_QUARTILE         | Ad quartile happened.                                                                       |
 | AD_CLICK            | Ad has been clicked.                                                                        |
+| AD_SKIP             | *(MediaTailor)* User skipped a skippable ad.           |
 
 ### VideoErrorAction
 

@@ -58,12 +58,16 @@ dependencies {
     // ExoPlayer (Media3) tracker
     implementation 'com.github.newrelic.video-agent-android:NRExoPlayerTracker:v4.1.0'
 
-    // Google IMA ad tracker (optional)
+    // Google IMA ad tracker (optional — for client-side ad insertion)
     implementation 'com.github.newrelic.video-agent-android:NRIMATracker:v4.1.0'
+
+    // AWS MediaTailor ad tracker (optional — for server-side ad insertion / SSAI)
+    implementation 'com.github.newrelic.video-agent-android:NRMediaTailorTracker:v4.1.0'
 }
 ```
 
 > **Note:** Replace `v4.1.0` with the desired [release version](https://github.com/newrelic/video-agent-android/releases).
+> `NRIMATracker` and `NRMediaTailorTracker` are mutually exclusive per player — pick one based on whether your stream uses CSAI (IMA) or SSAI (MediaTailor).
 
 ### Option 2: Install Manually Using AAR Files
 
@@ -118,7 +122,8 @@ The Video Agent is composed of three modules:
 |--------|-------------|----------|
 | **NewRelicVideoCore** | Base classes for tracker management, event generation, and data harvesting. Depends on the New Relic Android Agent. | Yes |
 | **NRExoPlayerTracker** | Video tracker for ExoPlayer (Media3). Automatically hooks into player lifecycle events. | Yes (for ExoPlayer) |
-| **NRIMATracker** | Ad tracker for the Google IMA SDK. Captures ad lifecycle events including quartiles, breaks, and errors. | Optional |
+| **NRIMATracker** | Ad tracker for the Google IMA SDK (client-side ad insertion / CSAI). Captures ad lifecycle events including quartiles, breaks, and errors. | Optional |
+| **NRMediaTailorTracker** | Ad tracker for AWS Elemental MediaTailor (server-side ad insertion / SSAI). Supports DASH and HLS, explicit and implicit session init, live + VOD, with rich VAST metadata. | Optional |
 
 ## Usage
 
@@ -162,6 +167,51 @@ protected void onDestroy() {
     super.onDestroy();
 }
 ```
+
+### Setup with ExoPlayer and AWS MediaTailor (SSAI)
+
+```java
+// Step 1: Initialize NRVideo (same as basic setup)
+
+// Step 2: Explicit MediaTailor session init — POST to /v1/session/…, get back
+//         a sessionized manifest URL plus a tracking URL.
+//   POST  https://<hash>.mediatailor.<region>.amazonaws.com/v1/session/<hash>/<config>/<manifestFile>
+//   body  {"reportingMode":"server", "adsParams":{…custom targeting…}}
+//   resp  {"manifestUrl":"/v1/dash/…?aws.sessionId=…", "trackingUrl":"/v1/tracking/…"}
+// Both paths are relative — prefix them with your MediaTailor host.
+
+String manifestUrl = /* absolute URL from session init */;
+String trackingUrl = /* absolute URL from session init */;
+
+ExoPlayer player = new ExoPlayer.Builder(this).build();
+
+// Step 3: Register with MEDIA_TAILOR as the ad tracker type.
+NRVideoPlayerConfiguration playerConfig = new NRVideoPlayerConfiguration(
+        "mediatailor-player",
+        player,
+        NRVideoPlayerConfiguration.AdTrackerType.MEDIA_TAILOR,
+        /* custom attrs */ null);
+Integer trackerId = NRVideo.addPlayer(playerConfig);
+
+// Step 4: Hand ExoPlayer the sessionized manifest URL and start playback.
+//         The tracker auto-derives the tracking URL from aws.sessionId in
+//         this URI — no extra wiring needed in the normal flow.
+player.setMediaItem(MediaItem.fromUri(manifestUrl));
+player.prepare();
+player.setPlayWhenReady(true);
+
+// Step 5 (Optional): For a "Skip ad" button in your UI, fire AD_SKIP via
+// NRTrackerMediaTailor adTracker = (NRTrackerMediaTailor)
+//         NewRelicVideoAgent.getInstance().getAdTracker(trackerId);
+// adTracker.notifyAdSkipped();
+```
+
+What the tracker emits on `VideoAdAction`:
+`AD_BREAK_START`, `AD_REQUEST`, `AD_START`, `AD_PAUSE`, `AD_RESUME`,
+`AD_SEEK_START`, `AD_SEEK_END`, `AD_BUFFER_START`, `AD_BUFFER_END`,
+`AD_QUARTILE` (25/50/75%), `AD_END`, `AD_BREAK_END`, `AD_SKIP`, `AD_ERROR`.
+All events carry `trackerName="NRMTracker"`, `adPartner="aws-mediatailor"`,
+plus rich VAST metadata (see [DATAMODEL.md](./DATAMODEL.md)).
 
 ### Setup with ExoPlayer and IMA Ads
 
@@ -298,6 +348,7 @@ if (shouldEnable) {
 | `.withHarvestCycle(seconds)` | `int` | 300 (Mobile) / 180 (TV) | Interval in seconds between data harvests. For on-demand video, use a minimum of 300 seconds. |
 | `.enableLogging()` | — | Disabled | Enable debug logging for development. |
 | `.enableQoeAggregate(enabled)` | `boolean` | `false` | Enable Quality of Experience event aggregation (`QOE_AGGREGATE` events). |
+| `.withQoeAggregateIntervalMultiplier(multiplier)` | `int` | `1` | Controls how often `QOE_AGGREGATE` events are emitted relative to the harvest cycle. `1` = every harvest cycle, `2` = every other cycle, `3` = every third, etc. The first and last harvest cycles always emit a `QOE_AGGREGATE` event regardless of this value. |
 | `.withMemoryOptimization()` | — | Disabled | Optimize for low-memory devices. |
 
 ### NRVideoPlayerConfiguration
