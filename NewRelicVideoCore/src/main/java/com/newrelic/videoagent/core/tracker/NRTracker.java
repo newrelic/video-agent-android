@@ -292,6 +292,12 @@ public class NRTracker {
                 // Process CONTENT_BUFFER_END events for rebuffering time calculation
                 videoTracker.calculateRebufferingTime(attributes);
             }
+            else if (CONTENT_RENDITION_CHANGE.equals(action)) {
+                videoTracker.processQoeRenditionChange(attributes);
+            }
+            else if (CONTENT_PAUSE.equals(action) || CONTENT_RESUME.equals(action)) {
+                videoTracker.processQoePauseTime(action);
+            }
         }
     }
 }
