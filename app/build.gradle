@@ -59,6 +59,7 @@ dependencies {
     implementation project(path: ':NewRelicVideoCore')
     implementation project(path: ':NRExoPlayerTracker')
     implementation project(path: ':NRIMATracker')
+    implementation project(path: ':NRMediaTailorTracker')
     testImplementation 'junit:junit:4.13.2'
 
     // Updated AndroidX Test dependencies that are compatible with Android 12+
