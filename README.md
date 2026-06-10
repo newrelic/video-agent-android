@@ -155,7 +155,7 @@ Map<String, Object> customAttrs = new HashMap<>();
 customAttrs.put("contentTitle", "My Video Title");
 
 NRVideoPlayerConfiguration playerConfig =
-        new NRVideoPlayerConfiguration("my-player", player, false, customAttrs);
+        new NRVideoPlayerConfiguration("my-player", player, null, customAttrs);
 
 Integer trackerId = NRVideo.addPlayer(playerConfig);
 
@@ -170,40 +170,62 @@ protected void onDestroy() {
 
 ### Setup with ExoPlayer and AWS MediaTailor (SSAI)
 
+Pass `NRAdConfig.mediaTailor()` (or one of its overloads) as the third argument to
+`NRVideoPlayerConfiguration`. The tracker activates automatically when `addPlayer` is called.
+
 ```java
 // Step 1: Initialize NRVideo (same as basic setup)
 
-// Step 2: Explicit MediaTailor session init — POST to /v1/session/…, get back
-//         a sessionized manifest URL plus a tracking URL.
-//   POST  https://<hash>.mediatailor.<region>.amazonaws.com/v1/session/<hash>/<config>/<manifestFile>
-//   body  {"reportingMode":"server", "adsParams":{…custom targeting…}}
+// Step 2: POST to /v1/session/… to create a session.
+//   POST  https://<hash>.mediatailor.<region>.amazonaws.com/v1/session/<hash>/<config>/<manifest>
+//   body  {"reportingMode":"server", "adsParams":{…targeting params…}}
 //   resp  {"manifestUrl":"/v1/dash/…?aws.sessionId=…", "trackingUrl":"/v1/tracking/…"}
-// Both paths are relative — prefix them with your MediaTailor host.
+// Both returned paths are root-relative — prepend your MediaTailor host.
 
-String manifestUrl = /* absolute URL from session init */;
-String trackingUrl = /* absolute URL from session init */;
+String manifestUrl = /* absolute manifest URL from session-init response */;
+String trackingUrl = /* absolute tracking URL from session-init response */;
 
 ExoPlayer player = new ExoPlayer.Builder(this).build();
 
-// Step 3: Register with MEDIA_TAILOR as the ad tracker type.
+// Step 3: Register the player with NRAdConfig.mediaTailor().
+//   Pass the trackingUrl from session init directly — no extra wiring needed.
 NRVideoPlayerConfiguration playerConfig = new NRVideoPlayerConfiguration(
         "mediatailor-player",
         player,
-        NRVideoPlayerConfiguration.AdTrackerType.MEDIA_TAILOR,
+        NRAdConfig.mediaTailor(null, trackingUrl),
         /* custom attrs */ null);
 Integer trackerId = NRVideo.addPlayer(playerConfig);
 
-// Step 4: Hand ExoPlayer the sessionized manifest URL and start playback.
-//         The tracker auto-derives the tracking URL from aws.sessionId in
-//         this URI — no extra wiring needed in the normal flow.
+// Step 4: Hand ExoPlayer the manifest URL and start playback.
 player.setMediaItem(MediaItem.fromUri(manifestUrl));
 player.prepare();
 player.setPlayWhenReady(true);
 
-// Step 5 (Optional): For a "Skip ad" button in your UI, fire AD_SKIP via
+// Step 5 (Optional): For a "Skip ad" button in your UI.
 // NRTrackerMediaTailor adTracker = (NRTrackerMediaTailor)
 //         NewRelicVideoAgent.getInstance().getAdTracker(trackerId);
 // adTracker.notifyAdSkipped();
+```
+
+#### Custom CDN
+
+When MediaTailor serves ad segments from a customer-owned CDN domain, ad segments have no
+`segments.mediatailor` in their URLs. Pass your CDN's ad-segment path prefix so the tracker
+can detect them. The AWS-recommended prefix `/tm/` is already checked automatically — only set
+`segmentPrefix` if your CDN uses a different path.
+
+```java
+// /tm/ is checked automatically — no segmentPrefix needed for the common case
+NRAdConfig.mediaTailor()
+
+// Custom CDN with /tm/ ad-segment path — still automatic, no override needed
+NRAdConfig.mediaTailor()
+
+// Custom CDN with a non-/tm/ ad-segment path
+NRAdConfig.mediaTailor("/my-ads/")
+
+// Custom CDN + explicit tracking URL (POST session-init flow)
+NRAdConfig.mediaTailor("/my-ads/", trackingUrl)
 ```
 
 What the tracker emits on `VideoAdAction`:
@@ -224,7 +246,7 @@ ExoPlayer player = new ExoPlayer.Builder(this)
         .build();
 
 NRVideoPlayerConfiguration playerConfig =
-        new NRVideoPlayerConfiguration("my-player", player, true, null);
+        new NRVideoPlayerConfiguration("my-player", player, NRAdConfig.csai(), null);
 
 Integer trackerId = NRVideo.addPlayer(playerConfig);
 
@@ -356,8 +378,10 @@ if (shouldEnable) {
 |-----------|------|-------------|
 | `playerName` | `String` | Unique identifier for the video player. Used to distinguish between multiple players. |
 | `player` | `ExoPlayer` | The ExoPlayer instance to track. |
-| `isAdEnabled` | `boolean` | Set `true` if the player has an IMA ads loader; `false` otherwise. |
+| `adConfig` | `NRAdConfig` | Ad framework configuration. Pass `NRAdConfig.csai()` for IMA, `NRAdConfig.mediaTailor()` for MediaTailor, or `null` for no ad tracking. |
 | `customAttributes` | `Map<String, Object>` | Custom attributes to attach to all events from this player. |
+
+> **Upgrading from v4.2.0?** The old `boolean isAdEnabled` and `AdTrackerType` constructors are still supported but deprecated. They compile without changes — `true` maps to `NRAdConfig.csai()`, `AdTrackerType.IMA` maps to `NRAdConfig.csai()`, `AdTrackerType.MEDIA_TAILOR` maps to `NRAdConfig.mediaTailor()`. Migrate at your own pace.
 
 ### Custom Attribute Limits
 

@@ -5,6 +5,7 @@ import android.content.Context;
 
 import androidx.media3.exoplayer.ExoPlayer;
 
+import com.newrelic.videoagent.core.NRAdConfig;
 import com.newrelic.videoagent.core.tracker.NRTracker;
 
 import org.junit.After;
@@ -174,7 +175,7 @@ public class NRVideoTest {
         NRVideoPlayerConfiguration playerConfig = new NRVideoPlayerConfiguration(
             "TestPlayer",
             mockPlayer,
-            false,
+            (NRAdConfig) null,
             null
         );
 
