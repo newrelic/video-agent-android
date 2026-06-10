@@ -1,3 +1,15 @@
+## [4.3.0](https://github.com/newrelic/video-agent-android/compare/v4.2.0...v4.3.0) (2026-06-10)
+
+### Features
+
+* Add new QOE attributes ([6442505](https://github.com/newrelic/video-agent-android/commit/64425052089b337989e27f2a8c0acdc2df444f48))
+* enable QoE by default with interval multiplier 2 ([8d71a24](https://github.com/newrelic/video-agent-android/commit/8d71a245b0670e46e1f054ab31726437a5e907b8))
+* introduce NRAdConfig — unified ad configuration and custom CDN support ([dd5c528](https://github.com/newrelic/video-agent-android/commit/dd5c528f2f99def88f26fdb8d37948db5b7a9624)), closes [#106](https://github.com/newrelic/video-agent-android/issues/106) [#108](https://github.com/newrelic/video-agent-android/issues/108)
+
+### Bug Fixes
+
+* fire BUFFER_END and PAUSE correctly when user pauses during rebuffer ([e3cd1b3](https://github.com/newrelic/video-agent-android/commit/e3cd1b3ae3418b09060559f4ec90c186d59df168))
+* Issue fixed related to switch ups and downs ([0b6e8a8](https://github.com/newrelic/video-agent-android/commit/0b6e8a853b7f8c700aa8e3c4e73ef4875635fbc0))
 ## [4.2.0](https://github.com/newrelic/video-agent-android/compare/v4.1.1...v4.2.0) (2026-05-21)
 
 ### Features
