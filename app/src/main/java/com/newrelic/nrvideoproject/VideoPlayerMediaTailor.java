@@ -11,9 +11,9 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.ui.PlayerView;
 
+import com.newrelic.videoagent.core.NRAdConfig;
 import com.newrelic.videoagent.core.NRVideo;
 import com.newrelic.videoagent.core.NRVideoPlayerConfiguration;
-import com.newrelic.videoagent.core.NRVideoPlayerConfiguration.AdTrackerType;
 
 import org.json.JSONObject;
 
@@ -150,7 +150,7 @@ public class VideoPlayerMediaTailor extends AppCompatActivity {
         NRVideoPlayerConfiguration cfg = new NRVideoPlayerConfiguration(
                 "mediatailor-player",
                 player,
-                AdTrackerType.MEDIA_TAILOR,
+                NRAdConfig.mediaTailor(null, trackingUrl),
                 customAttrs);
 
         trackerId = NRVideo.addPlayer(cfg);
