@@ -710,7 +710,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         } else {
             NRLog.d("\tVideo Paused");
 
-            if (getState().isPlaying && !inAd) {
+            if (getState().isStarted && !getState().isPaused && !player.isPlayingAd()) {
                 sendPause();
             }
         }
@@ -816,6 +816,11 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         NRLog.d("onVideoSizeChanged analytics, H = " + height + " W = " + width);
 
         if (player.isPlayingAd() || isLinkedAdBreakActive()) return;
+        // Media3 fires (0,0) when the renderer clears output between resolution
+        // transitions. Treat as non-event: otherwise prevSize→0 emits a false
+        // DOWN and the subsequent 0→newSize is silenced by the first-observation
+        // guard (lastMul == 0), eating every real shift.
+        if (width <= 0 || height <= 0) return;
 
         long currMul = (long) width * height;
         long lastMul = (long) lastWidth * lastHeight;

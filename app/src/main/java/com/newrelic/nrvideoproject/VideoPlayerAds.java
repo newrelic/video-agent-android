@@ -4,6 +4,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import com.google.ads.interactivemedia.v3.api.AdErrorEvent;
 import com.google.ads.interactivemedia.v3.api.AdEvent;
+import com.newrelic.videoagent.core.NRAdConfig;
 import com.newrelic.videoagent.core.NRVideo;
 import com.newrelic.videoagent.core.NRVideoPlayerConfiguration;
 import androidx.appcompat.app.AppCompatActivity;
@@ -80,7 +81,7 @@ public class VideoPlayerAds extends AppCompatActivity implements AdErrorEvent.Ad
         mediaSourceFactory.setAdViewProvider(playerView);
 
         player = new ExoPlayer.Builder(this).setMediaSourceFactory(mediaSourceFactory).build();
-        NRVideoPlayerConfiguration playerConfiguration = new NRVideoPlayerConfiguration("test-player-something-else", player, true, null);
+        NRVideoPlayerConfiguration playerConfiguration = new NRVideoPlayerConfiguration("test-player-something-else", player, NRAdConfig.csai(), null);
         trackerId = NRVideo.addPlayer(playerConfiguration);
         adTracker = (NRTrackerIMA) NewRelicVideoAgent.getInstance().getAdTracker(trackerId);
         // Get the ad tracker before building the loader
