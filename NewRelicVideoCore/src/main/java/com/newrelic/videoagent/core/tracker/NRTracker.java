@@ -162,8 +162,8 @@ public class NRTracker {
         attributes = getAttributes(action, attributes);
         timeSinceTable.applyAttributes(action, attributes);
 
-        // Process QoE events that require timing attributes
-        processQoeEvents(action, attributes);
+        // Hook for subclasses that need fully-assembled (post-timeSince) attributes (e.g. QoE)
+        onQoeEvent(action, attributes);
 
         attributes.put("agentSession", getAgentSession());
         attributes.put("instrumentation.provider", "newrelic");
@@ -271,33 +271,15 @@ public class NRTracker {
         return NewRelicVideoAgent.getInstance().getSessionId();
     }
     /**
-     * Process QoE events that require timing attributes to be already applied.
-     * This method handles QOE_AGGREGATE and CONTENT_BUFFER_END events for various QoE calculations.
+     * Hook called from {@link #sendEvent} after attributes are fully assembled
+     * (post {@code getAttributes} + {@code timeSinceTable.applyAttributes}). No-op in the base
+     * class; {@link NRVideoTracker} overrides it to feed its QoE aggregator. This replaces the
+     * former {@code instanceof}-based downcast.
      *
      * @param action The event action name
-     * @param attributes The event attributes map (timing attributes already applied)
+     * @param attributes The fully-assembled event attributes (timing attributes already applied)
      */
-    private void processQoeEvents(String action, Map<String, Object> attributes) {
-        if (this instanceof NRVideoTracker) {
-            NRVideoTracker videoTracker = (NRVideoTracker) this;
-
-            if (QOE_AGGREGATE.equals(action)) {
-                // Process QOE_AGGREGATE events for startup time calculation
-                Long timeSinceRequested = (Long) attributes.get("timeSinceRequested");
-                Long timeSinceStarted = (Long) attributes.get("timeSinceStarted");
-                Long timeSinceLastError = (Long) attributes.get("timeSinceLastError");
-                videoTracker.calculateAndAddStartupTime(attributes, timeSinceRequested, timeSinceStarted, timeSinceLastError);
-            }
-            else if (CONTENT_BUFFER_END.equals(action)) {
-                // Process CONTENT_BUFFER_END events for rebuffering time calculation
-                videoTracker.calculateRebufferingTime(attributes);
-            }
-            else if (CONTENT_RENDITION_CHANGE.equals(action)) {
-                videoTracker.processQoeRenditionChange(attributes);
-            }
-            else if (CONTENT_PAUSE.equals(action) || CONTENT_RESUME.equals(action)) {
-                videoTracker.processQoePauseTime(action);
-            }
-        }
+    protected void onQoeEvent(String action, Map<String, Object> attributes) {
+        // no-op in base
     }
 }
