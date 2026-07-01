@@ -314,9 +314,9 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         if (CONTENT_START.equals(action)) {
             qoeAggregator.setStartupAdTime(startupPeriodAdTime == null ? 0L : startupPeriodAdTime);
         }
-        // Phase 1: adBreakActive is inert (false); the bitrate timer is still driven by the
-        // explicit sender call-sites. isPlaying is reserved for a later phase.
-        qoeAggregator.processAction(action, attributes, state.isPlaying, false);
+        boolean adBreakActive = (linkedTracker instanceof NRVideoTracker)
+                && ((NRVideoTracker) linkedTracker).state.isAdBreak;
+        qoeAggregator.processAction(action, attributes, state.isPlaying, adBreakActive);
         // Cache the fully-assembled snapshot for the harvest-time QOE envelope.
         cachedStandardAttributes = new HashMap<>(attributes);
     }

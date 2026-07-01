@@ -15,8 +15,8 @@ import static org.junit.Assert.*;
 /**
  * Unit tests for the QoE attributes added in qoeAggregateVersion 1.1.0:
  *   - avgDownloadRate / minDownloadRate / maxDownloadRate
- *   - totalSwitchUps / totalSwitchDowns / totalTimeSwitchedDown
- *   - totalPauseTime
+ *   - totalSwitchUps / totalSwitchDowns
+ *   - totalPauseTime (banks timeSincePaused; excludes ad-break pauses)
  *   - totalRenditions
  *
  * Strategy:
@@ -111,9 +111,8 @@ public class NRVideoTrackerQoeTest {
     }
 
     /**
-     * Drive a CONTENT_RENDITION_CHANGE carrying a rendition bitrate. The bitrate is what
-     * totalTimeSwitchedDown is anchored on (session-max); requires the tracker to be started
-     * so getAttributes() populates contentRenditionBitrate.
+     * Drive a CONTENT_RENDITION_CHANGE carrying a rendition bitrate; requires the tracker to be
+     * started so getAttributes() populates contentRenditionBitrate. Used to drive switch counts.
      */
     private void renditionChange(String shift, long bitrate) {
         tracker.renditionBitrate = bitrate;
@@ -139,7 +138,6 @@ public class NRVideoTrackerQoeTest {
 
         assertEquals(0L, lng(k, "totalSwitchUps"));
         assertEquals(0L, lng(k, "totalSwitchDowns"));
-        assertEquals(0L, lng(k, "totalTimeSwitchedDown"));
         assertEquals(0L, lng(k, "totalPauseTime"));
         assertEquals(0L, lng(k, "totalRenditions"));
 
@@ -229,74 +227,6 @@ public class NRVideoTrackerQoeTest {
         Map<String, Object> k = kpis();
         assertEquals(0L, lng(k, "totalSwitchUps"));
         assertEquals(0L, lng(k, "totalSwitchDowns"));
-        assertEquals(0L, lng(k, "totalTimeSwitchedDown"));
-    }
-
-    // =========================================================================
-    // totalTimeSwitchedDown
-    // =========================================================================
-
-    @Test
-    public void timeSwitchedDown_banksWhenRecoveringToPeak() {
-        startContent();
-
-        renditionChange("down", 5_000_000L);   // establishes session peak = 5M, no interval
-        renditionChange("down", 3_000_000L);   // below peak -> open interval
-        sleep(SLEEP_MS);
-        renditionChange("up",   5_000_000L);   // back to peak -> close, bank elapsed
-
-        long t = lng(kpis(), "totalTimeSwitchedDown");
-        assertTrue("below-peak time banked (was " + t + ")", t >= MIN_ELAPSED);
-    }
-
-    @Test
-    public void timeSwitchedDown_partialRecoveryStaysBelowPeak() {
-        // The defining session-max behavior: an upswitch that is still below the session
-        // peak must NOT close the interval (unlike the previous-rendition semantic).
-        startContent();
-
-        renditionChange("down", 5_000_000L);   // peak = 5M
-        renditionChange("down", 2_000_000L);   // open interval
-        sleep(SLEEP_MS);
-        renditionChange("up",   3_000_000L);   // 3M < 5M -> still below peak, interval stays OPEN
-
-        long v1 = lng(kpis(), "totalTimeSwitchedDown");
-        sleep(SLEEP_MS);
-        long v2 = lng(kpis(), "totalTimeSwitchedDown");
-        assertTrue("still counting below the session peak (" + v1 + " -> " + v2 + ")", v2 > v1);
-    }
-
-    @Test
-    public void timeSwitchedDown_consecutiveDownsKeepOneInterval() {
-        startContent();
-
-        renditionChange("down", 5_000_000L);   // peak = 5M
-        renditionChange("down", 3_000_000L);   // open interval
-        sleep(SLEEP_MS);
-        renditionChange("down", 2_000_000L);   // still below peak — interval start must NOT reset
-        sleep(SLEEP_MS);
-        renditionChange("up",   5_000_000L);   // recover to peak -> close
-
-        long t = lng(kpis(), "totalTimeSwitchedDown");
-        // One continuous interval spanning both sleeps.
-        assertTrue("continuous interval (was " + t + ")", t >= (2 * MIN_ELAPSED));
-    }
-
-    @Test
-    public void timeSwitchedDown_openIntervalSnapshotIsNonMutating() {
-        startContent();
-
-        renditionChange("down", 5_000_000L);   // peak = 5M
-        renditionChange("down", 3_000_000L);   // open, never recovered
-        sleep(SLEEP_MS);
-
-        long first = lng(kpis(), "totalTimeSwitchedDown");
-        assertTrue("open interval reflected at emit (was " + first + ")", first >= MIN_ELAPSED);
-
-        sleep(SLEEP_MS);
-        long second = lng(kpis(), "totalTimeSwitchedDown");
-        // Non-mutating snapshot: the interval is still open, so it keeps growing.
-        assertTrue("snapshot keeps growing (" + first + " -> " + second + ")", second > first);
     }
 
     // =========================================================================
@@ -387,11 +317,10 @@ public class NRVideoTrackerQoeTest {
         tracker.sendPause(); sleep(SLEEP_MS); tracker.sendResume();
         sleep(SLEEP_MS);
 
-        // Sanity: state accumulated (incl. an OPEN switched-down interval).
+        // Sanity: state accumulated.
         Map<String, Object> before = kpis();
         assertEquals(1L, lng(before, "totalSwitchUps"));
         assertEquals(1L, lng(before, "totalSwitchDowns"));
-        assertTrue(lng(before, "totalTimeSwitchedDown") > 0);
         assertTrue(lng(before, "totalPauseTime") > 0);
         assertTrue(lng(before, "totalRenditions") >= 1);
         assertTrue(before.containsKey("avgDownloadRate"));
@@ -410,7 +339,6 @@ public class NRVideoTrackerQoeTest {
         Map<String, Object> after = kpis();
         assertEquals(0L, lng(after, "totalSwitchUps"));
         assertEquals(0L, lng(after, "totalSwitchDowns"));
-        assertEquals(0L, lng(after, "totalTimeSwitchedDown"));
         assertEquals(0L, lng(after, "totalPauseTime"));
         assertEquals(0L, lng(after, "totalRenditions"));
         assertFalse("download rate cleared", after.containsKey("avgDownloadRate"));

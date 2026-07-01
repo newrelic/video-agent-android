@@ -208,16 +208,37 @@ public class NRQoEAggregatorTest {
         assertTrue((Boolean) k.get("hadPlaybackError"));
     }
 
-    // ---- pause time (time-based, tolerance) --------------------------------
+    // ---- pause time (banks the event's timeSincePaused) ---------
 
     @Test
-    public void pauseTime_banksOnResume() {
+    public void pauseTime_banksTimeSincePaused() {
         request();
         feed(CONTENT_START, attrs("timeSinceRequested", 0L));
         feed(CONTENT_PAUSE, attrs());
-        sleep(SLEEP_MS);
-        feed(CONTENT_RESUME, attrs());
-        assertTrue(lng(kpis(), "totalPauseTime") >= MIN_ELAPSED);
+        feed(CONTENT_RESUME, attrs("timeSincePaused", 5000L));
+        // Banked from the event attribute (deterministic), not a wall-clock delta.
+        assertEquals(5000L, lng(kpis(), "totalPauseTime"));
+    }
+
+    @Test
+    public void pauseTime_accumulatesAcrossPauses() {
+        request();
+        feed(CONTENT_START, attrs("timeSinceRequested", 0L));
+        feed(CONTENT_PAUSE, attrs());
+        feed(CONTENT_RESUME, attrs("timeSincePaused", 5000L));
+        feed(CONTENT_PAUSE, attrs());
+        feed(CONTENT_RESUME, attrs("timeSincePaused", 3000L));
+        assertEquals(8000L, lng(kpis(), "totalPauseTime"));
+    }
+
+    @Test
+    public void pauseTime_excludedDuringAdBreak() {
+        request();
+        feed(CONTENT_START, attrs("timeSinceRequested", 0L));
+        // adBreakActive = true -> the pause is the player pausing for an ad, not a user pause.
+        agg.processAction(CONTENT_PAUSE, attrs(), true, true);
+        agg.processAction(CONTENT_RESUME, attrs("timeSincePaused", 5000L), true, false);
+        assertEquals(0L, lng(kpis(), "totalPauseTime"));
     }
 
     @Test

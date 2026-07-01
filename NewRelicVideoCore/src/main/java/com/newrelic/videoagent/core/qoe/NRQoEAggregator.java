@@ -137,9 +137,9 @@ public final class NRQoEAggregator {
         } else if (CONTENT_RENDITION_CHANGE.equals(action)) {
             handleRenditionChange(attributes);
         } else if (CONTENT_PAUSE.equals(action)) {
-            handlePause();
+            handlePause(adBreakActive);
         } else if (CONTENT_RESUME.equals(action)) {
-            handleResume();
+            handleResume(attributes);
         }
     }
 
@@ -216,8 +216,6 @@ public final class NRQoEAggregator {
 
         kpiAttributes.put("totalSwitchUps", qoeTotalSwitchUps);
         kpiAttributes.put("totalSwitchDowns", qoeTotalSwitchDowns);
-        long openMs = (qoeSwitchedDownSinceMs == null) ? 0L : System.currentTimeMillis() - qoeSwitchedDownSinceMs;
-        kpiAttributes.put("totalTimeSwitchedDown", safeAdd(qoeTotalTimeSwitchedDown, openMs));
 
         long openPauseMs = (qoePauseStartMs == null) ? 0L : System.currentTimeMillis() - qoePauseStartMs;
         kpiAttributes.put("totalPauseTime", safeAdd(qoeTotalPauseTime, openPauseMs));
@@ -363,15 +361,22 @@ public final class NRQoEAggregator {
         }
     }
 
-    private void handlePause() {
+    private void handlePause(boolean adBreakActive) {
+        if (adBreakActive) {
+            return;
+        }
         qoePauseStartMs = System.currentTimeMillis();
     }
 
-    private void handleResume() {
-        if (qoePauseStartMs != null) {
-            qoeTotalPauseTime = safeAdd(qoeTotalPauseTime, System.currentTimeMillis() - qoePauseStartMs);
-            qoePauseStartMs = null;
+    private void handleResume(Map<String, Object> attributes) {
+        if (qoePauseStartMs == null) {
+            return;
         }
+        Object timeSincePaused = attributes.get("timeSincePaused");
+        if (timeSincePaused instanceof Long) {
+            qoeTotalPauseTime = safeAdd(qoeTotalPauseTime, (Long) timeSincePaused);
+        }
+        qoePauseStartMs = null;
     }
 
     // =========================================================================
