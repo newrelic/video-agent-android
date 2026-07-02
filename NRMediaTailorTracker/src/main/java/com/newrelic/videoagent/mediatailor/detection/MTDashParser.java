@@ -15,6 +15,7 @@ import com.newrelic.videoagent.mediatailor.model.MTAdBreak;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Turns a Media3 {@link DashManifest} into a list of {@link MTAdBreak}s.
@@ -32,6 +33,21 @@ import java.util.List;
 public final class MTDashParser {
 
     private MTDashParser() {}
+
+    /**
+     * Cumulative count of DASH periods where some representations resolved to
+     * ad-segment URLs and others didn't. Such periods are classified as
+     * content because a single ad-flagged representation is not sufficient
+     * evidence — a low-bitrate audio rendition happening to sit on a CDN path
+     * that contains {@code /tm/} would otherwise misclassify a full content
+     * period as an ad. Non-zero values point at manifests where detection is
+     * ambiguous and worth investigating.
+     */
+    private static final AtomicInteger mixedPeriodCount = new AtomicInteger(0);
+
+    public static int mixedPeriodCount() {
+        return mixedPeriodCount.get();
+    }
 
     public static List<MTAdBreak> parse(DashManifest manifest) {
         List<MTAdBreak> breaks = new ArrayList<>();
@@ -88,18 +104,43 @@ public final class MTDashParser {
         }
     }
 
+    /**
+     * A DASH period is an ad only when <em>every</em> representation in the
+     * period resolves to an ad-segment URL. Requiring unanimous agreement
+     * avoids false positives when a subset of representations happens to
+     * live on a CDN path pattern that overlaps with MediaTailor's — most
+     * commonly a low-bitrate audio rendition on a shared CDN — where a
+     * single-hit heuristic would classify the whole period as an ad and
+     * block content telemetry from progressing through it.
+     */
     private static boolean isMediaTailorAdPeriod(Period period) {
         if (period == null || period.adaptationSets == null) return false;
+        int totalReps = 0;
+        int adReps = 0;
         for (AdaptationSet set : period.adaptationSets) {
             if (set == null || set.representations == null) continue;
             for (Representation rep : set.representations) {
                 if (rep == null || rep.baseUrls == null) continue;
-                for (BaseUrl b : rep.baseUrls) {
-                    if (b == null || b.url == null) continue;
-                    if (b.url.contains(MTConstants.MT_SEGMENT_PATTERN)) return true;
-                    if (b.url.contains(MTConstants.MT_DASHSEGMENT_PATH_PATTERN)) return true;
-                }
+                totalReps++;
+                if (isAdRepresentation(rep)) adReps++;
             }
+        }
+        if (totalReps == 0) return false;
+        if (adReps == totalReps) return true;
+        if (adReps > 0) {
+            // Some but not all representations point at ad segments — treat
+            // as content (safer than a false-positive ad break) and record
+            // the ambiguity for diagnostics.
+            mixedPeriodCount.incrementAndGet();
+        }
+        return false;
+    }
+
+    private static boolean isAdRepresentation(Representation rep) {
+        for (BaseUrl b : rep.baseUrls) {
+            if (b == null || b.url == null) continue;
+            if (b.url.contains(MTConstants.MT_SEGMENT_PATTERN)) return true;
+            if (b.url.contains(MTConstants.MT_DASHSEGMENT_PATH_PATTERN)) return true;
         }
         return false;
     }
