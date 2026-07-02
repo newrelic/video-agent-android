@@ -106,18 +106,42 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
 
     private int nonLinearAvailsCount = 0;
 
+    /**
+     * How often the playhead-poll loop ticks. 250 ms is a reasonable default
+     * for the common 15-30 s ad and fires quartile events with sub-second
+     * precision. Battery-constrained devices playing long-duration content
+     * where only break-entry / break-exit granularity matters can raise this
+     * to reduce main-thread wake-ups.
+     */
+    private final long pollIntervalMs;
+
     public NRTrackerMediaTailor(NRVideoConfiguration configuration) {
         super(configuration);
+        this.pollIntervalMs = MTConstants.PLAYHEAD_POLL_INTERVAL_MS;
     }
 
     @Deprecated
     public NRTrackerMediaTailor() {
         super();
+        this.pollIntervalMs = MTConstants.PLAYHEAD_POLL_INTERVAL_MS;
     }
 
     public NRTrackerMediaTailor(NRVideoConfiguration configuration, ExoPlayer player) {
         super(configuration);
+        this.pollIntervalMs = MTConstants.PLAYHEAD_POLL_INTERVAL_MS;
         setPlayer(player);
+    }
+
+    /**
+     * Constructs the tracker with a custom playhead-poll interval. Values
+     * less than or equal to zero fall back to the default — a zero interval
+     * would busy-loop the main looper.
+     */
+    public NRTrackerMediaTailor(NRVideoConfiguration configuration, long playheadPollIntervalMs) {
+        super(configuration);
+        this.pollIntervalMs = playheadPollIntervalMs > 0
+                ? playheadPollIntervalMs
+                : MTConstants.PLAYHEAD_POLL_INTERVAL_MS;
     }
 
     @Override
@@ -547,12 +571,12 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
                     tick();
                 } finally {
                     if (!isDisposed.get() && pollHandler != null) {
-                        pollHandler.postDelayed(this, MTConstants.PLAYHEAD_POLL_INTERVAL_MS);
+                        pollHandler.postDelayed(this, pollIntervalMs);
                     }
                 }
             }
         };
-        pollHandler.postDelayed(pollRunnable, MTConstants.PLAYHEAD_POLL_INTERVAL_MS);
+        pollHandler.postDelayed(pollRunnable, pollIntervalMs);
     }
 
     private void stopPolling() {
