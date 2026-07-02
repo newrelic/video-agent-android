@@ -134,6 +134,11 @@ public final class MTAdScheduleMerger {
         if (avail.availId != null) target.id = avail.availId;
         target.confirmedByTracking = true;
         target.availProgramDateTime = avail.availProgramDateTime;
+        // An empty ads array is MediaTailor's signal that the ad decision
+        // server had nothing to serve for this slot — content will play
+        // through the avail. Mark it now so the state machine knows to fire
+        // AD_ERROR(NO_FILL) instead of pretending an ad ran.
+        target.isNoFill = avail.ads.isEmpty();
         if (avail.durationMs > 0) {
             target.durationMs = avail.durationMs;
             target.endTimeMs = target.startTimeMs + avail.durationMs;
@@ -185,6 +190,11 @@ public final class MTAdScheduleMerger {
         MTAdBreak b = new MTAdBreak(id, startMs, durationMs);
         b.confirmedByTracking = true;
         b.availProgramDateTime = avail.availProgramDateTime;
+        // An avail with no ads is a no-fill on the tracking side. The break
+        // still needs to exist so downstream can fire AD_BREAK_START and the
+        // AD_ERROR(NO_FILL), but its "no ad rendered" nature must survive
+        // into the schedule.
+        b.isNoFill = avail.ads.isEmpty();
         if (!avail.ads.isEmpty()) {
             MTTrackingResponse.Ad first = avail.ads.get(0);
             b.title = first.adTitle;

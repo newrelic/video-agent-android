@@ -41,9 +41,20 @@ public class MTAdBreak {
     public String adPosition;
     public boolean confirmedByTracking;
 
+    /**
+     * The tracking response returned this avail with an empty {@code ads}
+     * array. MediaTailor treats that as a normal no-fill scenario — content
+     * plays through the slot — but the tracker must not fire AD_START or
+     * quartile events, otherwise the break appears as a rendered ad with
+     * zero impressions in reporting. Instead the tracker emits AD_BREAK_START
+     * followed by AD_ERROR(NO_FILL) followed by AD_BREAK_END.
+     */
+    public boolean isNoFill;
+
     public boolean hasFiredStart;
     public boolean hasFiredEnd;
     public boolean hasFiredAdStart;
+    public boolean hasFiredNoFillError;
     public boolean hasFiredQ1;
     public boolean hasFiredQ2;
     public boolean hasFiredQ3;

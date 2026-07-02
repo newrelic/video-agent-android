@@ -18,10 +18,12 @@ import androidx.media3.exoplayer.dash.manifest.DashManifest;
 import androidx.media3.exoplayer.hls.HlsManifest;
 import androidx.media3.extractor.metadata.emsg.EventMessage;
 
+import com.newrelic.videoagent.core.NRDef;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.mediatailor.BuildConfig;
+import com.newrelic.videoagent.mediatailor.MTAdErrorCode;
 import com.newrelic.videoagent.mediatailor.MTConstants;
 import com.newrelic.videoagent.mediatailor.detection.MTDashParser;
 import com.newrelic.videoagent.mediatailor.detection.MTDetector;
@@ -34,7 +36,9 @@ import com.newrelic.videoagent.mediatailor.schedule.MTAdScheduleMerger;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -555,6 +559,20 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
             active.hasFiredStart = true;
         }
 
+        // A no-fill avail is a break with no ad to render — content plays
+        // through. Firing AD_START / AD_QUARTILE here would create phantom
+        // impressions for an ad that never existed, so emit AD_ERROR(NO_FILL)
+        // once and skip the pod/no-pods paths entirely. The AD_BREAK_END is
+        // still fired by handleExitingBreak when the playhead leaves.
+        if (active.isNoFill) {
+            if (!active.hasFiredNoFillError) {
+                NRLog.d("MT AD_ERROR NO_FILL at " + active.startTimeMs + "ms");
+                sendAdErrorEvent(MTAdErrorCode.NO_FILL, null);
+                active.hasFiredNoFillError = true;
+            }
+            return;
+        }
+
         if (!active.pods.isEmpty()) {
             MTAdPod pod = active.findActivePod(position);
             if (pod != null && pod != currentAdPod) {
@@ -581,6 +599,20 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         if (active.pods.isEmpty()) {
             trackQuartiles(active, position - active.startTimeMs);
         }
+    }
+
+    /**
+     * Emits an {@code AD_ERROR} event carrying a semantic string {@code
+     * errorCode}. The base class's {@code sendError(int, String)} path stores
+     * the code as an int, which would force downstream to memorise a numeric
+     * mapping; going through {@code sendVideoErrorEvent} directly keeps the
+     * attribute readable in NRDB.
+     */
+    private void sendAdErrorEvent(MTAdErrorCode code, String message) {
+        Map<String, Object> attr = new HashMap<>();
+        attr.put("errorCode", code.name());
+        attr.put("errorMessage", message != null ? message : code.defaultMessage());
+        super.sendVideoErrorEvent(NRDef.AD_ERROR, attr);
     }
 
     private void handleExitingBreak() {
