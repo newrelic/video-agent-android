@@ -53,7 +53,7 @@ public final class NRVideoConfiguration {
     private final List<ObfuscationRule> obfuscationRules;
 
     // Runtime configuration fields (mutable, thread-safe) - Using AtomicBoolean for better performance
-    private final AtomicBoolean qoeAggregateEnabled = new AtomicBoolean(false);
+    private final AtomicBoolean qoeAggregateEnabled = new AtomicBoolean(true);
     private final AtomicBoolean runtimeConfigInitialized = new AtomicBoolean(false);
 
 
@@ -246,8 +246,8 @@ public final class NRVideoConfiguration {
         private boolean debugLoggingEnabled = false;
         private boolean isTV = false;
         private String collectorAddress = null;
-        private boolean qoeAggregateEnabled = false; // Default disabled
-        private int qoeAggregateIntervalMultiplier = 1; // Default 1 (send every harvest cycle)
+        private boolean qoeAggregateEnabled = true; // Default enabled
+        private int qoeAggregateIntervalMultiplier = 2; // Default 2 (send every other harvest cycle)
         // React analogy: this starts as an empty array [] — no rules by default.
         private List<ObfuscationRule> obfuscationRules = new ArrayList<>();
 

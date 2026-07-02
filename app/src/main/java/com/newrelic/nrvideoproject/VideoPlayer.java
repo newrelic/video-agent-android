@@ -7,6 +7,7 @@ import androidx.media3.ui.PlayerView;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
+import com.newrelic.videoagent.core.NRAdConfig;
 import com.newrelic.videoagent.core.NRVideo;
 import com.newrelic.videoagent.core.NRVideoPlayerConfiguration;
 import com.newrelic.videoagent.core.NewRelicVideoAgent;
@@ -66,7 +67,7 @@ public class VideoPlayer extends AppCompatActivity {
         customAttr.put("myAttrStr", "Hello");
         customAttr.put("myAttrInt", 101);
         customAttr.put("name", "nr-video-agent-android-01-24JUL-john-starc");
-        NRVideoPlayerConfiguration playerConfiguration = new NRVideoPlayerConfiguration("test-player", player, false, customAttr);
+        NRVideoPlayerConfiguration playerConfiguration = new NRVideoPlayerConfiguration("test-player", player, (NRAdConfig) null, customAttr);
         trackerId = NRVideo.addPlayer(playerConfiguration);
         // Get the content tracker and configure aggregation
         NRTracker tracker = NewRelicVideoAgent.getInstance().getContentTracker(trackerId);

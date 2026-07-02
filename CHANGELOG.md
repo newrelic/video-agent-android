@@ -1,3 +1,15 @@
+## [4.3.0](https://github.com/newrelic/video-agent-android/compare/v4.2.0...v4.3.0) (2026-06-10)
+
+### Features
+
+* Add new QOE attributes ([6442505](https://github.com/newrelic/video-agent-android/commit/64425052089b337989e27f2a8c0acdc2df444f48))
+* enable QoE by default with interval multiplier 2 ([8d71a24](https://github.com/newrelic/video-agent-android/commit/8d71a245b0670e46e1f054ab31726437a5e907b8))
+* introduce NRAdConfig — unified ad configuration and custom CDN support ([dd5c528](https://github.com/newrelic/video-agent-android/commit/dd5c528f2f99def88f26fdb8d37948db5b7a9624)), closes [#106](https://github.com/newrelic/video-agent-android/issues/106) [#108](https://github.com/newrelic/video-agent-android/issues/108)
+
+### Bug Fixes
+
+* fire BUFFER_END and PAUSE correctly when user pauses during rebuffer ([e3cd1b3](https://github.com/newrelic/video-agent-android/commit/e3cd1b3ae3418b09060559f4ec90c186d59df168))
+* Issue fixed related to switch ups and downs ([0b6e8a8](https://github.com/newrelic/video-agent-android/commit/0b6e8a853b7f8c700aa8e3c4e73ef4875635fbc0))
 ## [4.2.0](https://github.com/newrelic/video-agent-android/compare/v4.1.1...v4.2.0) (2026-05-21)
 
 ### Features
@@ -11,13 +23,35 @@
 
 ### Features
 
-* **NRMediaTailorTracker** — new optional AAR module for AWS Elemental MediaTailor SSAI.
+* **NRAdConfig** — unified ad configuration object, the single place for all ad options per player session.
+  * `NRAdConfig.csai()` — Google IMA / any CSAI framework.
+  * `NRAdConfig.mediaTailor()` — AWS MediaTailor SSAI with default AWS domain detection.
+  * `NRAdConfig.mediaTailor(segmentPrefix)` — custom CDN with a non-`/tm/` ad-segment path.
+  * `NRAdConfig.mediaTailor(segmentPrefix, trackingUrl)` — custom CDN + explicit tracking URL (POST session-init flow).
+  * Pass `null` as the `adConfig` argument to `NRVideoPlayerConfiguration` to disable ad tracking.
+
+* **Backward compatibility** — existing integrations built against v4.2.0 compile without changes:
+  * `new NRVideoPlayerConfiguration(name, player, true, attrs)` → `NRAdConfig.csai()`
+  * `new NRVideoPlayerConfiguration(name, player, false, attrs)` → no ad tracking
+  * `AdTrackerType.IMA` → `NRAdConfig.csai()`
+  * `AdTrackerType.MEDIA_TAILOR` → `NRAdConfig.mediaTailor()`
+  * `AdTrackerType.NONE` → no ad tracking
+  * `isAdEnabled()` and `getAdTrackerType()` kept as deprecated methods.
+  All deprecated; migrate to `NRAdConfig` factory methods at your own pace.
+
+* **Custom CDN support for MediaTailor** — ad segments served from customer-owned CDN domains are now detected automatically:
+  * `/tm/` (AWS-recommended CDN prefix) is checked for all customers without any configuration.
+  * `segmentPrefix` in `NRAdConfig` overrides this for CDN paths that differ from `/tm/`.
+  * When `NRAdConfig.mediaTailor()` is passed, the tracker activates unconditionally — no `mediatailor` substring required in the manifest URL, enabling fully custom CDN manifest domains.
+
+* **NRMediaTailorTracker** — AWS Elemental MediaTailor SSAI tracker module.
   * Supports **DASH** (multi-period BaseURL detection + single-period SCTE‑35 EventStream) and **HLS** (segment URL + discontinuity-driven pod splitting).
   * Implicit and explicit session-init flows (POST `/v1/session/…`); recovers `sessionId` from DASH `<Location>` when the client-side URI doesn't carry it.
   * VOD and Live — tracking API polled once for VOD, on every manifest refresh for Live.
   * Rich VAST metadata on `VideoAdAction` events emitted by `NRTrackerMediaTailor` (identified by `trackerName = "NRMTracker"`): `adSystem`, `vastAdId`, `creativeSequence`, `skipOffset`, `adProgramDateTime`, `availProgramDateTime`, `isBumper`, `nonLinearAvailsCount`. These attributes are **not** populated by `NRTrackerIMA`.
+  * Structured log tags — `[MT][CONFIG]`, `[MT][DETECT]`, `[MT][HLS]`, `[MT][DASH]`, `[MT][TRACK]`, `[MT][EVENT]` — for targeted filtering in Logcat.
   * `notifyAdSkipped()` API for skippable-ad UX integrations.
-* **NRVideoPlayerConfiguration.AdTrackerType** — `NONE` / `IMA` / `MEDIA_TAILOR` replaces the boolean `isAdEnabled` (legacy ctor preserved). `NRVideo.addPlayer` switches the ad-tracker slot accordingly.
+
 * **NRTrackerExoPlayer** — new `isLinkedAdBreakActive()` gate suppresses stray `CONTENT_PAUSE` / `CONTENT_RESUME` / `CONTENT_BUFFER_*` / `CONTENT_START` / `CONTENT_RENDITION_CHANGE` / `CONTENT_SEEK_START` events during SSAI ad breaks, and routes error callbacks (`onPlayerError`, `onLoadError`) to the ad tracker as `AD_ERROR` when one is active.
 
 ## [4.1.1](https://github.com/newrelic/video-agent-android/compare/v4.1.0...v4.1.1) (2026-04-22)

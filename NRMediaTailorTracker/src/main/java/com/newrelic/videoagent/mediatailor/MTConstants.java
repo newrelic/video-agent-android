@@ -32,11 +32,20 @@ public final class MTConstants {
     private MTConstants() {}
 
     public static final String MT_URL_MARKER = "mediatailor";
-    public static final String MT_SEGMENT_PATTERN = "segments.mediatailor";
-    // Alternative MediaTailor ad-period markers — used when responses are served
-    // through MediaTailor's own/CDN rewrite host (see user guide p.183 for DASH).
+
+    // ── Ad-segment detection markers ───────────────────────────────────────
+    // Checked in this order for every segment URL / DASH base URL:
+    //   1. MT_SEGMENT_PATTERN       — default AWS ad-segment hostname
+    //   2. MT_HLSSEGMENT_PATH_PATTERN / MT_DASHSEGMENT_PATH_PATTERN
+    //                               — MediaTailor CDN rewrite paths
+    //   3. MT_DEFAULT_AD_SEGMENT_PATH — AWS-recommended custom CDN prefix,
+    //                                   always checked for all customers
+    //   4. customer segmentPrefix   — override for non-/tm/ CDN paths (optional)
+    public static final String MT_SEGMENT_PATTERN          = "segments.mediatailor";
     public static final String MT_DASHSEGMENT_PATH_PATTERN = "/v1/dashsegment/";
-    public static final String MT_HLSSEGMENT_PATH_PATTERN = "/v1/hlssegment/";
+    public static final String MT_HLSSEGMENT_PATH_PATTERN  = "/v1/hlssegment/";
+    /** AWS-recommended CDN ad-segment path prefix (parity with VideoJS PR #106). */
+    public static final String MT_DEFAULT_AD_SEGMENT_PATH  = "/tm/";
 
     public static final String SCTE35_SCHEME_MARKER = "scte35";
 
@@ -64,4 +73,15 @@ public final class MTConstants {
     public static final double QUARTILE_Q1 = 0.25;
     public static final double QUARTILE_Q2 = 0.50;
     public static final double QUARTILE_Q3 = 0.75;
+
+    // ── Log tag prefixes ───────────────────────────────────────────────────
+    // All MediaTailor log lines start with [MT] followed by a subsystem tag.
+    // Grep for "[MT]" to see everything, or narrow with e.g. "[MT][DETECT]".
+    public static final String LOG_TAG         = "[MT]";
+    public static final String LOG_CONFIG      = "[MT][CONFIG]";
+    public static final String LOG_DETECT      = "[MT][DETECT]";
+    public static final String LOG_PARSE_HLS   = "[MT][HLS]";
+    public static final String LOG_PARSE_DASH  = "[MT][DASH]";
+    public static final String LOG_TRACK       = "[MT][TRACK]";
+    public static final String LOG_EVENT       = "[MT][EVENT]";
 }

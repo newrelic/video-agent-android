@@ -469,4 +469,109 @@ public class NRTrackerStateTest {
         assertFalse(state.isStarted);
         assertFalse(state.isPlaying);
     }
+
+    // --- Bug fix tests: pause state preserved across buffer/seek end ---
+
+    @Test
+    public void testGoBufferEndWhilePausedKeepsIsPlayingFalse() {
+        // Scenario: user pauses before network stalls, buffer fills while paused.
+        // goBufferEnd() must not flip isPlaying to true.
+        state.goRequest();
+        state.goStart();
+        state.goPause();        // user pauses
+        state.goBufferStart();  // network stalls
+
+        assertTrue(state.goBufferEnd());
+        assertFalse(state.isBuffering);
+        assertTrue(state.isPaused);
+        assertFalse(state.isPlaying);  // must stay false — player is still paused
+    }
+
+    @Test
+    public void testGoBufferEndWhileNotPausedSetsIsPlayingTrue() {
+        // Regression guard: normal rebuffer (no pause) must still resume playing.
+        state.goRequest();
+        state.goStart();
+        state.goBufferStart();
+
+        assertTrue(state.goBufferEnd());
+        assertFalse(state.isBuffering);
+        assertFalse(state.isPaused);
+        assertTrue(state.isPlaying);  // must be true — normal playback resumes
+    }
+
+    @Test
+    public void testGoSeekEndWhilePausedKeepsIsPlayingFalse() {
+        // Scenario: user pauses, then seeks to an unbuffered position.
+        // goSeekEnd() must not flip isPlaying to true.
+        state.goRequest();
+        state.goStart();
+        state.goPause();       // user pauses
+        state.goSeekStart();   // user drags progress bar
+
+        assertTrue(state.goSeekEnd());
+        assertFalse(state.isSeeking);
+        assertTrue(state.isPaused);
+        assertFalse(state.isPlaying);  // must stay false — player is still paused
+    }
+
+    @Test
+    public void testGoSeekEndWhileNotPausedSetsIsPlayingTrue() {
+        // Regression guard: normal seek (no pause) must still resume playing.
+        state.goRequest();
+        state.goStart();
+        state.goSeekStart();
+
+        assertTrue(state.goSeekEnd());
+        assertFalse(state.isSeeking);
+        assertFalse(state.isPaused);
+        assertTrue(state.isPlaying);  // must be true — normal playback resumes
+    }
+
+    @Test
+    public void testFullRebufferWhilePausedFlow() {
+        // Full scenario: stall → pause during buffer → buffer fills → resume.
+        // isPaused must survive buffer start/end and clear on resume.
+        state.goRequest();
+        state.goStart();
+        state.goBufferStart();  // network stalls while playing
+        state.goPause();        // user pauses during buffer
+
+        assertTrue(state.isPaused);
+        assertFalse(state.isPlaying);
+
+        state.goBufferEnd();    // buffer fills while still paused
+
+        assertTrue(state.isPaused);
+        assertFalse(state.isPlaying);
+        assertFalse(state.isBuffering);
+
+        state.goResume();       // user taps play
+
+        assertFalse(state.isPaused);
+        assertTrue(state.isPlaying);
+    }
+
+    @Test
+    public void testFullSeekWhilePausedFlow() {
+        // Full scenario: pause → seek → seek ends → resume.
+        state.goRequest();
+        state.goStart();
+        state.goPause();
+        state.goSeekStart();
+
+        assertTrue(state.isPaused);
+        assertFalse(state.isPlaying);
+
+        state.goSeekEnd();      // seek finishes while paused
+
+        assertTrue(state.isPaused);
+        assertFalse(state.isPlaying);
+        assertFalse(state.isSeeking);
+
+        state.goResume();
+
+        assertFalse(state.isPaused);
+        assertTrue(state.isPlaying);
+    }
 }

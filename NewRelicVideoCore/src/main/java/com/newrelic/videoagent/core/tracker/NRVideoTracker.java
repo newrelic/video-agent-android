@@ -15,6 +15,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+import java.util.Collections;
+import java.util.concurrent.ConcurrentHashMap;
+
 
 import static com.newrelic.videoagent.core.NRDef.*;
 import com.newrelic.videoagent.core.exception.ErrorExceptionHandler;
@@ -59,6 +63,27 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
     private Long startupPeriodPauseTime; // Pause time that occurred during startup period
     private boolean hasContentStarted; // Tracks whether content has successfully started (for buffer classification)
     private boolean initialBufferingHappened; // Tracks if initial buffering completed
+
+    // QoE network download-rate tracking (samples of contentNetworkDownloadBitrate)
+    private Long qoeDownloadRateSum;
+    private Long qoeDownloadRateCount;
+    private Long qoeMinDownloadRate;
+    private Long qoeMaxDownloadRate;
+
+    // QOE switch ups and downs
+    private long qoeTotalSwitchUps;
+    private long qoeTotalSwitchDowns;
+    private long qoeTotalTimeSwitchedDown;
+    private long qoeMaxRenditionBitrate;  // highest rendition bitrate seen this view
+    private Long qoeSwitchedDownSinceMs;
+
+    // QOE total pause time
+    private long qoeTotalPauseTime;
+    private Long qoePauseStartMs; // start of open pause; null = not paused
+
+    // QOE distinct renditions (keyed by width*height)
+    private final Set<Long> qoePlayedRenditions =
+            Collections.newSetFromMap(new ConcurrentHashMap<Long, Boolean>());
 
     // Time-weighted bitrate calculation fields
     private Long qoeCurrentBitrate;
@@ -167,6 +192,20 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         qoeTotalBitrateWeightedTime = 0L;
         qoeTotalActiveTime = 0L;
         qoeBitrateTimerPaused = false;
+
+        qoeDownloadRateSum = 0L;
+        qoeDownloadRateCount = 0L;
+        qoeMinDownloadRate = null;
+        qoeMaxDownloadRate = null;
+
+        qoeTotalSwitchUps = 0L;
+        qoeTotalSwitchDowns = 0L;
+        qoeTotalTimeSwitchedDown = 0L;
+        qoeMaxRenditionBitrate = 0L;
+        qoeSwitchedDownSinceMs = null;
+
+        qoeTotalPauseTime = 0L;
+        qoePauseStartMs = null;
     }
 
     /**
@@ -327,6 +366,8 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         // QoE: Track bitrate after all attributes are processed (including contentBitrate)
         if (!state.isAd && !QOE_AGGREGATE.equals(action)) {
             trackBitrateFromProcessedAttributes(action, attr);
+            trackDownloadRateMetrics(attr);
+            trackPlayedRenditions(attr);
         }
 
         // Cache attributes for non-QOE events (for thread-safe QOE generation)
@@ -890,7 +931,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         }
 
         // qoeAggregateVersion - Version identifier for QOE calculation algorithm
-        kpiAttributes.put("qoeAggregateVersion", "1.0.0");
+        kpiAttributes.put("qoeAggregateVersion", "1.1.0");
 
         // startupTime - Cached value calculated at CONTENT_START
         if (qoeStartupTime != null && qoeStartupTime >= 0) {
@@ -904,6 +945,30 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
             qoeHadStartupError = false;
         }
         kpiAttributes.put("hadStartupError", qoeHadStartupError);
+
+        // Download-rate KPIs (from contentNetworkDownloadBitrate samples)
+        if (qoeDownloadRateCount != null && qoeDownloadRateCount > 0) {
+            long avgDownloadRate = Math.round((double) qoeDownloadRateSum / qoeDownloadRateCount);
+            kpiAttributes.put("avgDownloadRate", avgDownloadRate);
+        }
+        if (qoeMinDownloadRate != null) {
+            kpiAttributes.put("minDownloadRate", qoeMinDownloadRate);
+        }
+        if (qoeMaxDownloadRate != null) {
+            kpiAttributes.put("maxDownloadRate", qoeMaxDownloadRate);
+        }
+
+        // rendition switch ups and downs
+        kpiAttributes.put("totalSwitchUps", qoeTotalSwitchUps);
+        kpiAttributes.put("totalSwitchDowns", qoeTotalSwitchDowns);
+        long openMs = (qoeSwitchedDownSinceMs == null) ? 0L : System.currentTimeMillis() - qoeSwitchedDownSinceMs;
+        kpiAttributes.put("totalTimeSwitchedDown", safeAdd(qoeTotalTimeSwitchedDown, openMs));
+
+        // totalPauseTime — bank + currently-open pause, without closing it
+        long openPauseMs = (qoePauseStartMs == null) ? 0L : System.currentTimeMillis() - qoePauseStartMs;
+        kpiAttributes.put("totalPauseTime", safeAdd(qoeTotalPauseTime, openPauseMs));
+
+        kpiAttributes.put("totalRenditions", (long) qoePlayedRenditions.size());
 
         return kpiAttributes;
     }
@@ -933,6 +998,50 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         // Set initialBufferingHappened flag after processing this buffer event
         if (!initialBufferingHappened) {
             initialBufferingHappened = true;
+        }
+    }
+
+    // Update rendition-switch QoE metrics from a CONTENT_RENDITION_CHANGE event.
+    void processQoeRenditionChange(Map<String, Object> attributes) {
+        if (state.isAd) return;
+
+        // Switch up/down counters — driven by the player-published shift (unchanged).
+        Object shift = attributes.get("shift");
+        if ("up".equals(shift))   qoeTotalSwitchUps++;
+        if ("down".equals(shift)) qoeTotalSwitchDowns++;
+
+        // totalTimeSwitchedDown: cumulative time below the highest rendition bitrate
+        // seen so far in this view.
+        Long bitrate = extractBitrateValue(attributes.get("contentRenditionBitrate"));
+        if (bitrate == null || bitrate <= 0) return;
+        long now = System.currentTimeMillis();
+
+        // Recovered to/above the session peak → close the open below-max interval.
+        if (qoeSwitchedDownSinceMs != null && bitrate >= qoeMaxRenditionBitrate) {
+            qoeTotalTimeSwitchedDown = safeAdd(qoeTotalTimeSwitchedDown, now - qoeSwitchedDownSinceMs);
+            qoeSwitchedDownSinceMs = null;
+        }
+        // New session peak.
+        if (bitrate > qoeMaxRenditionBitrate) {
+            qoeMaxRenditionBitrate = bitrate;
+        }
+        // Dropped below the peak with no interval open → start one.
+        if (bitrate < qoeMaxRenditionBitrate && qoeSwitchedDownSinceMs == null) {
+            qoeSwitchedDownSinceMs = now;
+        }
+    }
+
+    /**
+     * Update total pause time. Opens an interval on CONTENT_PAUSE, banks it on CONTENT_RESUME.
+     * An interval still open at emit is added by the snapshot in calculateQOEKpiAttributes().
+     */
+    void processQoePauseTime(String action) {
+        if (state.isAd) return;
+        if (CONTENT_PAUSE.equals(action)) {
+            qoePauseStartMs = System.currentTimeMillis();
+        } else if (CONTENT_RESUME.equals(action) && qoePauseStartMs != null) {
+            qoeTotalPauseTime = safeAdd(qoeTotalPauseTime, System.currentTimeMillis() - qoePauseStartMs);
+            qoePauseStartMs = null;
         }
     }
 
@@ -1204,6 +1313,22 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         qoeTotalBitrateWeightedTime = 0L;
         qoeTotalActiveTime = 0L;
         qoeBitrateTimerPaused = false;
+
+        qoeDownloadRateSum = 0L;
+        qoeDownloadRateCount = 0L;
+        qoeMinDownloadRate = null;
+        qoeMaxDownloadRate = null;
+
+        qoeTotalSwitchUps = 0L;
+        qoeTotalSwitchDowns = 0L;
+        qoeTotalTimeSwitchedDown = 0L;
+        qoeMaxRenditionBitrate = 0L;
+        qoeSwitchedDownSinceMs = null;
+
+        qoeTotalPauseTime = 0L;
+        qoePauseStartMs = null;
+        
+        qoePlayedRenditions.clear();
 
         // Reset QOE provider fields for new view session
         // NOTE: Don't reset pendingQoeForNextHarvest here - it needs to persist until next harvest
@@ -1743,6 +1868,33 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         qoeLastTrackedBitrate = currentBitrate;
         // Update QoE metrics efficiently
         updateQoeBitrateMetrics(currentBitrate, action);
+    }
+
+     // Sample contentNetworkDownloadBitrate for QoE download-rate KPIs
+    private void trackDownloadRateMetrics(Map<String, Object> processedAttributes) {
+        Long sample = extractBitrateValue(processedAttributes.get("contentNetworkDownloadBitrate"));
+        if (sample == null || sample <= 0) {
+            return;   // getNetworkDownloadBitrate() returns null/<=0 when unavailable
+        }
+
+        // Accumulate for average (overflow-safe, mirrors updateQoeBitrateMetrics)
+        if (qoeDownloadRateCount < Long.MAX_VALUE - 1) {
+            qoeDownloadRateSum = safeAdd(qoeDownloadRateSum, sample);
+            qoeDownloadRateCount++;
+        }
+
+        // Running min / max with null sentinel for first sample
+        qoeMinDownloadRate = (qoeMinDownloadRate == null) ? sample : Math.min(qoeMinDownloadRate, sample);
+        qoeMaxDownloadRate = (qoeMaxDownloadRate == null) ? sample : Math.max(qoeMaxDownloadRate, sample);
+    }
+
+    // Record distinct renditions played, keyed by width*height
+    private void trackPlayedRenditions(Map<String, Object> processedAttributes) {
+        Long w = extractBitrateValue(processedAttributes.get("contentRenditionWidth"));
+        Long h = extractBitrateValue(processedAttributes.get("contentRenditionHeight"));
+        if (w != null && w > 0 && h != null && h > 0) {
+            qoePlayedRenditions.add(w * h);
+        }
     }
 
     /**

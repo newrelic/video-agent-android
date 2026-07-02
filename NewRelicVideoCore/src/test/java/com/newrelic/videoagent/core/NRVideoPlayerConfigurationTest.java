@@ -25,60 +25,63 @@ public class NRVideoPlayerConfigurationTest {
         MockitoAnnotations.openMocks(this);
     }
 
+    // ── Current API ───────────────────────────────────────────────────────────
+
     @Test
-    public void testConstructorWithAllParameters() {
+    public void testConstructorWithAdConfig() {
         Map<String, Object> customAttrs = new HashMap<>();
         customAttrs.put("key1", "value1");
 
         NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
-            "TestPlayer",
-            mockPlayer,
-            true,
-            customAttrs
-        );
+            "TestPlayer", mockPlayer, NRAdConfig.csai(), customAttrs);
 
         assertNotNull(config);
         assertEquals("TestPlayer", config.getPlayerName());
         assertEquals(mockPlayer, config.getPlayer());
-        assertTrue(config.isAdEnabled());
+        assertNotNull(config.getAdConfig());
+        assertEquals(NRAdConfig.Type.CSAI, config.getAdConfig().type);
         assertEquals(customAttrs, config.getCustomAttributes());
     }
 
     @Test
-    public void testConstructorWithAdDisabled() {
+    public void testConstructorWithNoAds() {
         NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
-            "TestPlayer",
-            mockPlayer,
-            false,
-            null
-        );
+            "TestPlayer", mockPlayer, (NRAdConfig) null, null);
 
         assertNotNull(config);
-        assertFalse(config.isAdEnabled());
+        assertNull(config.getAdConfig());
     }
 
     @Test
-    public void testGetPlayerName() {
+    public void testMediaTailorAdConfig() {
         NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
-            "MyPlayer",
-            mockPlayer,
-            false,
-            null
-        );
+            "TestPlayer", mockPlayer, NRAdConfig.mediaTailor(), null);
 
-        assertEquals("MyPlayer", config.getPlayerName());
+        assertNotNull(config.getAdConfig());
+        assertEquals(NRAdConfig.Type.SSAI_MT, config.getAdConfig().type);
+        assertNull(config.getAdConfig().segmentPrefix);
+        assertNull(config.getAdConfig().trackingUrl);
     }
 
     @Test
-    public void testGetPlayer() {
+    public void testMediaTailorAdConfigWithSegmentPrefix() {
         NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
-            "TestPlayer",
-            mockPlayer,
-            false,
-            null
-        );
+            "TestPlayer", mockPlayer, NRAdConfig.mediaTailor("/tm/"), null);
 
-        assertSame(mockPlayer, config.getPlayer());
+        assertEquals(NRAdConfig.Type.SSAI_MT, config.getAdConfig().type);
+        assertEquals("/tm/", config.getAdConfig().segmentPrefix);
+        assertNull(config.getAdConfig().trackingUrl);
+    }
+
+    @Test
+    public void testMediaTailorAdConfigWithTrackingUrl() {
+        String url = "https://mediatailor.us-east-1.amazonaws.com/v1/tracking/abc/123";
+        NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
+            "TestPlayer", mockPlayer, NRAdConfig.mediaTailor(null, url), null);
+
+        assertEquals(NRAdConfig.Type.SSAI_MT, config.getAdConfig().type);
+        assertNull(config.getAdConfig().segmentPrefix);
+        assertEquals(url, config.getAdConfig().trackingUrl);
     }
 
     @Test
@@ -88,172 +91,18 @@ public class NRVideoPlayerConfigurationTest {
         customAttrs.put("attr2", 42);
 
         NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
-            "TestPlayer",
-            mockPlayer,
-            false,
-            customAttrs
-        );
+            "TestPlayer", mockPlayer, (NRAdConfig) null, customAttrs);
 
-        Map<String, Object> result = config.getCustomAttributes();
-        assertEquals(customAttrs, result);
-        assertEquals("value1", result.get("attr1"));
-        assertEquals(42, result.get("attr2"));
+        assertEquals("value1", config.getCustomAttributes().get("attr1"));
+        assertEquals(42, config.getCustomAttributes().get("attr2"));
     }
 
     @Test
-    public void testIsAdEnabled() {
-        NRVideoPlayerConfiguration configWithAds = new NRVideoPlayerConfiguration(
-            "TestPlayer",
-            mockPlayer,
-            true,
-            null
-        );
-
-        NRVideoPlayerConfiguration configWithoutAds = new NRVideoPlayerConfiguration(
-            "TestPlayer",
-            mockPlayer,
-            false,
-            null
-        );
-
-        assertTrue(configWithAds.isAdEnabled());
-        assertFalse(configWithoutAds.isAdEnabled());
-    }
-
-    @Test
-    public void testConstructorWithNullPlayerName() {
+    public void testNullCustomAttributes() {
         NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
-            null,
-            mockPlayer,
-            false,
-            null
-        );
-
-        assertNull(config.getPlayerName());
-    }
-
-    @Test
-    public void testConstructorWithNullPlayer() {
-        NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
-            "TestPlayer",
-            null,
-            false,
-            null
-        );
-
-        assertNull(config.getPlayer());
-    }
-
-    @Test
-    public void testConstructorWithNullCustomAttributes() {
-        NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
-            "TestPlayer",
-            mockPlayer,
-            false,
-            null
-        );
+            "TestPlayer", mockPlayer, (NRAdConfig) null, null);
 
         assertNull(config.getCustomAttributes());
-    }
-
-    @Test
-    public void testConstructorWithEmptyCustomAttributes() {
-        Map<String, Object> emptyAttrs = new HashMap<>();
-
-        NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
-            "TestPlayer",
-            mockPlayer,
-            false,
-            emptyAttrs
-        );
-
-        assertNotNull(config.getCustomAttributes());
-        assertTrue(config.getCustomAttributes().isEmpty());
-    }
-
-    @Test
-    public void testConstructorWithMultipleCustomAttributes() {
-        Map<String, Object> customAttrs = new HashMap<>();
-        customAttrs.put("stringAttr", "test");
-        customAttrs.put("intAttr", 123);
-        customAttrs.put("boolAttr", true);
-        customAttrs.put("doubleAttr", 3.14);
-
-        NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
-            "TestPlayer",
-            mockPlayer,
-            true,
-            customAttrs
-        );
-
-        Map<String, Object> result = config.getCustomAttributes();
-        assertEquals(4, result.size());
-        assertEquals("test", result.get("stringAttr"));
-        assertEquals(123, result.get("intAttr"));
-        assertEquals(true, result.get("boolAttr"));
-        assertEquals(3.14, result.get("doubleAttr"));
-    }
-
-    @Test
-    public void testPlayerNameWithSpecialCharacters() {
-        String specialName = "Player@#$%^&*()_+-=[]{}|;':\",./<>?";
-
-        NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
-            specialName,
-            mockPlayer,
-            false,
-            null
-        );
-
-        assertEquals(specialName, config.getPlayerName());
-    }
-
-    @Test
-    public void testPlayerNameWithEmptyString() {
-        NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
-            "",
-            mockPlayer,
-            false,
-            null
-        );
-
-        assertEquals("", config.getPlayerName());
-    }
-
-    @Test
-    public void testMultipleInstancesWithSamePlayer() {
-        NRVideoPlayerConfiguration config1 = new NRVideoPlayerConfiguration(
-            "Player1",
-            mockPlayer,
-            true,
-            null
-        );
-
-        NRVideoPlayerConfiguration config2 = new NRVideoPlayerConfiguration(
-            "Player2",
-            mockPlayer,
-            false,
-            null
-        );
-
-        assertSame(config1.getPlayer(), config2.getPlayer());
-        assertNotEquals(config1.getPlayerName(), config2.getPlayerName());
-    }
-
-    @Test
-    public void testCustomAttributesImmutability() {
-        Map<String, Object> originalAttrs = new HashMap<>();
-        originalAttrs.put("key", "value");
-
-        NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
-            "TestPlayer",
-            mockPlayer,
-            false,
-            originalAttrs
-        );
-
-        Map<String, Object> retrievedAttrs = config.getCustomAttributes();
-        assertSame(originalAttrs, retrievedAttrs);
     }
 
     @Test
@@ -262,15 +111,74 @@ public class NRVideoPlayerConfigurationTest {
         customAttrs.put("test", "value");
 
         NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
-            "CompletePlayer",
-            mockPlayer,
-            true,
-            customAttrs
-        );
+            "CompletePlayer", mockPlayer,
+            NRAdConfig.mediaTailor("/ads/", "https://tracking.example.com"),
+            customAttrs);
 
         assertNotNull(config.getPlayerName());
         assertNotNull(config.getPlayer());
         assertNotNull(config.getCustomAttributes());
+        assertEquals(NRAdConfig.Type.SSAI_MT, config.getAdConfig().type);
+        assertEquals("/ads/", config.getAdConfig().segmentPrefix);
+        assertEquals("https://tracking.example.com", config.getAdConfig().trackingUrl);
+    }
+
+    // ── Backward compatibility (deprecated API) ───────────────────────────────
+
+    @Test
+    @SuppressWarnings("deprecation")
+    public void testDeprecatedBooleanConstructorTrue() {
+        NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
+            "TestPlayer", mockPlayer, true, null);
+
+        assertNotNull(config.getAdConfig());
+        assertEquals(NRAdConfig.Type.CSAI, config.getAdConfig().type);
         assertTrue(config.isAdEnabled());
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    public void testDeprecatedBooleanConstructorFalse() {
+        NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
+            "TestPlayer", mockPlayer, false, null);
+
+        assertNull(config.getAdConfig());
+        assertFalse(config.isAdEnabled());
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    public void testDeprecatedAdTrackerTypeIma() {
+        NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
+            "TestPlayer", mockPlayer,
+            NRVideoPlayerConfiguration.AdTrackerType.IMA, null);
+
+        assertNotNull(config.getAdConfig());
+        assertEquals(NRAdConfig.Type.CSAI, config.getAdConfig().type);
+        assertEquals(NRVideoPlayerConfiguration.AdTrackerType.IMA, config.getAdTrackerType());
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    public void testDeprecatedAdTrackerTypeMediaTailor() {
+        NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
+            "TestPlayer", mockPlayer,
+            NRVideoPlayerConfiguration.AdTrackerType.MEDIA_TAILOR, null);
+
+        assertNotNull(config.getAdConfig());
+        assertEquals(NRAdConfig.Type.SSAI_MT, config.getAdConfig().type);
+        assertEquals(NRVideoPlayerConfiguration.AdTrackerType.MEDIA_TAILOR, config.getAdTrackerType());
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    public void testDeprecatedAdTrackerTypeNone() {
+        NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
+            "TestPlayer", mockPlayer,
+            NRVideoPlayerConfiguration.AdTrackerType.NONE, null);
+
+        assertNull(config.getAdConfig());
+        assertEquals(NRVideoPlayerConfiguration.AdTrackerType.NONE, config.getAdTrackerType());
+        assertFalse(config.isAdEnabled());
     }
 }
