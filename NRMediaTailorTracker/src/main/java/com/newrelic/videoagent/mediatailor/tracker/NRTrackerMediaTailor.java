@@ -758,8 +758,15 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         if (vastAdId != null) attr.put("vastAdId", vastAdId);
         if (creativeSequence != null) attr.put("creativeSequence", creativeSequence);
         if (skipOffset != null) attr.put("skipOffset", skipOffset);
-        if (adProgramDateTime != null) attr.put("adProgramDateTime", adProgramDateTime);
-        if (availProgramDateTime != null) attr.put("availProgramDateTime", availProgramDateTime);
+        // These wall-clock fields are the join key for correlating an event
+        // stream across HLS/DASH boundaries and across live sessions in NRDB.
+        // Omitting them when null makes a query like `WHERE availProgramDateTime
+        // IS NOT NULL` return inconsistent populations depending on whether the
+        // customer is on HLS-live (populated) or DASH-VOD (usually absent), so
+        // dashboards silently drift when the source stream type changes. Emit
+        // the empty string instead so the schema stays stable.
+        attr.put("adProgramDateTime", adProgramDateTime != null ? adProgramDateTime : "");
+        attr.put("availProgramDateTime", availProgramDateTime != null ? availProgramDateTime : "");
         if (currentAdPod != null && currentAdPod.isBumper) {
             attr.put("isBumper", Boolean.TRUE);
         } else if (currentAdBreak != null) {

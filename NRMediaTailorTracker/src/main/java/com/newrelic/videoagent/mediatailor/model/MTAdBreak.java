@@ -69,4 +69,27 @@ public class MTAdBreak {
         }
         return null;
     }
+
+    /**
+     * Stable identity for the underlying MediaTailor avail across polls.
+     *
+     * <p>On live streams the HLS sliding window rotates, so {@link #startTimeMs}
+     * (derived from segment time or the live edge) shifts on every manifest
+     * refresh. A tolerance-based time match is therefore not stable for the
+     * same avail across polls — the same ad break can appear at 100ms on one
+     * poll and 5100ms on the next, and pure time matching treats them as two
+     * distinct breaks.</p>
+     *
+     * <p>{@code availId} and {@code availProgramDateTime} both come from the
+     * tracking response, and together identify the avail unambiguously across
+     * window rotations. When either is absent (VOD, or the break is still
+     * only manifest-detected and hasn't been enriched by tracking yet), this
+     * returns {@code null} so callers fall back to time-based matching, which
+     * is safe on VOD where {@link #startTimeMs} is stable.</p>
+     */
+    public String identityKey() {
+        if (id == null || id.isEmpty()) return null;
+        if (availProgramDateTime == null || availProgramDateTime.isEmpty()) return null;
+        return id + "|" + availProgramDateTime;
+    }
 }

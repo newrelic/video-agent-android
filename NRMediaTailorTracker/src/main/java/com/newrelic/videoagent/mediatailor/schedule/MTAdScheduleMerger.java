@@ -44,7 +44,7 @@ public final class MTAdScheduleMerger {
         List<MTAdBreak> merged = new ArrayList<>(existing);
         for (MTAdBreak candidate : incoming) {
             if (candidate == null) continue;
-            MTAdBreak match = findMatch(merged, candidate.startTimeMs);
+            MTAdBreak match = findMatch(merged, candidate);
             if (match == null) {
                 merged.add(candidate);
             } else if (!match.confirmedByTracking && candidate.confirmedByTracking) {
@@ -68,7 +68,7 @@ public final class MTAdScheduleMerger {
             long availStart = resolveAvailStart(avail);
             if (availStart < 0) continue;
 
-            MTAdBreak match = findMatch(out, availStart);
+            MTAdBreak match = findMatchForAvail(out, avail, availStart);
             if (match != null) {
                 enrich(match, avail);
             } else {
@@ -79,7 +79,38 @@ public final class MTAdScheduleMerger {
         return out;
     }
 
-    private static MTAdBreak findMatch(List<MTAdBreak> list, long startMs) {
+    private static MTAdBreak findMatch(List<MTAdBreak> list, MTAdBreak candidate) {
+        // Prefer the stable (availId|availProgramDateTime) key when the
+        // candidate carries one — otherwise a live sliding window that has
+        // rotated by more than AD_TIMING_TOLERANCE_MS between polls looks
+        // like a distinct new avail under pure time matching.
+        String key = candidate.identityKey();
+        if (key != null) {
+            for (MTAdBreak b : list) {
+                if (key.equals(b.identityKey())) return b;
+            }
+        }
+        return findByStart(list, candidate.startTimeMs);
+    }
+
+    private static MTAdBreak findMatchForAvail(List<MTAdBreak> list,
+                                                MTTrackingResponse.Avail avail,
+                                                long availStart) {
+        // Tracking avails always carry availId; availProgramDateTime is
+        // present on live and typically absent on VOD. When both are present
+        // we can identity-match against an already-enriched break in the
+        // schedule and skip the time-proximity path entirely.
+        if (avail.availId != null && !avail.availId.isEmpty()
+                && avail.availProgramDateTime != null && !avail.availProgramDateTime.isEmpty()) {
+            String key = avail.availId + "|" + avail.availProgramDateTime;
+            for (MTAdBreak b : list) {
+                if (key.equals(b.identityKey())) return b;
+            }
+        }
+        return findByStart(list, availStart);
+    }
+
+    private static MTAdBreak findByStart(List<MTAdBreak> list, long startMs) {
         for (MTAdBreak b : list) {
             if (Math.abs(b.startTimeMs - startMs) < MTConstants.AD_TIMING_TOLERANCE_MS) {
                 return b;
