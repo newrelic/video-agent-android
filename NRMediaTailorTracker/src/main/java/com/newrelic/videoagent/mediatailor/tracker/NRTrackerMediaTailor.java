@@ -813,6 +813,13 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         if (vastAdId != null) attr.put("vastAdId", vastAdId);
         if (creativeSequence != null) attr.put("creativeSequence", creativeSequence);
         if (skipOffset != null) attr.put("skipOffset", skipOffset);
+        // Emit a stable per-creative identifier alongside adId. Ad servers
+        // can wrap the same creative in different <Ad> envelopes across
+        // sessions, so a `SELECT count(DISTINCT adId)` query inflates the
+        // creative count. MediaTailor itself indexes by <Creative> id, and
+        // queries on `adPrimaryId` follow the same rule.
+        String primaryId = currentAdPod != null ? currentAdPod.primaryKey() : null;
+        if (primaryId != null) attr.put("adPrimaryId", primaryId);
         // These wall-clock fields are the join key for correlating an event
         // stream across HLS/DASH boundaries and across live sessions in NRDB.
         // Omitting them when null makes a query like `WHERE availProgramDateTime

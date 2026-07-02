@@ -167,14 +167,14 @@ public final class MTAdScheduleMerger {
             // Build pods from the tracking timings as the only source.
             for (MTTrackingResponse.Ad ad : avail.ads) {
                 MTAdPod pod = new MTAdPod(ad.startTimeMs, ad.durationMs);
-                copyAdToPod(ad, pod);
+                copyAdToPod(ad, pod, avail.availId);
                 target.pods.add(pod);
             }
         } else if (target.pods.size() == avail.ads.size()) {
             // Manifest pod count and tracking ad count agree; index-align the
             // metadata onto the existing (correctly-timed) manifest pods.
             for (int i = 0; i < target.pods.size(); i++) {
-                copyAdToPod(avail.ads.get(i), target.pods.get(i));
+                copyAdToPod(avail.ads.get(i), target.pods.get(i), avail.availId);
             }
         } else {
             // Counts disagree. This happens most often when the manifest parse
@@ -191,7 +191,7 @@ public final class MTAdScheduleMerger {
             target.podCountMismatch = true;
             for (MTAdPod pod : target.pods) {
                 MTTrackingResponse.Ad closest = closestAdWithinTolerance(pod.startTimeMs, avail.ads);
-                if (closest != null) copyAdToPod(closest, pod);
+                if (closest != null) copyAdToPod(closest, pod, avail.availId);
             }
         }
     }
@@ -212,8 +212,9 @@ public final class MTAdScheduleMerger {
         return bestDelta < MTConstants.AD_TIMING_TOLERANCE_MS ? best : null;
     }
 
-    private static void copyAdToPod(MTTrackingResponse.Ad ad, MTAdPod pod) {
+    private static void copyAdToPod(MTTrackingResponse.Ad ad, MTAdPod pod, String availId) {
         pod.title = ad.adTitle;
+        pod.availId = availId;
         pod.adId = ad.adId;
         pod.creativeId = ad.creativeId;
         pod.adSystem = ad.adSystem;
@@ -250,7 +251,7 @@ public final class MTAdScheduleMerger {
             b.skipOffset = first.skipOffset;
             for (MTTrackingResponse.Ad ad : avail.ads) {
                 MTAdPod pod = new MTAdPod(ad.startTimeMs, ad.durationMs);
-                copyAdToPod(ad, pod);
+                copyAdToPod(ad, pod, avail.availId);
                 b.pods.add(pod);
             }
         }
