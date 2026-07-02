@@ -1,5 +1,7 @@
 package com.newrelic.videoagent.mediatailor.schedule;
 
+import com.newrelic.videoagent.core.utils.NRLog;
+import com.newrelic.videoagent.mediatailor.MTAdErrorCode;
 import com.newrelic.videoagent.mediatailor.MTConstants;
 import com.newrelic.videoagent.mediatailor.model.MTAdBreak;
 import com.newrelic.videoagent.mediatailor.model.MTAdPod;
@@ -57,15 +59,20 @@ public final class MTAdScheduleMerger {
 
     /**
      * Enriches the schedule with tracking API metadata. Existing breaks gain
-     * titles/creativeIds/pods; avails not present in the schedule are appended.
+     * titles/creativeIds/pods; avails not present in the schedule are
+     * appended. Data-integrity anomalies encountered during the merge are
+     * returned via {@link MergedSchedule#pendingErrors} so the caller can
+     * emit them as {@code AD_ERROR} events on the main looper — the merger
+     * itself has no event-emission path.
      */
-    public static List<MTAdBreak> enrichWithTracking(List<MTAdBreak> schedule, MTTrackingResponse tracking) {
-        if (tracking == null) return schedule;
+    public static MergedSchedule enrichWithTracking(List<MTAdBreak> schedule, MTTrackingResponse tracking) {
         List<MTAdBreak> out = new ArrayList<>(schedule);
+        List<MTAdErrorCode> pendingErrors = new ArrayList<>();
+        if (tracking == null) return new MergedSchedule(out, pendingErrors);
 
         for (MTTrackingResponse.Avail avail : tracking.avails) {
             if (avail == null) continue;
-            long availStart = resolveAvailStart(avail);
+            long availStart = resolveAvailStart(avail, pendingErrors);
             if (availStart < 0) continue;
 
             MTAdBreak match = findMatchForAvail(out, avail, availStart);
@@ -76,7 +83,7 @@ public final class MTAdScheduleMerger {
             }
         }
         sortByStart(out);
-        return out;
+        return new MergedSchedule(out, pendingErrors);
     }
 
     private static MTAdBreak findMatch(List<MTAdBreak> list, MTAdBreak candidate) {
@@ -250,9 +257,21 @@ public final class MTAdScheduleMerger {
         return b;
     }
 
-    private static long resolveAvailStart(MTTrackingResponse.Avail avail) {
+    private static long resolveAvailStart(MTTrackingResponse.Avail avail, List<MTAdErrorCode> pendingErrors) {
         if (avail.startTimeMs > 0) return avail.startTimeMs;
-        if (!avail.ads.isEmpty()) return avail.ads.get(0).startTimeMs;
+        if (!avail.ads.isEmpty()) {
+            // startTimeInSeconds is a required field on the tracking-avail
+            // schema; when it's missing or zero the MediaTailor configuration
+            // is usually wrong on the operator side. Infer from the first ad
+            // so the break doesn't disappear from the schedule, but surface
+            // MISSING_AVAIL_START so someone knows the data is off. On mid-
+            // roll avails with a leading slate fragment this inference is
+            // wrong by whatever gap sits before the first ad's media, and
+            // the AD_BREAK_START ends up firing late.
+            NRLog.w("MT tracking avail missing startTimeInSeconds; inferring from first ad");
+            pendingErrors.add(MTAdErrorCode.MISSING_AVAIL_START);
+            return avail.ads.get(0).startTimeMs;
+        }
         return -1L;
     }
 

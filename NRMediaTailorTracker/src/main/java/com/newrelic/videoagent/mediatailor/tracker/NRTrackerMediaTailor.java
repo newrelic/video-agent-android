@@ -33,6 +33,7 @@ import com.newrelic.videoagent.mediatailor.model.MTAdPod;
 import com.newrelic.videoagent.mediatailor.net.MTTrackingClient;
 import com.newrelic.videoagent.mediatailor.net.MTTrackingResponse;
 import com.newrelic.videoagent.mediatailor.schedule.MTAdScheduleMerger;
+import com.newrelic.videoagent.mediatailor.schedule.MergedSchedule;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -495,14 +496,20 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
             public void run() {
                 if (isDisposed.get()) return;
                 nonLinearAvailsCount = resp.nonLinearAvails.size();
+                MergedSchedule merged;
                 synchronized (adSchedule) {
-                    List<MTAdBreak> enriched = MTAdScheduleMerger.enrichWithTracking(
+                    merged = MTAdScheduleMerger.enrichWithTracking(
                             new ArrayList<>(adSchedule), resp);
                     adSchedule.clear();
-                    adSchedule.addAll(enriched);
+                    adSchedule.addAll(merged.breaks);
                     NRLog.d("MT schedule enriched: " + adSchedule.size()
                             + " breaks, confirmed="
                             + countConfirmed(adSchedule));
+                }
+                // Emit outside the adSchedule lock so an error-event listener
+                // that touches the schedule can't deadlock against us.
+                for (MTAdErrorCode code : merged.pendingErrors) {
+                    sendAdErrorEvent(code, null);
                 }
             }
         });
