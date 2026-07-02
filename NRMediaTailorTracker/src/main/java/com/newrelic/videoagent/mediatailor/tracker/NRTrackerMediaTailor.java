@@ -349,6 +349,19 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
             }
         } else if (manifest instanceof HlsManifest) {
             HlsManifest hls = (HlsManifest) manifest;
+            // Publica/SpringServe-style operator configurations may advertise
+            // the tracking endpoint directly via an EXT-X-DATERANGE tag with
+            // CLASS="tracking". When present that's authoritative and skips
+            // the URL-rewrite heuristic — customers on non-default CDN path
+            // layouts would otherwise be stuck calling setTrackingUrl(String)
+            // by hand.
+            if (trackingUrl == null) {
+                String fromTag = MTHlsParser.extractTrackingUrl(hls);
+                if (fromTag != null) {
+                    trackingUrl = fromTag;
+                    NRLog.d("MT trackingUrl from EXT-X-DATERANGE CLASS=tracking: " + trackingUrl);
+                }
+            }
             int segCount = hls.mediaPlaylist != null && hls.mediaPlaylist.segments != null
                     ? hls.mediaPlaylist.segments.size() : 0;
             List<MTAdBreak> parsed = MTHlsParser.parse(hls);

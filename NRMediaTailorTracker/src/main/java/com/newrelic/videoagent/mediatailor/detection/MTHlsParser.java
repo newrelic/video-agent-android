@@ -5,6 +5,8 @@ import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.hls.HlsManifest;
 import androidx.media3.exoplayer.hls.playlist.HlsMediaPlaylist;
 
+import androidx.annotation.Nullable;
+
 import com.newrelic.videoagent.mediatailor.MTConstants;
 import com.newrelic.videoagent.mediatailor.model.MTAdBreak;
 import com.newrelic.videoagent.mediatailor.model.MTAdPod;
@@ -12,6 +14,8 @@ import com.newrelic.videoagent.mediatailor.model.MTAdPod;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Turns a Media3 {@link HlsManifest} into a list of {@link MTAdBreak}s.
@@ -85,6 +89,46 @@ public final class MTHlsParser {
         if (seg.url == null) return false;
         return seg.url.contains(MTConstants.MT_SEGMENT_PATTERN)
                 || seg.url.contains(MTConstants.MT_HLSSEGMENT_PATH_PATTERN);
+    }
+
+    // ── Tracking URL discovery from manifest markers ──────────────────────
+
+    /** Matches EXT-X-DATERANGE lines whose CLASS attribute is "tracking".
+     *  MediaTailor emits these when the operator opts in to manifest-side
+     *  advertising of the tracking endpoint; otherwise the URI has to be
+     *  derived by URL rewriting of the manifest URL. */
+    private static final Pattern DATERANGE_CLASS_TRACKING =
+            Pattern.compile("#EXT-X-DATERANGE:.*CLASS=\"tracking\".*", Pattern.CASE_INSENSITIVE);
+
+    /** Captures the URI attribute value out of a matched DATERANGE line. */
+    private static final Pattern DATERANGE_URI =
+            Pattern.compile("URI=\"([^\"]+)\"", Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Reads the tracking URL directly from an {@code EXT-X-DATERANGE} tag
+     * with {@code CLASS="tracking"} on the manifest, if one is present.
+     *
+     * <p>Non-default MediaTailor / Publica / SpringServe configurations use
+     * a custom CDN path pattern that the URL-rewrite heuristic in
+     * {@code MTDetector} won't recognise, so the app previously had to call
+     * {@code setTrackingUrl(String)} by hand. When the operator has opted in
+     * to advertising the endpoint via a daterange marker, this reads it
+     * directly and skips the rewrite path entirely.</p>
+     *
+     * @return the URI from the marker, or {@code null} if no such tag exists.
+     */
+    @Nullable
+    public static String extractTrackingUrl(HlsManifest manifest) {
+        if (manifest == null || manifest.mediaPlaylist == null) return null;
+        List<String> tags = manifest.mediaPlaylist.tags;
+        if (tags == null) return null;
+        for (String tag : tags) {
+            if (tag == null) continue;
+            if (!DATERANGE_CLASS_TRACKING.matcher(tag).matches()) continue;
+            Matcher m = DATERANGE_URI.matcher(tag);
+            if (m.find()) return m.group(1);
+        }
+        return null;
     }
 
     private static void closePod(MTAdBreak br, MTAdPod pod) {
