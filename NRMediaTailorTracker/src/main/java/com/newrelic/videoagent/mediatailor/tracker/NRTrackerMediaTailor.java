@@ -444,6 +444,22 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
                 if (isDisposed.get()) return;
                 if (resp == null) {
                     NRLog.w("MT tracking fetch returned null (failed or cancelled)");
+                    // Distinguish a customer-visible fetch failure from a
+                    // cancellation caused by our own teardown — the latter is
+                    // routine (activate/deactivate cycles the client) and
+                    // shouldn't fire AD_ERROR.
+                    final MTAdErrorCode err = client.getLastError();
+                    if (err != null) {
+                        Handler main = pollHandler;
+                        if (main == null) main = new Handler(Looper.getMainLooper());
+                        main.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (isDisposed.get()) return;
+                                sendAdErrorEvent(err, null);
+                            }
+                        });
+                    }
                     return;
                 }
                 applyTrackingResponse(resp);

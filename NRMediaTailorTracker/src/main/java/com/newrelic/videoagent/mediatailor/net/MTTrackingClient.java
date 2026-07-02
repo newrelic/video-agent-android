@@ -1,6 +1,7 @@
 package com.newrelic.videoagent.mediatailor.net;
 
 import com.newrelic.videoagent.core.utils.NRLog;
+import com.newrelic.videoagent.mediatailor.MTAdErrorCode;
 import com.newrelic.videoagent.mediatailor.MTConstants;
 
 import org.json.JSONArray;
@@ -12,6 +13,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -55,6 +57,18 @@ public class MTTrackingClient {
     private volatile String nextToken;
     private volatile long tokenIssuedAtMs;
 
+    /**
+     * Reason the most recent {@link #fetch(String)} returned {@code null}.
+     * Reset to {@code null} at the top of every fetch; callers can read it
+     * after a null response to distinguish a socket timeout from a persistent
+     * token expiry.
+     */
+    private volatile MTAdErrorCode lastError;
+
+    public MTAdErrorCode getLastError() {
+        return lastError;
+    }
+
     public void cancel() {
         cancelled.set(true);
         HttpURLConnection c = activeConnection;
@@ -78,6 +92,7 @@ public class MTTrackingClient {
         // client — but the tracker reuses one instance across polls, so treat
         // each fetch as a fresh attempt.
         cancelled.set(false);
+        lastError = null;
 
         // The server would reject an over-age token with HTTP 400 anyway; save
         // the round-trip by dropping it ourselves once we're close to expiry.
@@ -90,6 +105,7 @@ public class MTTrackingClient {
 
         int attempts = 0;
         boolean triedResetOn400 = false;
+        boolean lastAttemptWasTimeout = false;
         while (attempts <= MTConstants.TRACKING_MAX_RETRIES) {
             if (cancelled.get()) return null;
             try {
@@ -109,14 +125,27 @@ public class MTTrackingClient {
                     // retry doesn't count against the transient-failure budget
                 } else {
                     NRLog.w("MT tracking HTTP 400 persists after reset — tracking unavailable");
+                    lastError = MTAdErrorCode.TOKEN_EXPIRED;
                     return null;
                 }
+            } catch (SocketTimeoutException e) {
+                if (cancelled.get()) return null;
+                NRLog.d("MT tracking fetch attempt " + (attempts + 1) + " timed out");
+                lastAttemptWasTimeout = true;
+                attempts++;
             } catch (Exception e) {
                 if (cancelled.get()) return null;
                 NRLog.d("MT tracking fetch attempt " + (attempts + 1) + " failed: " + e);
+                lastAttemptWasTimeout = false;
                 attempts++;
             }
         }
+        // Retry budget exhausted. Distinguish a timeout (points at ADS
+        // latency) from a generic transport failure (network, DNS, non-2xx)
+        // so downstream can alert on the right thing.
+        lastError = lastAttemptWasTimeout
+                ? MTAdErrorCode.ADS_TIMEOUT
+                : MTAdErrorCode.TRACKING_FETCH_FAILED;
         return null;
     }
 
