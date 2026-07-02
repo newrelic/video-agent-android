@@ -51,6 +51,17 @@ public class MTAdBreak {
      */
     public boolean isNoFill;
 
+    /**
+     * The manifest parser saw a different number of pods than the tracking
+     * response's {@code ads} array reported for this avail. Manifest pod
+     * boundaries were kept as ground truth (they come from actual segment /
+     * discontinuity data), and tracking metadata was matched to the closest
+     * pod within tolerance — some pods may therefore lack metadata, or some
+     * tracking ads may have been left unassigned. Surfaces the mismatch as a
+     * diagnostic without forcing quartile timing onto the wrong slot.
+     */
+    public boolean podCountMismatch;
+
     public boolean hasFiredStart;
     public boolean hasFiredEnd;
     public boolean hasFiredAdStart;

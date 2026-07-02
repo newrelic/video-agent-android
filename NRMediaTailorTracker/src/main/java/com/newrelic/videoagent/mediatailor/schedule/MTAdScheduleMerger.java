@@ -154,18 +154,55 @@ public final class MTAdScheduleMerger {
             target.skipOffset = first.skipOffset;
         }
 
-        if (!target.pods.isEmpty() && target.pods.size() == avail.ads.size()) {
-            for (int i = 0; i < target.pods.size(); i++) {
-                copyAdToPod(avail.ads.get(i), target.pods.get(i));
-            }
-        } else {
-            target.pods.clear();
+        if (target.pods.isEmpty()) {
+            // No manifest-derived pods on this break yet — either the manifest
+            // parser hasn't run for this avail, or it produced no segments.
+            // Build pods from the tracking timings as the only source.
             for (MTTrackingResponse.Ad ad : avail.ads) {
                 MTAdPod pod = new MTAdPod(ad.startTimeMs, ad.durationMs);
                 copyAdToPod(ad, pod);
                 target.pods.add(pod);
             }
+        } else if (target.pods.size() == avail.ads.size()) {
+            // Manifest pod count and tracking ad count agree; index-align the
+            // metadata onto the existing (correctly-timed) manifest pods.
+            for (int i = 0; i < target.pods.size(); i++) {
+                copyAdToPod(avail.ads.get(i), target.pods.get(i));
+            }
+        } else {
+            // Counts disagree. This happens most often when the manifest parse
+            // races the tracking fetch on live — the two sides observe the
+            // avail at slightly different moments and one sees an ad the
+            // other doesn't. Previously the code wiped the manifest pods and
+            // rebuilt from tracking, but tracking timings are rounded to
+            // whole seconds while manifest pods come from actual segment /
+            // discontinuity data, so quartile events ended up firing at
+            // playhead positions the player never reached (or firing on the
+            // wrong creative when pods shifted by one slot). Keep the manifest
+            // boundaries and copy tracking metadata onto whichever pod matches
+            // by startTimeMs within tolerance; leave the rest unadorned.
+            target.podCountMismatch = true;
+            for (MTAdPod pod : target.pods) {
+                MTTrackingResponse.Ad closest = closestAdWithinTolerance(pod.startTimeMs, avail.ads);
+                if (closest != null) copyAdToPod(closest, pod);
+            }
         }
+    }
+
+    private static MTTrackingResponse.Ad closestAdWithinTolerance(long startMs, List<MTTrackingResponse.Ad> ads) {
+        MTTrackingResponse.Ad best = null;
+        long bestDelta = Long.MAX_VALUE;
+        for (MTTrackingResponse.Ad ad : ads) {
+            long delta = Math.abs(ad.startTimeMs - startMs);
+            if (delta < bestDelta) {
+                bestDelta = delta;
+                best = ad;
+            }
+        }
+        // Refuse to paste metadata onto a pod that has no near match — a
+        // "least-wrong" copy would put ad-3's title on ad-2's slot when the
+        // counts differ.
+        return bestDelta < MTConstants.AD_TIMING_TOLERANCE_MS ? best : null;
     }
 
     private static void copyAdToPod(MTTrackingResponse.Ad ad, MTAdPod pod) {
