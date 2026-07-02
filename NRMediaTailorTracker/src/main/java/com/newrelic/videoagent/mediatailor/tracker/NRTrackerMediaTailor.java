@@ -598,6 +598,16 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
 
         if (!active.pods.isEmpty()) {
             MTAdPod pod = active.findActivePod(position);
+            // Pod ends before its enclosing break does — either the manifest
+            // has a gap between the last pod's end and the break's end, or
+            // the pod's endTimeMs was clamped down at parse time. Fire the
+            // AD_END here rather than waiting until handleExitingBreak so
+            // the pod's runtime isn't attributed to the tail of the break.
+            if (pod == null && currentAdPod != null) {
+                NRLog.d("MT AD_END (pod ended before break end)");
+                sendEnd();
+                currentAdPod = null;
+            }
             if (pod != null && pod != currentAdPod) {
                 if (currentAdPod != null) {
                     NRLog.d("MT AD_END (pod transition)");

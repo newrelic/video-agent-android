@@ -11,6 +11,7 @@ import com.newrelic.videoagent.mediatailor.model.MTAdPod;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Turns a Media3 {@link HlsManifest} into a list of {@link MTAdBreak}s.
@@ -26,6 +27,19 @@ import java.util.List;
 public final class MTHlsParser {
 
     private MTHlsParser() {}
+
+    /**
+     * Cumulative count of pods whose computed endTimeMs was clamped down to
+     * their enclosing break's endTimeMs. Non-zero values point at manifests
+     * where segment startMs values or discontinuity gaps don't sum
+     * consistently — worth surfacing so an operator can debug the source
+     * manifest without the tracker silently discarding the AD_END event.
+     */
+    private static final AtomicInteger clampedPodCount = new AtomicInteger(0);
+
+    public static int clampedPodCount() {
+        return clampedPodCount.get();
+    }
 
     public static List<MTAdBreak> parse(HlsManifest manifest) {
         List<MTAdBreak> breaks = new ArrayList<>();
@@ -84,6 +98,23 @@ public final class MTHlsParser {
         closePod(br, pod);
         if (br.durationMs < MTConstants.MIN_AD_DURATION_MS) return;
         br.endTimeMs = br.startTimeMs + br.durationMs;
+        // Segment startMs values and pod-duration sums can disagree at the
+        // rounding-edge or when a discontinuity introduces a small gap that
+        // isn't reflected in the summed durations. When that happens the
+        // final pod's endTimeMs sits past the break's endTimeMs, and the
+        // state machine's findActivePod would match a playhead position the
+        // break has already ended before — so AD_END for the last pod would
+        // never fire because the playhead has exited the break. Cap pod
+        // ends to the break end so the pod remains matchable up to that
+        // point and the state machine gets a clean exit.
+        for (MTAdPod p : br.pods) {
+            if (p.endTimeMs > br.endTimeMs) {
+                long clamped = br.endTimeMs - p.startTimeMs;
+                p.durationMs = Math.max(clamped, 0L);
+                p.endTimeMs = br.endTimeMs;
+                clampedPodCount.incrementAndGet();
+            }
+        }
         out.add(br);
     }
 }
