@@ -423,14 +423,20 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
     }
 
     private void startTrackingFetch() {
-        cancelTrackingFetch();
-        trackingClient = new MTTrackingClient();
+        // Abort any in-flight fetch but keep the same client instance: it
+        // holds the NextToken cursor, and creating a fresh client on every
+        // poll would force the server to re-send the full manifest window
+        // (or miss beacons that arrived between polls, if the server treats
+        // absence-of-token as "start over").
+        abortInFlightTracking();
+        if (trackingClient == null) trackingClient = new MTTrackingClient();
+        final MTTrackingClient client = trackingClient;
         final String url = trackingUrl;
         NRLog.d("MT tracking fetch: " + url);
         trackingWorker = new Thread(new Runnable() {
             @Override
             public void run() {
-                MTTrackingResponse resp = trackingClient.fetch(url);
+                MTTrackingResponse resp = client.fetch(url);
                 if (isDisposed.get()) return;
                 if (resp == null) {
                     NRLog.w("MT tracking fetch returned null (failed or cancelled)");
@@ -443,15 +449,20 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         trackingWorker.start();
     }
 
-    private void cancelTrackingFetch() {
-        if (trackingClient != null) {
-            trackingClient.cancel();
-            trackingClient = null;
-        }
+    private void abortInFlightTracking() {
+        if (trackingClient != null) trackingClient.cancel();
         if (trackingWorker != null) {
             trackingWorker.interrupt();
             trackingWorker = null;
         }
+    }
+
+    private void cancelTrackingFetch() {
+        // Session teardown: drop the cursor too, because the next activation
+        // is a new MediaTailor session and any retained token belongs to the
+        // one we just left.
+        abortInFlightTracking();
+        trackingClient = null;
     }
 
     private void applyTrackingResponse(final MTTrackingResponse resp) {
