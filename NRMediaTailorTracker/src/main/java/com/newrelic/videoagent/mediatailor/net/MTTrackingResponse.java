@@ -1,5 +1,7 @@
 package com.newrelic.videoagent.mediatailor.net;
 
+import com.newrelic.videoagent.mediatailor.model.MTTrackingEvent;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -51,6 +53,7 @@ public class MTTrackingResponse {
         public String skipOffset;       // HH:MM:SS for skippable ads (null if not skippable)
         public String adProgramDateTime; // wall clock of ad start (Live correlation)
         public boolean isBumper;        // ad stitched in from a MediaTailor bumper configuration
+        public final List<MTTrackingEvent> trackingEvents = new ArrayList<>();
     }
 
     /**

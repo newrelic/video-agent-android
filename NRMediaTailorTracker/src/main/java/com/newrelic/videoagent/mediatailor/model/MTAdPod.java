@@ -1,5 +1,8 @@
 package com.newrelic.videoagent.mediatailor.model;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * A single ad creative inside an {@link MTAdBreak}. Roughly equivalent to a
  * VAST {@code <Ad>} / {@code <Creative>} pair. Multiple pods play sequentially
@@ -25,6 +28,15 @@ public class MTAdPod {
     public String skipOffset;         // HH:MM:SS, null if not skippable
     public String adProgramDateTime;  // wall clock
     public boolean isBumper;
+
+    /**
+     * VAST beacon entries parsed from the pod's tracking metadata. The
+     * tracker never fires these — client-side beacon firing is the player's
+     * job per MediaTailor's contract. Populated so integrators who route
+     * beacons through their own attribution pipeline can iterate without
+     * having to reach into the raw tracking response.
+     */
+    public final List<MTTrackingEvent> trackingEvents = new ArrayList<>();
 
     public boolean hasFiredStart;
     public boolean hasFiredQ1;

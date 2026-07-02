@@ -3,6 +3,7 @@ package com.newrelic.videoagent.mediatailor.net;
 import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.mediatailor.MTAdErrorCode;
 import com.newrelic.videoagent.mediatailor.MTConstants;
+import com.newrelic.videoagent.mediatailor.model.MTTrackingEvent;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -296,6 +297,28 @@ public class MTTrackingClient {
         ad.isBumper = containsIgnoreCase(ad.adSystem, "bumper")
                 || containsIgnoreCase(ad.adTitle, "bumper")
                 || containsIgnoreCase(ad.adId, "bumper");
+        // startTimeInSeconds means something different inside a tracking
+        // event than at the avail/ad level: here it's relative to the ad's
+        // own start, not to the playback session. Rename during parse so
+        // downstream can't accidentally treat it as an absolute timeline
+        // position — that would fire beacons at wildly wrong moments.
+        JSONArray tev = adJson.optJSONArray("trackingEvents");
+        if (tev != null) {
+            for (int k = 0; k < tev.length(); k++) {
+                JSONObject e = tev.getJSONObject(k);
+                MTTrackingEvent event = new MTTrackingEvent();
+                event.eventType = e.optString("eventType", null);
+                event.relativeToAdStartMs = toMs(e.opt("startTimeInSeconds"));
+                JSONArray urls = e.optJSONArray("beaconUrls");
+                if (urls != null) {
+                    for (int u = 0; u < urls.length(); u++) {
+                        String url = urls.optString(u, null);
+                        if (url != null && !url.isEmpty()) event.beaconUrls.add(url);
+                    }
+                }
+                ad.trackingEvents.add(event);
+            }
+        }
         return ad;
     }
 

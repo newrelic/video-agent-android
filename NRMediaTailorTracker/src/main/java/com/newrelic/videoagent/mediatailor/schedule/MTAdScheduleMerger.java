@@ -223,6 +223,8 @@ public final class MTAdScheduleMerger {
         pod.skipOffset = ad.skipOffset;
         pod.adProgramDateTime = ad.adProgramDateTime;
         pod.isBumper = ad.isBumper;
+        pod.trackingEvents.clear();
+        pod.trackingEvents.addAll(ad.trackingEvents);
         if (ad.durationMs > 0) {
             pod.durationMs = ad.durationMs;
             pod.endTimeMs = pod.startTimeMs + ad.durationMs;
