@@ -171,16 +171,16 @@ public final class NRQoEAggregator {
         }
         kpiAttributes.put("totalRebufferingTime", qoeTotalRebufferingTime);
 
-        long elapsedTime = realtimePlaytimeMs;
+        long playtimeMs = realtimePlaytimeMs;
 
-        if (elapsedTime > 0) {
-            double rebufferingRatio = ((double) qoeTotalRebufferingTime / elapsedTime) * 100;
+        if (playtimeMs > 0) {
+            double rebufferingRatio = ((double) qoeTotalRebufferingTime / playtimeMs) * 100;
             kpiAttributes.put("rebufferingRatio", rebufferingRatio);
         } else {
             kpiAttributes.put("rebufferingRatio", 0.0);
         }
 
-        kpiAttributes.put("totalPlaytime", elapsedTime);
+        kpiAttributes.put("totalPlaytime", playtimeMs);
 
         Long timeWeightedAverage = calculateTimeWeightedAverageBitrate();
         if (timeWeightedAverage != null) {
