@@ -19,6 +19,7 @@ apply plugin: 'maven-publish'
 
 allprojects {
     repositories {
+        mavenLocal() // PoC: consume the KMP shared-core aar published via publishToMavenLocal
         google()
         mavenCentral()
     }

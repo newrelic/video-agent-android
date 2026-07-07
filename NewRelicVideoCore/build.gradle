@@ -52,6 +52,10 @@ dependencies {
     implementation 'androidx.media3:media3-exoplayer:1.2.0'
     implementation 'androidx.media3:media3-exoplayer-ima:1.2.0'
 
+    // PoC: QoE aggregator now lives in the KMP shared-core (same FQN, drop-in). The Java
+    // NRQoEAggregator.java is deleted; this Kotlin aar supplies the identical class.
+    implementation 'com.newrelic.videoagent:shared-core-android:0.1.0'
+
     // Add androidx.leanback for accurate Android TV detection
 //    implementation 'androidx.leanback:leanback:1.0.0'
 
