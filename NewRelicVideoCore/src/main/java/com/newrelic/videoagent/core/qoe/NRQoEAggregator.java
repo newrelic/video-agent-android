@@ -494,7 +494,6 @@ public final class NRQoEAggregator {
         if (sample == null || sample <= 0) {
             return;
         }
-        // iOS parity: the adapter holds the last segment's download bitrate and echoes it on every
         // heartbeat; skip a sample identical to the previous one so stale repeats don't skew the avg.
         if (qoeLastDownloadRate != null && qoeLastDownloadRate.equals(sample)) {
             return;
