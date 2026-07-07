@@ -41,6 +41,7 @@ public final class NRQoEAggregator {
     private Long qoeDownloadRateCount;
     private Long qoeMinDownloadRate;
     private Long qoeMaxDownloadRate;
+    private Long qoeLastDownloadRate;  // last download sample;
 
     // ---- Rendition switch metrics ------------------------------------------
     private long qoeTotalSwitchUps;
@@ -95,6 +96,7 @@ public final class NRQoEAggregator {
         qoeDownloadRateCount = 0L;
         qoeMinDownloadRate = null;
         qoeMaxDownloadRate = null;
+        qoeLastDownloadRate = null;
 
         qoeTotalSwitchUps = 0L;
         qoeTotalSwitchDowns = 0L;
@@ -250,6 +252,7 @@ public final class NRQoEAggregator {
         qoeDownloadRateCount = 0L;
         qoeMinDownloadRate = null;
         qoeMaxDownloadRate = null;
+        qoeLastDownloadRate = null;
 
         qoeTotalSwitchUps = 0L;
         qoeTotalSwitchDowns = 0L;
@@ -491,6 +494,12 @@ public final class NRQoEAggregator {
         if (sample == null || sample <= 0) {
             return;
         }
+        // iOS parity: the adapter holds the last segment's download bitrate and echoes it on every
+        // heartbeat; skip a sample identical to the previous one so stale repeats don't skew the avg.
+        if (qoeLastDownloadRate != null && qoeLastDownloadRate.equals(sample)) {
+            return;
+        }
+        qoeLastDownloadRate = sample;
         if (qoeDownloadRateCount < Long.MAX_VALUE - 1) {
             qoeDownloadRateSum = safeAdd(qoeDownloadRateSum, sample);
             qoeDownloadRateCount++;

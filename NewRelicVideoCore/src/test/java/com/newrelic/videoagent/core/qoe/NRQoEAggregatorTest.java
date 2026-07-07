@@ -104,6 +104,16 @@ public class NRQoEAggregatorTest {
         assertEquals(4000L, lng(k, "avgDownloadRate"));
     }
 
+    @Test
+    public void downloadRate_dedupsConsecutiveIdenticalSamples() {
+        request();
+        feed(CONTENT_HEARTBEAT, attrs("contentNetworkDownloadBitrate", 1000L));
+        feed(CONTENT_HEARTBEAT, attrs("contentNetworkDownloadBitrate", 1000L)); // stale repeat -> skipped
+        feed(CONTENT_HEARTBEAT, attrs("contentNetworkDownloadBitrate", 3000L));
+        // (1000 + 3000) / 2 = 2000, not (1000 + 1000 + 3000) / 3
+        assertEquals(2000L, lng(kpis(), "avgDownloadRate"));
+    }
+
     // ---- peak bitrate ------------------------------------------------------
 
     @Test
