@@ -6,7 +6,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 
-import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -27,7 +26,7 @@ import static org.junit.Assert.*;
  *     path. Switch and pause metrics are driven through the real event pipeline
  *     (sendVideoEvent / sendPause / sendResume) so the NRTracker.processQoeEvents()
  *     wiring is exercised too.
- *   - KPI values are read back from the private calculateQOEKpiAttributes() via reflection.
+ *   - KPI values are read back from the extracted NRQoEAggregator via getQoeAggregator().
  *
  * Time-based assertions use small real sleeps with generous tolerance (the production
  * code uses System.currentTimeMillis()); this mirrors the existing playtime tests.
@@ -70,15 +69,20 @@ public class NRVideoTrackerQoeTest {
         @Override public Long getNetworkDownloadBitrate(){ return networkDownloadBitrate; }
     }
 
-    @SuppressWarnings("unchecked")
+    /**
+     * Phase 1: KPIs now come from the extracted aggregator (via the package-private accessor).
+     * Real-time playtime is supplied by the tracker in production; tests that don't exercise
+     * playtime pass 0. Returns null before a CONTENT_REQUEST (the aggregator's gate), so tests
+     * that read KPIs must establish a session (startContent() or requestOnly()) first.
+     */
     private Map<String, Object> kpis() {
-        try {
-            Method m = NRVideoTracker.class.getDeclaredMethod("calculateQOEKpiAttributes");
-            m.setAccessible(true);
-            return (Map<String, Object>) m.invoke(tracker);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        return tracker.getQoeAggregator().generateAggregateAttributes(0L);
+    }
+
+    /** Open the aggregator gate without starting playback (feeds CONTENT_REQUEST). */
+    private void requestOnly() {
+        tracker.setPlayer(new Object());
+        tracker.sendRequest();
     }
 
     private static long lng(Map<String, Object> m, String key) {
@@ -93,9 +97,9 @@ public class NRVideoTrackerQoeTest {
         tracker.sendStart();
     }
 
-    /** Drive one content event so the getAttributes() capture hooks run. */
+    /** Drive one content event through the real pipeline so the onQoeEvent feed hook runs. */
     private void emitContentEvent() {
-        tracker.getAttributes(CONTENT_HEARTBEAT, null);
+        tracker.sendVideoEvent(CONTENT_HEARTBEAT, null);
     }
 
     private void sendShift(String shift) {
@@ -130,6 +134,7 @@ public class NRVideoTrackerQoeTest {
 
     @Test
     public void defaults_countersZero_downloadOmitted() {
+        requestOnly();
         Map<String, Object> k = kpis();
 
         assertEquals(0L, lng(k, "totalSwitchUps"));
@@ -204,6 +209,7 @@ public class NRVideoTrackerQoeTest {
 
     @Test
     public void switches_countUpsAndDowns() {
+        requestOnly();
         sendShift("down");
         sendShift("down");
         sendShift("up");
@@ -216,6 +222,7 @@ public class NRVideoTrackerQoeTest {
 
     @Test
     public void switches_missingOrUnknownShiftIgnored() {
+        requestOnly();
         sendShift(null);          // no "shift" attribute
         sendShift("sideways");    // unrecognised value
 
@@ -365,7 +372,7 @@ public class NRVideoTrackerQoeTest {
     }
 
     // =========================================================================
-    // Reset per view (sendEnd -> resetQoeMetrics)
+    // Reset per view (sendEnd -> aggregator.reset())
     // =========================================================================
 
     @Test
@@ -389,9 +396,17 @@ public class NRVideoTrackerQoeTest {
         assertTrue(lng(before, "totalRenditions") >= 1);
         assertTrue(before.containsKey("avgDownloadRate"));
 
-        // End the view -> resetQoeMetrics().
+        // End the view -> aggregator.reset() (closes the gate too).
         tracker.sendEnd();
+        assertNull("gate closed after view end", kpis());
 
+        // A fresh view (new CONTENT_REQUEST) starts clean. Clear the player-data getters so the
+        // new session carries no rendition/download samples yet.
+        tracker.renditionWidth = null;
+        tracker.renditionHeight = null;
+        tracker.renditionBitrate = null;
+        tracker.networkDownloadBitrate = null;
+        tracker.sendRequest();
         Map<String, Object> after = kpis();
         assertEquals(0L, lng(after, "totalSwitchUps"));
         assertEquals(0L, lng(after, "totalSwitchDowns"));
