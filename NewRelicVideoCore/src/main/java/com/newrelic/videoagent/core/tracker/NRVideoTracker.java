@@ -380,9 +380,6 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                 // startupPeriodAdTime (set above) is pushed into the aggregator by onQoeEvent
                 // when it processes CONTENT_START; the aggregator caches startup time there too.
                 sendVideoEvent(CONTENT_START);
-
-                // Resume bitrate timer when content starts playing
-                qoeAggregator.resumeBitrateTimer();
             }
             playtimeSinceLastEventTimestamp = System.currentTimeMillis();
         }
@@ -402,8 +399,6 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                 sendVideoAdEvent(AD_PAUSE);
             } else {
                 sendVideoEvent(CONTENT_PAUSE);
-                // Pause bitrate timer during pause to exclude paused time from average
-                qoeAggregator.pauseBitrateTimer();
             }
             playtimeSinceLastEventTimestamp = 0L;
         }
@@ -432,10 +427,6 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                 sendVideoAdEvent(AD_RESUME);
             } else {
                 sendVideoEvent(CONTENT_RESUME);
-                // Resume bitrate timer when playback resumes (only if not buffering or seeking)
-                if (!state.isBuffering && !state.isSeeking) {
-                    qoeAggregator.resumeBitrateTimer();
-                }
             }
             if (!state.isBuffering && !state.isSeeking) {
                 playtimeSinceLastEventTimestamp = System.currentTimeMillis();
@@ -496,8 +487,6 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                 sendVideoAdEvent(AD_SEEK_START);
             } else {
                 sendVideoEvent(CONTENT_SEEK_START);
-                // Pause bitrate timer during seeking to exclude seek time from average
-                qoeAggregator.pauseBitrateTimer();
             }
             playtimeSinceLastEventTimestamp = 0L;
         }
@@ -512,10 +501,6 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                 sendVideoAdEvent(AD_SEEK_END);
             } else {
                 sendVideoEvent(CONTENT_SEEK_END);
-                // Resume bitrate timer when seeking ends (only if not buffering or paused)
-                if (!state.isBuffering && !state.isPaused) {
-                    qoeAggregator.resumeBitrateTimer();
-                }
             }
             if (!state.isBuffering && !state.isPaused) {
                 playtimeSinceLastEventTimestamp = System.currentTimeMillis();
@@ -536,8 +521,6 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                 sendVideoAdEvent(AD_BUFFER_START);
             } else {
                 sendVideoEvent(CONTENT_BUFFER_START);
-                // Pause bitrate timer during buffering to exclude buffering time from average
-                qoeAggregator.pauseBitrateTimer();
             }
             playtimeSinceLastEventTimestamp = 0L;
         }
@@ -558,10 +541,6 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                 sendVideoAdEvent(AD_BUFFER_END);
             } else {
                 sendVideoEvent(CONTENT_BUFFER_END);
-                // Resume bitrate timer when buffering ends (only if not seeking or paused)
-                if (!state.isSeeking && !state.isPaused) {
-                    qoeAggregator.resumeBitrateTimer();
-                }
             }
             if (!state.isSeeking && !state.isPaused) {
                 playtimeSinceLastEventTimestamp = System.currentTimeMillis();

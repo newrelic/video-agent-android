@@ -90,7 +90,7 @@ public final class NRQoEAggregator {
         qoeLastRenditionChangeTime = null;
         qoeTotalBitrateWeightedTime = 0L;
         qoeTotalActiveTime = 0L;
-        qoeBitrateTimerPaused = false;
+        qoeBitrateTimerPaused = true;   // start "not running" until CONTENT_START
 
         qoeDownloadRateSum = 0L;
         qoeDownloadRateCount = 0L;
@@ -123,6 +123,17 @@ public final class NRQoEAggregator {
                                            boolean isPlaying, boolean adBreakActive) {
         if (attributes == null) {
             attributes = new HashMap<>();
+        }
+
+        // Drive the bitrate timer from play state, replacing the explicit sender
+        // call-sites. state.isPlaying is set by the tracker's goXxx state machine before this runs
+        // and is false during pause/buffer/seek. Done before the extractors so a resume restarts
+        // the segment clock from "now".
+        boolean timerRunning = !qoeBitrateTimerPaused;
+        if (timerRunning && !isPlaying) {
+            pauseBitrateTimer();
+        } else if (!timerRunning && isPlaying) {
+            resumeBitrateTimer();
         }
 
         // Always-on extractors (run for every content event, as getAttributes() did before).
@@ -246,7 +257,7 @@ public final class NRQoEAggregator {
         qoeLastRenditionChangeTime = null;
         qoeTotalBitrateWeightedTime = 0L;
         qoeTotalActiveTime = 0L;
-        qoeBitrateTimerPaused = false;
+        qoeBitrateTimerPaused = true;   // start "not running" until CONTENT_START
 
         qoeDownloadRateSum = 0L;
         qoeDownloadRateCount = 0L;
@@ -386,7 +397,8 @@ public final class NRQoEAggregator {
     // Bitrate timer
     // =========================================================================
 
-    public synchronized void pauseBitrateTimer() {
+    // Driven by processAction from the isPlaying transition (already under the lock).
+    private void pauseBitrateTimer() {
         if (qoeBitrateTimerPaused) {
             return;
         }
@@ -410,7 +422,7 @@ public final class NRQoEAggregator {
         qoeBitrateTimerPaused = true;
     }
 
-    public synchronized void resumeBitrateTimer() {
+    private void resumeBitrateTimer() {
         if (!qoeBitrateTimerPaused) {
             return;
         }
