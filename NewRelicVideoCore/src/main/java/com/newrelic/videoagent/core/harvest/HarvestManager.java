@@ -174,9 +174,6 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
      * Like iOS: QOE is sent independently on each qualified harvest cycle,
      * regardless of whether the batch contains other VideoAction events.
      *
-     * Final QOE from CONTENT_END (marked with "isFinalQoe" flag) is always injected
-     * and triggers provider unregistration.
-     *
      * @param batch The harvest batch to potentially inject QOE events into
      * @param cycleNumber The current harvest cycle number
      */
@@ -193,19 +190,8 @@ public class HarvestManager implements EventBufferInterface.CapacityCallback {
                 Map<String, Object> currentQoeEvent = provider.generateQoeIfNeeded(batch, cycleNumber);
 
                 if (currentQoeEvent != null) {
-                    // Check if this is the final QOE from CONTENT_END
-                    if (Boolean.TRUE.equals(currentQoeEvent.get("isFinalQoe"))) {
-                        // FINAL QOE - remove internal flag before sending
-                        currentQoeEvent.remove("isFinalQoe");
-                        batch.add(currentQoeEvent);
-                        NRLog.d("Final QOE_AGGREGATE from CONTENT_END injected - provider will be unregistered");
-
-                        // Unregister provider after injecting final QOE
-                        qoeProviders.remove(provider);
-                        continue;
-                    }
-
-                    // Regular QOE - send independently (like iOS)
+                    // Periodic QOE - inject into the batch. The final QoE at CONTENT_END is recorded
+                    // to the buffer directly by the tracker, not via this provider path.
                     batch.add(currentQoeEvent);
                     NRLog.d("QOE_AGGREGATE injected into harvest batch (cycle " + cycleNumber + ")");
                 }

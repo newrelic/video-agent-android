@@ -55,7 +55,6 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
 
     // QOE_AGGREGATE provider fields
     private boolean qoeProviderRegistered = false;
-    private volatile Map<String, Object> pendingQoeForNextHarvest = null; // For CONTENT_END (volatile for thread safety)
     private Map<String, Object> lastSentQoeKpis = null; // Snapshot of last sent QoE KPIs for dirty check
     private volatile Map<String, Object> cachedStandardAttributes = null; // Cached attributes for thread-safe access
     private int qoeCycleCount = 0;   // per-session QoE harvest counter (reset at CONTENT_REQUEST)
@@ -143,8 +142,6 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
     public void dispose() {
         super.dispose();
         stopHeartbeat();
-        // Clean up pending QOE to prevent memory leaks
-        pendingQoeForNextHarvest = null;
         // Unregister the QOE provider so a disposed tracker is no longer polled at harvest.
         if (qoeProviderRegistered && NRVideo.getInstance() != null
                 && NRVideo.getInstance().getHarvestManager() != null) {
@@ -448,21 +445,23 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                 }
                 totalAdPlaytime = totalAdPlaytime + totalPlaytime;
             } else {
-                // Build final QOE at CONTENT_END and mark for next harvest cycle
-                if (configuration != null && configuration.isQoeAggregateEnabled() && qoeProviderRegistered) {
-                    // Build final QOE with complete metrics
-                    Map<String, Object> finalQoe = buildQoeEventWithStandardAttributes();
-
-                    // Mark as final QOE so HarvestManager knows to unregister provider
-                    finalQoe.put("isFinalQoe", true);
-
-                    // Store for next harvest cycle (will be sent with priority)
-                    pendingQoeForNextHarvest = finalQoe;
-
-                    NRLog.d("Final QOE_AGGREGATE prepared at CONTENT_END, will send on next harvest cycle");
-                }
-
+                // Send CONTENT_END first, then build the final QoE and record it straight into
+                // the crash-safe buffer. Survives a crash before the next harvest and drops the
+                // pending / isFinalQoe machinery.
                 sendVideoEvent(CONTENT_END);
+
+                if (configuration != null && configuration.isQoeAggregateEnabled() && qoeProviderRegistered) {
+                    Map<String, Object> finalQoe = buildQoeEventWithStandardAttributes();
+                    NRVideo.recordEvent(NR_VIDEO_EVENT, finalQoe);
+
+                    // Unregister now so no further periodic QoE fires for this ended session;
+                    // a new view re-registers at its next CONTENT_REQUEST.
+                    if (NRVideo.getInstance() != null && NRVideo.getInstance().getHarvestManager() != null) {
+                        NRVideo.getInstance().getHarvestManager().unregisterQoeProvider(this);
+                    }
+                    qoeProviderRegistered = false;
+                    NRLog.d("Final QOE_AGGREGATE recorded to crash-safe buffer at CONTENT_END");
+                }
             }
 
             stopHeartbeat();
@@ -473,7 +472,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
             playtimeSinceLastEvent = 0L;
             totalPlaytime = 0L;
             // Reset QoE state for new view session (aggregator KPIs + tracker-side dirty-check
-            // snapshot). pendingQoeForNextHarvest is intentionally NOT cleared here.
+            // snapshot). The final QoE was already recorded to the buffer above.
             qoeAggregator.reset();
             lastSentQoeKpis = null;
         }
@@ -599,15 +598,8 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
      */
     @Override
     public Map<String, Object> generateQoeIfNeeded(List<Map<String, Object>> batch, int harvestCycleNumber) {
-        // Priority 1: Check if there's a pending final QOE from CONTENT_END
-        if (pendingQoeForNextHarvest != null) {
-            Map<String, Object> finalQoe = pendingQoeForNextHarvest;
-            pendingQoeForNextHarvest = null; // Clear after retrieving
-            NRLog.d("Sending pending final QOE_AGGREGATE from CONTENT_END");
-            return finalQoe; // HarvestManager will see "isFinalQoe" flag and unregister provider
-        }
-
-        // Priority 2: Generate regular harvest QOE if conditions are met
+        // Periodic harvest QOE only. The final QoE at CONTENT_END is recorded directly to the
+        // crash-safe buffer by sendEnd(), not routed through this provider.
         if (!state.isAd && configuration != null && configuration.isQoeAggregateEnabled()) {
             // Check if this harvest cycle should send based on interval multiplier
             int intervalMultiplier = configuration.getQoeAggregateIntervalMultiplier();
