@@ -6,8 +6,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+
+import com.newrelic.videoagent.core.NRVideoConfiguration;
 
 import static com.newrelic.videoagent.core.NRDef.*;
 import static org.junit.Assert.*;
@@ -62,6 +66,9 @@ public class NRVideoTrackerQoeTest {
         Long renditionHeight;
         Long renditionBitrate;
         Long networkDownloadBitrate;
+
+        QoeTestTracker() { super(); }
+        QoeTestTracker(NRVideoConfiguration config) { super(config); }
 
         @Override public Long getRenditionWidth()        { return renditionWidth; }
         @Override public Long getRenditionHeight()       { return renditionHeight; }
@@ -299,6 +306,47 @@ public class NRVideoTrackerQoeTest {
         tracker.renditionWidth = 1280L; tracker.renditionHeight = 720L;  emitContentEvent(); // counted
 
         assertEquals(1L, lng(kpis(), "totalRenditions"));
+    }
+
+    // =========================================================================
+    // Per-session harvest cadence (qoeCycleCount), independent of global harvest number
+    // =========================================================================
+
+    /**
+     * The periodic-QoE gate must count this session's own polls (reset at CONTENT_REQUEST),
+     * NOT the global harvest number passed in. We use multiplier=2 and pass a constant global
+     * cycle (2) that the old global-parity formula {@code (harvestCycleNumber-1)%2} maps to
+     * "skip" forever — so if the gate still used it, nothing would ever emit.
+     */
+    @Test
+    public void cadence_gatesOnPerSessionPolls_notGlobalHarvestNumber() {
+        NRVideoConfiguration config = new NRVideoConfiguration.Builder("token")
+                .withQoeAggregateIntervalMultiplier(2)
+                .build();
+        QoeTestTracker t = new QoeTestTracker(config);
+        t.setPlayer(new Object());
+        t.sendRequest();   // CONTENT_REQUEST -> qoeCycleCount reset to 0, gate opened
+        t.sendStart();
+
+        final int GLOBAL = 2;                       // old formula: (2-1)%2==1 -> would never send
+        final List<Map<String, Object>> batch = new ArrayList<>();
+
+        // Session poll 1 -> emits (first poll always fires, regardless of global cycle).
+        t.networkDownloadBitrate = 1000L; t.sendVideoEvent(CONTENT_HEARTBEAT, null);
+        assertNotNull("session poll 1 must emit regardless of global harvest number",
+                t.generateQoeIfNeeded(batch, GLOBAL));
+
+        // Session poll 2 -> skipped by multiplier=2 (KPI still changed, so only cadence gates it).
+        t.networkDownloadBitrate = 2000L; t.sendVideoEvent(CONTENT_HEARTBEAT, null);
+        assertNull("session poll 2 skipped by multiplier",
+                t.generateQoeIfNeeded(batch, GLOBAL));
+
+        // Session poll 3 -> emits again.
+        t.networkDownloadBitrate = 3000L; t.sendVideoEvent(CONTENT_HEARTBEAT, null);
+        assertNotNull("session poll 3 emits",
+                t.generateQoeIfNeeded(batch, GLOBAL));
+
+        t.dispose();
     }
 
     // =========================================================================

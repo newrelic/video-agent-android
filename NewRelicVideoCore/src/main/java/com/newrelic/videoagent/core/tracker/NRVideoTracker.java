@@ -58,6 +58,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
     private volatile Map<String, Object> pendingQoeForNextHarvest = null; // For CONTENT_END (volatile for thread safety)
     private Map<String, Object> lastSentQoeKpis = null; // Snapshot of last sent QoE KPIs for dirty check
     private volatile Map<String, Object> cachedStandardAttributes = null; // Cached attributes for thread-safe access
+    private int qoeCycleCount = 0;   // per-session QoE harvest counter (reset at CONTENT_REQUEST)
 
     /**
      * Create a new NRVideoTracker.
@@ -349,7 +350,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                         NRLog.d("QOE provider registered at CONTENT_REQUEST");
                     }
                 }
-
+                qoeCycleCount = 0;   // reset cadence for the new view
                 sendVideoEvent(CONTENT_REQUEST);
             }
         }
@@ -611,12 +612,14 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
             // Check if this harvest cycle should send based on interval multiplier
             int intervalMultiplier = configuration.getQoeAggregateIntervalMultiplier();
 
-            // Formula matches iOS: (harvestCycleNumber - 1) % multiplier == 0
-            // Examples:
-            //   multiplier=1: cycles 1,2,3,4... (every harvest)
-            //   multiplier=2: cycles 1,3,5,7... (every other)
-            //   multiplier=3: cycles 1,4,7,10... (every third)
-            boolean shouldSend = (harvestCycleNumber - 1) % intervalMultiplier == 0;
+            // Per-session cadence: gate on this tracker's own poll count (reset at
+            // CONTENT_REQUEST), so the first periodic QoE fires on the session's first harvest
+            // regardless of global harvest parity.
+            //   multiplier=1: 1,2,3,4... (every harvest)
+            //   multiplier=2: 1,3,5,7... (every other)
+            //   multiplier=3: 1,4,7,10... (every third)
+            qoeCycleCount++;
+            boolean shouldSend = (qoeCycleCount - 1) % intervalMultiplier == 0;
 
             if (shouldSend) {
                 // Calculate current QoE KPIs from the aggregator
