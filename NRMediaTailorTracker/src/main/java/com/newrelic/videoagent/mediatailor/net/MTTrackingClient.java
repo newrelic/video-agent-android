@@ -24,39 +24,43 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * {@code POST /v1/tracking} contract.
  *
  * <p>Instance lifecycle: <b>one client per playback session</b>, reused across
- * every poll. The client holds the current {@code NextToken} — creating a
- * fresh instance on every fetch would discard the pagination cursor and cause
- * the server to re-send the same window each time (wasted parse cycles) or
- * skip beacons that arrived between polls (missed events).</p>
+ * every poll. The pagination cursor is scoped to a single poll cycle: each
+ * cycle reads the full current window from page 1 and follows {@code
+ * NextToken} within that cycle until the window is exhausted. The cursor is
+ * not carried into the next cycle — doing so would page past the window and
+ * skip avails that are still relevant.</p>
  *
  * <p>Request shape (per the AWS spec):</p>
  * <ul>
- *   <li>First fetch: {@code POST /v1/tracking/…} with body {@code {}} —
- *       returns the full manifest window and a {@code nextToken}.</li>
- *   <li>Subsequent fetches: {@code POST /v1/tracking/…} with body
- *       {@code {"NextToken":"…"}} — returns anything new since that cursor.
- *       If the server responds with the same token, there is nothing new.</li>
- *   <li>HTTP 400: the token has expired (they live for ~24h). The client
- *       drops the token and retries once with an empty body; if the second
- *       call also 400s the response is surfaced as {@code null} so the caller
- *       can degrade to manifest-only detection.</li>
+ *   <li>First page of a cycle: {@code POST /v1/tracking/…} with body
+ *       {@code {}} — returns the current manifest window and, if there is
+ *       more, a {@code nextToken}.</li>
+ *   <li>Subsequent pages <b>within the same cycle</b>: {@code POST
+ *       /v1/tracking/…} with body {@code {"NextToken":"…"}} — returns the next
+ *       page. The loop follows the cursor until the server stops issuing a new
+ *       token or the page cap is hit, then merges every page's avails into one
+ *       response.</li>
+ *   <li>HTTP 400 on the first page: the token has expired. The client drops it
+ *       and retries once with an empty body; if that also 400s the response is
+ *       surfaced as {@code null} so the caller degrades to manifest-only.</li>
  * </ul>
  *
- * <p>To dodge the forced expiry round-trip, the client resets its own token
- * pre-emptively at 23 hours of age. Nothing else about the wire is stateful
- * — the whole cursor lives here.</p>
+ * <p>The cursor is deliberately <b>not</b> persisted across poll cycles.
+ * Carrying it forward would page past the current window and skip avails that
+ * are still relevant, so every cycle restarts token-less and re-reads the full
+ * window.</p>
  */
 public class MTTrackingClient {
 
-    /** Pre-emptive reset threshold — one hour before the server's 24h expiry. */
-    private static final long TOKEN_MAX_AGE_MS = 23L * 60L * 60L * 1000L;
+    /**
+     * Upper bound on pages followed within a single poll cycle. A well-behaved
+     * MediaTailor window paginates in one or two pages; the cap stops a
+     * runaway cursor loop from blocking the fetch thread indefinitely.
+     */
+    private static final int MAX_PAGES_PER_CYCLE = 5;
 
     private final AtomicBoolean cancelled = new AtomicBoolean(false);
     private volatile HttpURLConnection activeConnection;
-
-    /** Retained across fetches so pagination survives poll boundaries. */
-    private volatile String nextToken;
-    private volatile long tokenIssuedAtMs;
 
     /**
      * Reason the most recent {@link #fetch(String)} returned {@code null}.
@@ -78,54 +82,70 @@ public class MTTrackingClient {
         }
     }
 
-    /**
-     * Clears any retained cursor so the next fetch starts a fresh manifest
-     * window. Called on activate/deactivate boundaries where continuity across
-     * sessions would be wrong.
-     */
-    public void resetToken() {
-        nextToken = null;
-        tokenIssuedAtMs = 0L;
-    }
-
     public MTTrackingResponse fetch(String trackingUrl) {
         // A cancel from a prior fetch would otherwise permanently poison this
         // client — but the tracker reuses one instance across polls, so treat
-        // each fetch as a fresh attempt.
+        // each cycle as a fresh attempt.
         cancelled.set(false);
         lastError = null;
 
-        // The server would reject an over-age token with HTTP 400 anyway; save
-        // the round-trip by dropping it ourselves once we're close to expiry.
-        if (nextToken != null
-                && tokenIssuedAtMs > 0L
-                && System.currentTimeMillis() - tokenIssuedAtMs > TOKEN_MAX_AGE_MS) {
-            NRLog.d("MT tracking pre-emptive NextToken reset (age > 23h)");
-            resetToken();
-        }
+        // Page 1 uses the retry budget (transient failures + one 400-recovery).
+        MTTrackingResponse first = fetchFirstPage(trackingUrl);
+        if (first == null) return null;
 
+        // Follow the cursor within this same cycle, merging every page's avails
+        // into the first response. A within-cycle token is a continuation of
+        // the window we're already reading, so a mid-page transient failure
+        // just truncates pagination — we still return the pages we have rather
+        // than discarding a good first page.
+        String token = first.nextToken;
+        int page = 1;
+        while (token != null && !token.isEmpty()) {
+            if (cancelled.get()) return first;
+            if (page >= MAX_PAGES_PER_CYCLE) {
+                NRLog.w("MT tracking pagination cap (" + MAX_PAGES_PER_CYCLE
+                        + " pages) hit — later avails in this window not fetched this cycle");
+                break;
+            }
+            MTTrackingResponse next;
+            try {
+                next = fetchOnce(trackingUrl, token);
+            } catch (Exception e) {
+                if (cancelled.get()) return first;
+                NRLog.d("MT tracking pagination page " + (page + 1) + " failed: " + e
+                        + " — returning pages fetched so far");
+                break;
+            }
+            if (next == null) break;
+            first.avails.addAll(next.avails);
+            first.nonLinearAvails.addAll(next.nonLinearAvails);
+            // Guard against a server that echoes the same token forever.
+            if (token.equals(next.nextToken)) break;
+            token = next.nextToken;
+            page++;
+        }
+        first.nextToken = null;
+        return first;
+    }
+
+    private MTTrackingResponse fetchFirstPage(String trackingUrl) {
         int attempts = 0;
         boolean triedResetOn400 = false;
         boolean lastAttemptWasTimeout = false;
         while (attempts <= MTConstants.TRACKING_MAX_RETRIES) {
             if (cancelled.get()) return null;
             try {
-                MTTrackingResponse resp = fetchOnce(trackingUrl);
-                if (resp != null) rememberToken(resp.nextToken);
-                return resp;
+                return fetchOnce(trackingUrl, null);
             } catch (TokenExpiredException e) {
-                // A 400 here means the server no longer recognises our token
-                // (the "same" session was rebalanced onto another node, or the
-                // token slipped past its 24h horizon between our pre-emptive
-                // check and the server's clock). One reset-and-retry is the
-                // documented recovery path.
+                // The server rejected an empty-body request with 400 only on
+                // the reset retry — treat a persistent 400 as tracking being
+                // unavailable. (First page carries no token, so a 400 here is
+                // unusual, but the recovery path is kept for parity.)
                 if (!triedResetOn400) {
-                    NRLog.d("MT tracking HTTP 400 — dropping NextToken and retrying with fresh window");
-                    resetToken();
+                    NRLog.d("MT tracking HTTP 400 on first page — retrying fresh window");
                     triedResetOn400 = true;
-                    // retry doesn't count against the transient-failure budget
                 } else {
-                    NRLog.w("MT tracking HTTP 400 persists after reset — tracking unavailable");
+                    NRLog.w("MT tracking HTTP 400 persists — tracking unavailable");
                     lastError = MTAdErrorCode.TOKEN_EXPIRED;
                     return null;
                 }
@@ -150,18 +170,7 @@ public class MTTrackingClient {
         return null;
     }
 
-    private void rememberToken(String token) {
-        if (token == null || token.isEmpty()) return;
-        // A repeated token means "no new beacons since your last poll" — the
-        // issuance time hasn't actually moved, so leave tokenIssuedAtMs alone
-        // and let the pre-emptive-reset clock keep counting from first issue.
-        if (!token.equals(this.nextToken)) {
-            this.nextToken = token;
-            this.tokenIssuedAtMs = System.currentTimeMillis();
-        }
-    }
-
-    private MTTrackingResponse fetchOnce(String trackingUrl) throws IOException, JSONException {
+    private MTTrackingResponse fetchOnce(String trackingUrl, String token) throws IOException, JSONException {
         URL url = new URL(trackingUrl);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         activeConnection = conn;
@@ -173,7 +182,7 @@ public class MTTrackingClient {
             conn.setRequestProperty("Accept", "application/json");
             conn.setRequestProperty("Content-Type", "application/json");
 
-            byte[] body = buildRequestBody().getBytes(StandardCharsets.UTF_8);
+            byte[] body = buildRequestBody(token).getBytes(StandardCharsets.UTF_8);
             conn.setFixedLengthStreamingMode(body.length);
             try (OutputStream os = conn.getOutputStream()) {
                 os.write(body);
@@ -203,9 +212,8 @@ public class MTTrackingClient {
         }
     }
 
-    private String buildRequestBody() {
-        String token = nextToken;
-        if (token == null) return "{}";
+    private String buildRequestBody(String token) {
+        if (token == null || token.isEmpty()) return "{}";
         return "{\"NextToken\":\"" + escapeJson(token) + "\"}";
     }
 

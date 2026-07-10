@@ -556,11 +556,9 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
     }
 
     private void startTrackingFetch() {
-        // Abort any in-flight fetch but keep the same client instance: it
-        // holds the NextToken cursor, and creating a fresh client on every
-        // poll would force the server to re-send the full manifest window
-        // (or miss beacons that arrived between polls, if the server treats
-        // absence-of-token as "start over").
+        // Abort any in-flight fetch but reuse the client instance to avoid
+        // per-poll allocation churn. Pagination is scoped to a single fetch
+        // cycle inside the client, so no cursor state needs to survive here.
         abortInFlightTracking();
         if (trackingClient == null) trackingClient = new MTTrackingClient();
         final MTTrackingClient client = trackingClient;
@@ -607,9 +605,8 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
     }
 
     private void cancelTrackingFetch() {
-        // Session teardown: drop the cursor too, because the next activation
-        // is a new MediaTailor session and any retained token belongs to the
-        // one we just left.
+        // Session teardown: release the client so the next activation starts a
+        // fresh MediaTailor session with no carry-over connection state.
         abortInFlightTracking();
         trackingClient = null;
     }
