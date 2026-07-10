@@ -692,6 +692,29 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         } else if (currentAdBreak != null) {
             handleExitingBreak();
         }
+
+        pruneViewedBreaks(position);
+    }
+
+    /**
+     * Drops breaks that ended more than {@link MTConstants#PRUNE_BUFFER_MS}
+     * before the playhead so a 24/7 live schedule stays bounded and per-tick
+     * scans stay flat. Only runs on live — a VOD schedule is finite and a
+     * viewer can seek back into an earlier break. The active break and any
+     * upcoming break are always kept; the buffer leaves a just-ended break
+     * around long enough for a trailing quartile / AD_END to resolve.
+     */
+    private void pruneViewedBreaks(long positionMs) {
+        if (!MTConstants.STREAM_TYPE_LIVE.equals(streamType)) return;
+        long cutoff = positionMs - MTConstants.PRUNE_BUFFER_MS;
+        synchronized (adSchedule) {
+            for (java.util.Iterator<MTAdBreak> it = adSchedule.iterator(); it.hasNext(); ) {
+                MTAdBreak b = it.next();
+                if (b != currentAdBreak && b.endTimeMs < cutoff) {
+                    it.remove();
+                }
+            }
+        }
     }
 
     private MTAdBreak findActiveBreak(long positionMs) {

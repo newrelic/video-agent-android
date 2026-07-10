@@ -67,6 +67,14 @@ public final class MTConstants {
 
     public static final long PLAYHEAD_POLL_INTERVAL_MS = 250L;
 
+    /**
+     * A break whose end is older than the playhead by more than this buffer is
+     * pruned from the live schedule. The buffer keeps a just-ended break around
+     * long enough for a late final quartile / AD_END to still resolve before it
+     * is dropped, while bounding schedule growth on 24/7 live sessions.
+     */
+    public static final long PRUNE_BUFFER_MS = 30_000L;
+
     public static final int TRACKING_TIMEOUT_MS = 5000;
     public static final int TRACKING_MAX_RETRIES = 1;
 
