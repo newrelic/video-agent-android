@@ -91,6 +91,27 @@ public final class MTDetector {
         String full = uri.toString();
         if (full == null) return null;
         Matcher m = SESSION_ID.matcher(full);
-        return m.find() ? m.group(1) : null;
+        if (m.find()) return m.group(1);
+        // Implicit-session and tracking URLs carry the session id as the last
+        // path segment rather than a query param.
+        return sessionIdFromPath(full);
+    }
+
+    /**
+     * Null-safe extraction of the trailing path segment — the MediaTailor
+     * convention that the session id is the last segment of a tracking URL
+     * ({@code /v1/tracking/{cfg}/{origin}/{sessionId}}). Strips any query
+     * string first. Returns {@code null} for missing or malformed input.
+     *
+     * <p>Single source of truth for the "trailing segment is sessionId"
+     * assumption so it stays fixable in one place if MediaTailor changes shape.</p>
+     */
+    public static String sessionIdFromPath(String url) {
+        if (url == null) return null;
+        int q = url.indexOf('?');
+        String path = q >= 0 ? url.substring(0, q) : url;
+        int slash = path.lastIndexOf('/');
+        if (slash < 0 || slash == path.length() - 1) return null;
+        return path.substring(slash + 1);
     }
 }
