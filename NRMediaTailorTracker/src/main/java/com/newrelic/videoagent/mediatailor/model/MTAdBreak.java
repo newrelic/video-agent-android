@@ -62,6 +62,17 @@ public class MTAdBreak {
      */
     public boolean podCountMismatch;
 
+    /**
+     * The break's pods were built from the tracking API's {@code ads} array
+     * rather than from manifest segment / discontinuity boundaries. MediaTailor
+     * fills an avail's {@code ads} incrementally, so a pod that starts as one
+     * ad can grow to several across polls. When the pods are tracking-sourced,
+     * a later poll reporting more ads than pods appends the newcomers; when the
+     * pods came from the manifest, their boundaries are ground truth and the
+     * extra tracking ads are matched to the closest pod instead.
+     */
+    public boolean podsFromTracking;
+
     public boolean hasFiredStart;
     public boolean hasFiredEnd;
     public boolean hasFiredAdStart;

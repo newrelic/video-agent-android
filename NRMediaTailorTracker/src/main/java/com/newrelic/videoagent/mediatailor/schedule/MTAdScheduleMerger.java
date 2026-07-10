@@ -170,6 +170,24 @@ public final class MTAdScheduleMerger {
                 copyAdToPod(ad, pod, avail.availId);
                 target.pods.add(pod);
             }
+            target.podsFromTracking = true;
+        } else if (target.podsFromTracking && avail.ads.size() > target.pods.size()) {
+            // The avail grew: MediaTailor reported more ads this poll than the
+            // last one, and the existing pods were themselves tracking-built.
+            // Update the pods we already have (preserving their fired flags) and
+            // append the newcomers keyed by adId so findActivePod picks them up
+            // on the next tick. Ads #2/#3 of a pod that first arrived as one ad
+            // would otherwise never fire AD_START / quartiles / AD_END.
+            for (MTTrackingResponse.Ad ad : avail.ads) {
+                MTAdPod existing = findPodByAdId(target.pods, ad.adId);
+                if (existing != null) {
+                    copyAdToPod(ad, existing, avail.availId);
+                } else {
+                    MTAdPod pod = new MTAdPod(ad.startTimeMs, ad.durationMs);
+                    copyAdToPod(ad, pod, avail.availId);
+                    target.pods.add(pod);
+                }
+            }
         } else if (target.pods.size() == avail.ads.size()) {
             // Manifest pod count and tracking ad count agree; index-align the
             // metadata onto the existing (correctly-timed) manifest pods.
@@ -194,6 +212,14 @@ public final class MTAdScheduleMerger {
                 if (closest != null) copyAdToPod(closest, pod, avail.availId);
             }
         }
+    }
+
+    private static MTAdPod findPodByAdId(List<MTAdPod> pods, String adId) {
+        if (adId == null) return null;
+        for (MTAdPod p : pods) {
+            if (adId.equals(p.adId)) return p;
+        }
+        return null;
     }
 
     private static MTTrackingResponse.Ad closestAdWithinTolerance(long startMs, List<MTTrackingResponse.Ad> ads) {
@@ -256,6 +282,7 @@ public final class MTAdScheduleMerger {
                 copyAdToPod(ad, pod, avail.availId);
                 b.pods.add(pod);
             }
+            b.podsFromTracking = true;
         }
         return b;
     }
