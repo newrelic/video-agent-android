@@ -358,10 +358,17 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         String detectionDesc = segmentPrefix != null
                 ? "aws-hostname | /tm/ | custom='" + segmentPrefix + "'"
                 : "aws-hostname | /tm/";
+        // An implicit-session stream exposes the sessionId only inside the
+        // media-playlist path, which ExoPlayer hasn't loaded yet at activation
+        // time — the reparse hook derives the tracking URL once it arrives.
+        // That is the normal path, so describe it as a deferral, not a failure.
+        String trackingState = trackingUrl != null
+                ? trackingUrl
+                : "will derive from media playlist once loaded";
         NRLog.d(MTConstants.LOG_DETECT + " activated"
                 + " format=" + manifestType
                 + " detection=[" + detectionDesc + "]"
-                + " trackingUrl=" + (trackingUrl != null ? trackingUrl : "pending")
+                + " trackingUrl=" + trackingState
                 + " endpoint=" + mediaTailorEndpoint);
 
         startPolling();
