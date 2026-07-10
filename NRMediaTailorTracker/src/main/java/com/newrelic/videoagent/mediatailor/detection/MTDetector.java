@@ -30,12 +30,13 @@ public final class MTDetector {
             Pattern.compile("/v1/(master|session|dash)/");
     private static final Pattern MANIFEST_FILE =
             Pattern.compile("/[^/]*\\.(m3u8|mpd)(\\?.*)?$");
-    // Implicit-session HLS flows carry no ?sessionId= query param; the session
-    // id lives inside the media playlist path as
-    // /v1/manifest/{cfg}/{origin}/{sessionId}/{variant}.m3u8. The tracking
-    // endpoint is the sibling /v1/tracking/{cfg}/{origin}/{sessionId}.
+    // Implicit-session flows carry no ?sessionId= query param; the session id
+    // lives inside the media playlist path. HLS uses
+    // /v1/manifest/{cfg}/{origin}/{sessionId}/{variant}.m3u8 and DASH uses
+    // /v1/dash/{cfg}/{origin}/{sessionId}/{variant}.mpd. The tracking endpoint
+    // is the sibling /v1/tracking/{cfg}/{origin}/{sessionId} in both cases.
     private static final Pattern MEDIA_SESSION_PATH =
-            Pattern.compile("/v1/manifest/([^/]+)/([^/]+)/([^/]+)/[^/]+\\.(m3u8|mpd)");
+            Pattern.compile("/v1/(?:manifest|dash)/([^/]+)/([^/]+)/([^/]+)/[^/]+\\.(m3u8|mpd)");
 
     private MTDetector() {}
 

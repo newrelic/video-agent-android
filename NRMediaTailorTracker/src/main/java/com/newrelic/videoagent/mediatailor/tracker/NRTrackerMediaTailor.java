@@ -407,6 +407,9 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
                 if (derived != null) {
                     trackingUrl = derived;
                     NRLog.d(MTConstants.LOG_TRACK + " trackingUrl recovered from DASH <Location>: " + trackingUrl);
+                } else {
+                    NRLog.d(MTConstants.LOG_TRACK + " DASH tracking URL not derivable from <Location>="
+                            + dash.location + " — falling back to manifest-marker detection");
                 }
             }
             List<MTAdBreak> parsed = MTDashParser.parse(dash, segmentPrefix);
