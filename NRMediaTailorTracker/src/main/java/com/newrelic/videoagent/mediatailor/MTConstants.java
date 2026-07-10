@@ -74,6 +74,16 @@ public final class MTConstants {
     public static final double QUARTILE_Q2 = 0.50;
     public static final double QUARTILE_Q3 = 0.75;
 
+    // ── Tracking-URL resolution path labels ────────────────────────────────
+    // Stable enum strings logged once per tracker init so downstream tooling
+    // can filter on how the tracking endpoint was resolved (or why it wasn't).
+    public static final String RESOLVE_EXPLICIT      = "explicit-option";
+    public static final String RESOLVE_QUERY         = "query-param";
+    public static final String RESOLVE_IMPLICIT_PATH = "implicit-media-playlist-path";
+    public static final String RESOLVE_DASH_LOCATION = "dash-location";
+    public static final String RESOLVE_DATERANGE     = "daterange";
+    public static final String RESOLVE_NOT_DERIVABLE = "mediatailor-url-not-derivable";
+
     // ── Log tag prefixes ───────────────────────────────────────────────────
     // All MediaTailor log lines start with [MT] followed by a subsystem tag.
     // Grep for "[MT]" to see everything, or narrow with e.g. "[MT][DETECT]".

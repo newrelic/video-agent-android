@@ -111,6 +111,9 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
 
     private final AtomicBoolean isDisposed = new AtomicBoolean(false);
     private final AtomicBoolean hasAttemptedTrackingFetch = new AtomicBoolean(false);
+    // Ensures the tracking-URL resolution path is classified exactly once per
+    // activation, no matter which hook (activate / reparse) resolves it first.
+    private boolean loggedTrackingResolution;
 
     private Handler pollHandler;
     private Runnable pollRunnable;
@@ -346,8 +349,19 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         mediaTailorEndpoint = uri.toString();
         manifestType        = MTDetector.manifestType(uri);
 
-        if (trackingUrl == null) {
-            trackingUrl = MTDetector.extractTrackingUrl(uri);
+        loggedTrackingResolution = false;
+        if (trackingUrl != null) {
+            // Set before any manifest was seen — came from NRAdConfig.trackingUrl.
+            logTrackingResolution(MTConstants.RESOLVE_EXPLICIT);
+        } else {
+            String derived = MTDetector.extractTrackingUrl(uri);
+            if (derived != null) {
+                trackingUrl = derived;
+                boolean fromQuery = uri.toString().contains("sessionId=");
+                logTrackingResolution(fromQuery
+                        ? MTConstants.RESOLVE_QUERY
+                        : MTConstants.RESOLVE_IMPLICIT_PATH);
+            }
         }
 
         hasAttemptedTrackingFetch.set(false);
@@ -372,6 +386,19 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
                 + " endpoint=" + mediaTailorEndpoint);
 
         startPolling();
+    }
+
+    /**
+     * Emits exactly one classification line per activation naming which path
+     * resolved the tracking endpoint (or that a MediaTailor URL yielded none).
+     * The label is a stable enum string so downstream tooling can filter on it
+     * when diagnosing an ad-less stream.
+     */
+    private void logTrackingResolution(String resolvedPath) {
+        if (loggedTrackingResolution) return;
+        loggedTrackingResolution = true;
+        NRLog.d(MTConstants.LOG_TRACK + " resolution=" + resolvedPath
+                + " trackingUrl=" + (trackingUrl != null ? trackingUrl : "none"));
     }
 
     private void deactivate() {
@@ -414,6 +441,7 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
                 if (derived != null) {
                     trackingUrl = derived;
                     NRLog.d(MTConstants.LOG_TRACK + " trackingUrl recovered from DASH <Location>: " + trackingUrl);
+                    logTrackingResolution(MTConstants.RESOLVE_DASH_LOCATION);
                 } else {
                     NRLog.d(MTConstants.LOG_TRACK + " DASH tracking URL not derivable from <Location>="
                             + dash.location + " — falling back to manifest-marker detection");
@@ -439,6 +467,7 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
                 if (fromTag != null) {
                     trackingUrl = fromTag;
                     NRLog.d(MTConstants.LOG_TRACK + " trackingUrl from EXT-X-DATERANGE CLASS=tracking: " + trackingUrl);
+                    logTrackingResolution(MTConstants.RESOLVE_DATERANGE);
                 }
             }
             int segCount = hls.mediaPlaylist != null && hls.mediaPlaylist.segments != null
@@ -454,6 +483,13 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
                     + manifest.getClass().getName());
         } else {
             NRLog.d(MTConstants.LOG_TAG + " getCurrentManifest() returned null — not loaded yet");
+        }
+        // A manifest has now been parsed. If no resolution path has claimed the
+        // tracking URL by this point, this is a MediaTailor stream whose
+        // endpoint can't be derived — record it once so an ad-less stream is
+        // diagnosable as "never resolved" rather than "resolved but empty".
+        if (trackingUrl == null && manifest != null) {
+            logTrackingResolution(MTConstants.RESOLVE_NOT_DERIVABLE);
         }
         maybeFetchTracking();
     }
