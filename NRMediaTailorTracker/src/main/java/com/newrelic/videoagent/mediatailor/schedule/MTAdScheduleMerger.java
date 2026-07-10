@@ -191,7 +191,7 @@ public final class MTAdScheduleMerger {
             // on the next tick. Ads #2/#3 of a pod that first arrived as one ad
             // would otherwise never fire AD_START / quartiles / AD_END.
             for (MTTrackingResponse.Ad ad : avail.ads) {
-                MTAdPod existing = findPodByAdId(target.pods, ad.adId);
+                MTAdPod existing = findMatchingPod(target.pods, ad);
                 if (existing != null) {
                     copyAdToPod(ad, existing, avail.availId);
                 } else {
@@ -236,10 +236,23 @@ public final class MTAdScheduleMerger {
         }
     }
 
-    private static MTAdPod findPodByAdId(List<MTAdPod> pods, String adId) {
-        if (adId == null) return null;
+    /**
+     * Locate the existing pod an incoming tracking ad corresponds to. adId is
+     * the stable identity when MediaTailor supplies one. A VAST ad with no
+     * {@code <Ad id>} reports a null adId; those fall back to matching by start
+     * time, which is stable across polls for tracking-built pods. Without the
+     * fallback a null-adId ad matches nothing and gets re-appended as a
+     * duplicate pod on every growth poll, inflating impressions.
+     */
+    private static MTAdPod findMatchingPod(List<MTAdPod> pods, MTTrackingResponse.Ad ad) {
+        if (ad.adId != null) {
+            for (MTAdPod p : pods) {
+                if (ad.adId.equals(p.adId)) return p;
+            }
+            return null;
+        }
         for (MTAdPod p : pods) {
-            if (adId.equals(p.adId)) return p;
+            if (p.adId == null && p.startTimeMs == ad.startTimeMs) return p;
         }
         return null;
     }
