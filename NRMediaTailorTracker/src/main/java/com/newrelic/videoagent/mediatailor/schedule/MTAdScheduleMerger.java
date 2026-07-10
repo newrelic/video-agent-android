@@ -66,6 +66,17 @@ public final class MTAdScheduleMerger {
      * itself has no event-emission path.
      */
     public static MergedSchedule enrichWithTracking(List<MTAdBreak> schedule, MTTrackingResponse tracking) {
+        return enrichWithTracking(schedule, tracking, -1L);
+    }
+
+    /**
+     * Variant that additionally takes the current playhead so the growth branch
+     * can flag a pod appended after the playhead already left its window — the
+     * append is real data but the engagement is unrecoverable, and marking it
+     * keeps the under-count visible.
+     */
+    public static MergedSchedule enrichWithTracking(List<MTAdBreak> schedule, MTTrackingResponse tracking,
+                                                     long playheadMs) {
         List<MTAdBreak> out = new ArrayList<>(schedule);
         List<MTAdErrorCode> pendingErrors = new ArrayList<>();
         if (tracking == null) return new MergedSchedule(out, pendingErrors);
@@ -77,7 +88,7 @@ public final class MTAdScheduleMerger {
 
             MTAdBreak match = findMatchForAvail(out, avail, availStart);
             if (match != null) {
-                enrich(match, avail);
+                enrich(match, avail, playheadMs, pendingErrors);
             } else {
                 out.add(fromAvail(avail, availStart));
             }
@@ -137,7 +148,8 @@ public final class MTAdScheduleMerger {
         }
     }
 
-    private static void enrich(MTAdBreak target, MTTrackingResponse.Avail avail) {
+    private static void enrich(MTAdBreak target, MTTrackingResponse.Avail avail,
+                               long playheadMs, List<MTAdErrorCode> pendingErrors) {
         if (avail.availId != null) target.id = avail.availId;
         target.confirmedByTracking = true;
         target.availProgramDateTime = avail.availProgramDateTime;
@@ -185,6 +197,16 @@ public final class MTAdScheduleMerger {
                 } else {
                     MTAdPod pod = new MTAdPod(ad.startTimeMs, ad.durationMs);
                     copyAdToPod(ad, pod, avail.availId);
+                    // The append is real, but if the playhead is already past
+                    // this pod's window the poll loop can never select it.
+                    // Flag it rather than fabricate a retroactive impression.
+                    if (playheadMs >= 0 && pod.endTimeMs <= playheadMs) {
+                        pod.missedByLateAppend = true;
+                        pendingErrors.add(MTAdErrorCode.POD_MISSED_LATE_APPEND);
+                        NRLog.w(MTConstants.LOG_TAG + " pod appended past playhead ("
+                                + pod.startTimeMs + "-" + pod.endTimeMs + "ms, playhead="
+                                + playheadMs + "ms) — counted as missed, no AD_* emitted");
+                    }
                     target.pods.add(pod);
                 }
             }

@@ -38,6 +38,14 @@ public class MTAdPod {
      */
     public final List<MTTrackingEvent> trackingEvents = new ArrayList<>();
 
+    /**
+     * The pod was appended to its break after the playhead had already passed
+     * its {@code endTimeMs}, so {@code findActivePod} will never select it and
+     * no AD_START / quartile / AD_END can fire without fabricating retroactive
+     * engagement. Set so the drop is countable rather than silent.
+     */
+    public boolean missedByLateAppend;
+
     public boolean hasFiredStart;
     public boolean hasFiredQ1;
     public boolean hasFiredQ2;

@@ -67,7 +67,17 @@ public enum MTAdErrorCode {
      * paths that surface this asymmetry rather than silently favouring
      * one source.
      */
-    MANIFEST_TRACKING_MISMATCH("Manifest and tracking response disagree");
+    MANIFEST_TRACKING_MISMATCH("Manifest and tracking response disagree"),
+
+    /**
+     * A pod arrived from the tracking API after the playhead had already
+     * passed its {@code endTime}. Its window is entirely in the past, so
+     * {@code findActivePod} can never select it and no AD_START / quartile /
+     * AD_END will fire — firing them retroactively would fabricate engagement
+     * that never happened. Emitted once per missed pod so the under-count is
+     * visible in reporting instead of a silent drop.
+     */
+    POD_MISSED_LATE_APPEND("Pod appended after playhead passed its endTime");
 
     private final String defaultMessage;
 

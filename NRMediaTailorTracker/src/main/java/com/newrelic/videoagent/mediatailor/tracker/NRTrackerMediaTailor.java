@@ -624,10 +624,11 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
             public void run() {
                 if (isDisposed.get()) return;
                 nonLinearAvailsCount = resp.nonLinearAvails.size();
+                long playhead = player != null ? player.getCurrentPosition() : -1L;
                 MergedSchedule merged;
                 synchronized (adSchedule) {
                     merged = MTAdScheduleMerger.enrichWithTracking(
-                            new ArrayList<>(adSchedule), resp);
+                            new ArrayList<>(adSchedule), resp, playhead);
                     adSchedule.clear();
                     adSchedule.addAll(merged.breaks);
                     NRLog.d(MTConstants.LOG_TRACK + " schedule enriched: " + adSchedule.size()
