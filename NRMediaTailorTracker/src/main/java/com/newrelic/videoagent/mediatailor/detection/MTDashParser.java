@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   <li>{@code segments.mediatailor} — default AWS ad-segment hostname.</li>
  *   <li>{@code /v1/dashsegment/} — MediaTailor CDN rewrite path.</li>
  *   <li>{@code /tm/} — AWS-recommended custom CDN prefix; always active.</li>
- *   <li>{@code segmentPrefix} — customer override; only checked when non-null.</li>
+ *   <li>{@code adSegmentPrefix} — customer override; only checked when non-null.</li>
  * </ol>
  */
 @OptIn(markerClass = UnstableApi.class)
@@ -63,25 +63,25 @@ public final class MTDashParser {
      * Parse the DASH manifest into ad breaks.
      *
      * @param manifest      Manifest from {@code ExoPlayer.getCurrentManifest()}.
-     * @param segmentPrefix Optional customer CDN prefix override. Pass {@code null}
+     * @param adSegmentPrefix Optional customer CDN prefix override. Pass {@code null}
      *                      to rely on default detection ({@code segments.mediatailor},
      *                      {@code /v1/dashsegment/}, and {@code /tm/}).
      */
-    public static List<MTAdBreak> parse(DashManifest manifest, @Nullable String segmentPrefix) {
+    public static List<MTAdBreak> parse(DashManifest manifest, @Nullable String adSegmentPrefix) {
         List<MTAdBreak> breaks = new ArrayList<>();
         if (manifest == null) return breaks;
 
         int periodCount = manifest.getPeriodCount();
         if (periodCount <= 0) return breaks;
 
-        logDetectionMode(segmentPrefix);
+        logDetectionMode(adSegmentPrefix);
 
         // ── Parse ──────────────────────────────────────────────────────────
         NRLog.d(MTConstants.LOG_PARSE_DASH + " parsing " + periodCount + " period(s), type="
                 + (periodCount > 1 ? "multi-period" : "single-period"));
 
         if (periodCount > 1) {
-            parseMultiPeriod(manifest, segmentPrefix, breaks);
+            parseMultiPeriod(manifest, adSegmentPrefix, breaks);
         } else {
             parseSinglePeriod(manifest.getPeriod(0), breaks);
         }
@@ -93,12 +93,12 @@ public final class MTDashParser {
     // ── Multi-period ───────────────────────────────────────────────────────
 
     private static void parseMultiPeriod(DashManifest manifest,
-                                          @Nullable String segmentPrefix,
+                                          @Nullable String adSegmentPrefix,
                                           List<MTAdBreak> out) {
         int count = manifest.getPeriodCount();
         for (int i = 0; i < count; i++) {
             Period period = manifest.getPeriod(i);
-            String adMarker = whichMarkerMatchedPeriod(period, segmentPrefix);
+            String adMarker = whichMarkerMatchedPeriod(period, adSegmentPrefix);
             if (adMarker == null) continue;
 
             long startMs    = period.startMs;
@@ -156,7 +156,7 @@ public final class MTDashParser {
      */
     @Nullable
     private static String whichMarkerMatchedPeriod(Period period,
-                                                    @Nullable String segmentPrefix) {
+                                                    @Nullable String adSegmentPrefix) {
         if (period == null || period.adaptationSets == null) return null;
         String firstMarker = null;
         int totalReps = 0;
@@ -168,7 +168,7 @@ public final class MTDashParser {
                 totalReps++;
                 for (BaseUrl b : rep.baseUrls) {
                     if (b == null || b.url == null) continue;
-                    String marker = whichMarkerMatched(b.url, segmentPrefix);
+                    String marker = whichMarkerMatched(b.url, adSegmentPrefix);
                     if (marker != null) {
                         adReps++;
                         if (firstMarker == null) firstMarker = marker;
@@ -193,21 +193,21 @@ public final class MTDashParser {
      * or {@code null} if no marker matched.
      */
     @Nullable
-    static String whichMarkerMatched(@Nullable String url, @Nullable String segmentPrefix) {
+    static String whichMarkerMatched(@Nullable String url, @Nullable String adSegmentPrefix) {
         if (url == null) return null;
         if (url.contains(MTConstants.MT_SEGMENT_PATTERN))          return "aws-hostname";
         if (url.contains(MTConstants.MT_DASHSEGMENT_PATH_PATTERN)) return "dashsegment-path";
         if (url.contains(MTConstants.MT_DEFAULT_AD_SEGMENT_PATH))  return "/tm/";
-        if (segmentPrefix != null && url.contains(segmentPrefix))  return "custom:'" + segmentPrefix + "'";
+        if (adSegmentPrefix != null && url.contains(adSegmentPrefix))  return "custom:'" + adSegmentPrefix + "'";
         return null;
     }
 
     // ── Logging ────────────────────────────────────────────────────────────
 
-    private static void logDetectionMode(@Nullable String segmentPrefix) {
-        if (segmentPrefix != null) {
+    private static void logDetectionMode(@Nullable String adSegmentPrefix) {
+        if (adSegmentPrefix != null) {
             NRLog.d(MTConstants.LOG_PARSE_DASH + " detection: aws-hostname | /tm/ | custom='"
-                    + segmentPrefix + "'");
+                    + adSegmentPrefix + "'");
         } else {
             NRLog.d(MTConstants.LOG_PARSE_DASH + " detection: aws-hostname | /tm/ (no custom prefix)");
         }

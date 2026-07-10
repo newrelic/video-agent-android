@@ -40,7 +40,7 @@ public final class MTConstants {
     //                               — MediaTailor CDN rewrite paths
     //   3. MT_DEFAULT_AD_SEGMENT_PATH — AWS-recommended custom CDN prefix,
     //                                   always checked for all customers
-    //   4. customer segmentPrefix   — override for non-/tm/ CDN paths (optional)
+    //   4. customer adSegmentPrefix   — override for non-/tm/ CDN paths (optional)
     public static final String MT_SEGMENT_PATTERN          = "segments.mediatailor";
     public static final String MT_DASHSEGMENT_PATH_PATTERN = "/v1/dashsegment/";
     public static final String MT_HLSSEGMENT_PATH_PATTERN  = "/v1/hlssegment/";

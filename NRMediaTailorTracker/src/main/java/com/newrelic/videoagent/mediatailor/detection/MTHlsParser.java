@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
  *   <li>{@code segments.mediatailor} — default AWS ad-segment hostname.</li>
  *   <li>{@code /v1/hlssegment/} — MediaTailor CDN rewrite path.</li>
  *   <li>{@code /tm/} — AWS-recommended custom CDN prefix; always active.</li>
- *   <li>{@code segmentPrefix} — customer override; only checked when non-null.</li>
+ *   <li>{@code adSegmentPrefix} — customer override; only checked when non-null.</li>
  * </ol>
  *
  * <p>Pod boundaries inside a break are detected via
@@ -55,17 +55,17 @@ public final class MTHlsParser {
      * Parse the HLS manifest into ad breaks.
      *
      * @param manifest      Manifest from {@code ExoPlayer.getCurrentManifest()}.
-     * @param segmentPrefix Optional customer CDN prefix override. Pass {@code null}
+     * @param adSegmentPrefix Optional customer CDN prefix override. Pass {@code null}
      *                      to rely on default detection ({@code segments.mediatailor},
      *                      {@code /v1/hlssegment/}, and {@code /tm/}).
      */
-    public static List<MTAdBreak> parse(HlsManifest manifest, @Nullable String segmentPrefix) {
+    public static List<MTAdBreak> parse(HlsManifest manifest, @Nullable String adSegmentPrefix) {
         List<MTAdBreak> breaks = new ArrayList<>();
         if (manifest == null || manifest.mediaPlaylist == null) return breaks;
         HlsMediaPlaylist playlist = manifest.mediaPlaylist;
         if (playlist.segments == null || playlist.segments.isEmpty()) return breaks;
 
-        logDetectionMode(segmentPrefix);
+        logDetectionMode(adSegmentPrefix);
 
         // ── Parse ad breaks ────────────────────────────────────────────────
         MTAdBreak currentBreak = null;
@@ -78,7 +78,7 @@ public final class MTHlsParser {
             long startMs = seg.relativeStartTimeUs / 1000L;
             long durMs   = Math.max(seg.durationUs / 1000L, 0L);
 
-            String matchedVia = whichMarkerMatched(seg.url, segmentPrefix);
+            String matchedVia = whichMarkerMatched(seg.url, adSegmentPrefix);
             if (matchedVia != null) {
                 if (currentBreak == null) {
                     currentBreak      = new MTAdBreak("hls-break-" + startMs, startMs, 0L);
@@ -117,12 +117,12 @@ public final class MTHlsParser {
      * (inspired by VideoJS PR #108's {@code whichAdSegmentMarker} helper).</p>
      */
     @Nullable
-    static String whichMarkerMatched(@Nullable String url, @Nullable String segmentPrefix) {
+    static String whichMarkerMatched(@Nullable String url, @Nullable String adSegmentPrefix) {
         if (url == null) return null;
         if (url.contains(MTConstants.MT_SEGMENT_PATTERN))         return "aws-hostname";
         if (url.contains(MTConstants.MT_HLSSEGMENT_PATH_PATTERN)) return "hlssegment-path";
         if (url.contains(MTConstants.MT_DEFAULT_AD_SEGMENT_PATH)) return "/tm/";
-        if (segmentPrefix != null && url.contains(segmentPrefix)) return "custom:'" + segmentPrefix + "'";
+        if (adSegmentPrefix != null && url.contains(adSegmentPrefix)) return "custom:'" + adSegmentPrefix + "'";
         return null;
     }
 
@@ -168,10 +168,10 @@ public final class MTHlsParser {
 
     // ── Logging ────────────────────────────────────────────────────────────
 
-    private static void logDetectionMode(@Nullable String segmentPrefix) {
-        if (segmentPrefix != null) {
+    private static void logDetectionMode(@Nullable String adSegmentPrefix) {
+        if (adSegmentPrefix != null) {
             NRLog.d(MTConstants.LOG_PARSE_HLS + " detection: aws-hostname | /tm/ | custom='"
-                    + segmentPrefix + "'");
+                    + adSegmentPrefix + "'");
         } else {
             NRLog.d(MTConstants.LOG_PARSE_HLS + " detection: aws-hostname | /tm/ (no custom prefix)");
         }

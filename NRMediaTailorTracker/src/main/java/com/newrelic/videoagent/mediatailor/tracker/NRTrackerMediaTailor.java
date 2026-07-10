@@ -85,7 +85,7 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
     private ExoPlayer player;
 
     // Set at construction time from NRAdConfig; null means no custom prefix.
-    private final String segmentPrefix;
+    private final String adSegmentPrefix;
     // True when the customer explicitly passed NRAdConfig.mediaTailor() —
     // activation is unconditional (no URL substring check required).
     private final boolean explicitlyConfigured;
@@ -126,7 +126,7 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
      * Primary constructor — called by {@link com.newrelic.videoagent.core.NRVideo#addPlayer}
      * when the customer passes {@link NRAdConfig#mediaTailor()}.
      *
-     * <p>Reads {@code segmentPrefix} and {@code trackingUrl} from the config so
+     * <p>Reads {@code adSegmentPrefix} and {@code trackingUrl} from the config so
      * both are available before the first manifest parse.</p>
      */
     public NRTrackerMediaTailor(NRVideoConfiguration configuration, NRAdConfig adConfig) {
@@ -141,7 +141,7 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
     public NRTrackerMediaTailor(NRVideoConfiguration configuration, NRAdConfig adConfig,
                                 long playheadPollIntervalMs) {
         super(configuration);
-        this.segmentPrefix        = adConfig != null ? adConfig.segmentPrefix : null;
+        this.adSegmentPrefix        = adConfig != null ? adConfig.adSegmentPrefix : null;
         this.explicitlyConfigured = adConfig != null;
         this.pollIntervalMs       = playheadPollIntervalMs > 0
                 ? playheadPollIntervalMs
@@ -151,14 +151,14 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         }
         NRLog.d(MTConstants.LOG_CONFIG + " tracker created — " + adConfig
                 + " explicitActivation=true"
-                + (segmentPrefix != null ? " segmentPrefix='" + segmentPrefix + "'" : " segmentPrefix=none (aws-hostname + /tm/ active)")
+                + (adSegmentPrefix != null ? " adSegmentPrefix='" + adSegmentPrefix + "'" : " adSegmentPrefix=none (aws-hostname + /tm/ active)")
                 + " pollIntervalMs=" + this.pollIntervalMs);
     }
 
     /** Fallback constructor used when no {@link NRAdConfig} is available. */
     public NRTrackerMediaTailor(NRVideoConfiguration configuration) {
         super(configuration);
-        this.segmentPrefix        = null;
+        this.adSegmentPrefix        = null;
         this.explicitlyConfigured = false;
         this.pollIntervalMs       = MTConstants.PLAYHEAD_POLL_INTERVAL_MS;
         NRLog.d(MTConstants.LOG_CONFIG + " tracker created — no NRAdConfig (URL auto-detect mode)");
@@ -167,7 +167,7 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
     @Deprecated
     public NRTrackerMediaTailor() {
         super();
-        this.segmentPrefix        = null;
+        this.adSegmentPrefix        = null;
         this.explicitlyConfigured = false;
         this.pollIntervalMs       = MTConstants.PLAYHEAD_POLL_INTERVAL_MS;
     }
@@ -369,8 +369,8 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         currentAdBreak = null;
         currentAdPod   = null;
 
-        String detectionDesc = segmentPrefix != null
-                ? "aws-hostname | /tm/ | custom='" + segmentPrefix + "'"
+        String detectionDesc = adSegmentPrefix != null
+                ? "aws-hostname | /tm/ | custom='" + adSegmentPrefix + "'"
                 : "aws-hostname | /tm/";
         // An implicit-session stream exposes the sessionId only inside the
         // media-playlist path, which ExoPlayer hasn't loaded yet at activation
@@ -447,7 +447,7 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
                             + dash.location + " — falling back to manifest-marker detection");
                 }
             }
-            List<MTAdBreak> parsed = MTDashParser.parse(dash, segmentPrefix);
+            List<MTAdBreak> parsed = MTDashParser.parse(dash, adSegmentPrefix);
             NRLog.d(MTConstants.LOG_PARSE_DASH + " manifest parsed: periods=" + dash.getPeriodCount()
                     + " adBreaks=" + parsed.size()
                     + " location=" + (dash.location != null ? dash.location : "null"));
@@ -472,7 +472,7 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
             }
             int segCount = hls.mediaPlaylist != null && hls.mediaPlaylist.segments != null
                     ? hls.mediaPlaylist.segments.size() : 0;
-            List<MTAdBreak> parsed = MTHlsParser.parse(hls, segmentPrefix);
+            List<MTAdBreak> parsed = MTHlsParser.parse(hls, adSegmentPrefix);
             NRLog.d(MTConstants.LOG_PARSE_HLS + " manifest parsed: segments=" + segCount
                     + " adBreaks=" + parsed.size());
             if (!parsed.isEmpty()) {
