@@ -350,6 +350,39 @@ public class NRVideoTrackerQoeTest {
     }
 
     // =========================================================================
+    // Staleness: emitted totalPlaytime is fresh (extrapolated), not the cached snapshot
+    // =========================================================================
+
+    /**
+     * The QOE envelope copies cached last-event attributes, which include a stale totalPlaytime.
+     * iOS parity: the emitted totalPlaytime must be the fresh, extrapolated value
+     * (computeRealtimePlaytimeMs = cached + elapsed-while-playing), not the snapshot.
+     *
+     * At CONTENT_START the cached totalPlaytime is 0; after playing for a while the emitted value
+     * must reflect the elapsed top-up. Under the old (stale-wins) behavior this would emit 0.
+     */
+    @Test
+    public void staleness_totalPlaytimeIsFreshNotCachedSnapshot() {
+        NRVideoConfiguration config = new NRVideoConfiguration.Builder("token")
+                .withQoeAggregateIntervalMultiplier(1)   // every poll qualifies
+                .build();
+        QoeTestTracker t = new QoeTestTracker(config);
+        t.setPlayer(new Object());
+        t.sendRequest();
+        t.sendStart();                 // caches totalPlaytime=0, arms playtime top-up (isPlaying + timestamp)
+
+        sleep(SLEEP_MS);               // time passes while playing -> fresh playtime > cached snapshot (0)
+
+        Map<String, Object> qoe = t.generateQoeIfNeeded(new ArrayList<>(), 1);
+        assertNotNull(qoe);
+        long emitted = lng(qoe, "totalPlaytime");
+        assertTrue("emitted totalPlaytime must be the fresh extrapolated value, not the stale cached "
+                + "snapshot (was " + emitted + ")", emitted >= MIN_ELAPSED);
+
+        t.dispose();
+    }
+
+    // =========================================================================
     // Reset per view (sendEnd -> aggregator.reset())
     // =========================================================================
 

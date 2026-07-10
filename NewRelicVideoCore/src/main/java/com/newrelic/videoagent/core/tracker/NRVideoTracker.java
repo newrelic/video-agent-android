@@ -644,8 +644,10 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
      * @return Complete QOE event map with standard attributes
      */
     private Map<String, Object> buildQoeEventWithStandardAttributes() {
-        // Start with QOE KPI attributes from the aggregator (real-time playtime supplied by tracker)
-        Map<String, Object> qoeEvent = qoeAggregator.generateAggregateAttributes(computeRealtimePlaytimeMs());
+        // Start with QOE KPI attributes from the aggregator (real-time playtime supplied by tracker).
+        // Capture fresh playtime once so we can restore it after the cached-attribute copy below.
+        long freshPlaytimeMs = computeRealtimePlaytimeMs();
+        Map<String, Object> qoeEvent = qoeAggregator.generateAggregateAttributes(freshPlaytimeMs);
         if (qoeEvent == null) {
             // Aggregator gate: no CONTENT_REQUEST seen yet (should not happen at build time)
             qoeEvent = new HashMap<>();
@@ -681,6 +683,11 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         } else {
             NRLog.w("QOE: No cached attributes available yet (this is normal for very first QOE before any video events)");
         }
+
+        // the cache copy above overwrote the aggregator's fresh totalPlaytime with the
+        // stale last-event snapshot. Restore the fresh value. rebufferingRatio was already computed from freshPlaytimeMs inside the
+        // aggregator, so the two stay mutually consistent — no recompute needed.
+        qoeEvent.put("totalPlaytime", freshPlaytimeMs);
 
         // Explicitly ensure session context attributes are present by applying timeSince values
         // This guarantees timeSinceRequested and timeSinceStarted are always included
