@@ -30,6 +30,12 @@ public final class MTDetector {
             Pattern.compile("/v1/(master|session|dash)/");
     private static final Pattern MANIFEST_FILE =
             Pattern.compile("/[^/]*\\.(m3u8|mpd)(\\?.*)?$");
+    // Implicit-session HLS flows carry no ?sessionId= query param; the session
+    // id lives inside the media playlist path as
+    // /v1/manifest/{cfg}/{origin}/{sessionId}/{variant}.m3u8. The tracking
+    // endpoint is the sibling /v1/tracking/{cfg}/{origin}/{sessionId}.
+    private static final Pattern MEDIA_SESSION_PATH =
+            Pattern.compile("/v1/manifest/([^/]+)/([^/]+)/([^/]+)/[^/]+\\.(m3u8|mpd)");
 
     private MTDetector() {}
 
@@ -50,16 +56,33 @@ public final class MTDetector {
 
     public static String extractTrackingUrl(Uri uri) {
         if (uri == null) return null;
-        String full = uri.toString();
+        return extractTrackingUrl(uri.toString());
+    }
+
+    /**
+     * String overload so the DASH {@code <Location>} rescue and other callers
+     * that already hold a URL string can derive without wrapping in a {@link Uri}.
+     */
+    public static String extractTrackingUrl(String full) {
         if (full == null) return null;
         Matcher m = SESSION_ID.matcher(full);
-        if (!m.find()) return null;
-        String sessionId = m.group(1);
-        String rewritten = MANIFEST_SEGMENT.matcher(full).replaceFirst("/v1/tracking/");
-        rewritten = MANIFEST_FILE.matcher(rewritten).replaceFirst("/" + sessionId);
-        int q = rewritten.indexOf('?');
-        if (q >= 0) rewritten = rewritten.substring(0, q);
-        return rewritten;
+        if (m.find()) {
+            String sessionId = m.group(1);
+            String rewritten = MANIFEST_SEGMENT.matcher(full).replaceFirst("/v1/tracking/");
+            rewritten = MANIFEST_FILE.matcher(rewritten).replaceFirst("/" + sessionId);
+            int q = rewritten.indexOf('?');
+            if (q >= 0) rewritten = rewritten.substring(0, q);
+            return rewritten;
+        }
+        // Implicit-session fallback: no query param, session id is a path
+        // segment. Rebuild the tracking endpoint from the origin instead of
+        // rewriting in place, since the manifest path shape differs.
+        Matcher p = MEDIA_SESSION_PATH.matcher(full);
+        if (p.find()) {
+            String origin = full.substring(0, p.start());
+            return origin + "/v1/tracking/" + p.group(1) + "/" + p.group(2) + "/" + p.group(3);
+        }
+        return null;
     }
 
     public static String extractSessionId(Uri uri) {
