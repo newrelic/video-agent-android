@@ -59,6 +59,17 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
     private volatile Map<String, Object> cachedStandardAttributes = null; // Cached attributes for thread-safe access
     private int qoeCycleCount = 0;   // per-session QoE harvest counter (reset at CONTENT_REQUEST)
 
+    // iOS-parity whitelist of context attributes carried onto QOE_AGGREGATE (plus custom attrs).
+    private static final java.util.Set<String> QOE_ENVELOPE_WHITELIST = new java.util.HashSet<>(java.util.Arrays.asList(
+        "contentDuration", "contentFps", "contentId", "contentIsLive", "contentIsMuted",
+        "contentPlayhead", "contentPlayrate", "contentRenditionHeight", "contentRenditionWidth",
+        "contentSrc", "contentTitle",
+        "instrumentation.name", "instrumentation.provider", "instrumentation.version",
+        "numberOfErrors", "numberOfVideos",
+        "playerName", "playerVersion", "src",
+        "timeSinceRequested", "timeSinceStarted",
+        "trackerName", "trackerVersion", "viewId", "viewSession"));
+
     /**
      * Create a new NRVideoTracker.
      */
@@ -646,28 +657,16 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         // Note: Cache is populated by video events (CONTENT_START, HEARTBEAT, etc.) on main thread
         // This avoids thread safety issues with ExoPlayer which requires main thread access
         if (cachedStandardAttributes != null) {
-            // Filter attributes to match iOS implementation:
-            // - Keep timeSinceRequested and timeSinceStarted (session context)
-            // - Filter out all other timeSince* attributes (event-specific)
-            // - Filter out bufferType (event-specific)
+            // iOS parity: emit only whitelisted context attributes plus any user-defined custom
+            // attributes (setAttribute). Everything else from the last content-event snapshot
+            // (contentBitrate, contentNetworkDownloadBitrate, numberOfAds, …) is dropped — the
+            // KPIs already convey that information.
+            java.util.Set<String> customKeys = getCustomAttributeKeys();
             for (Map.Entry<String, Object> entry : cachedStandardAttributes.entrySet()) {
                 String key = entry.getKey();
-
-                // Filter out event-specific timeSince* attributes
-                // Keep only timeSinceRequested and timeSinceStarted for session context
-                if (key.startsWith("timeSince")
-                    && !key.equals("timeSinceRequested")
-                    && !key.equals("timeSinceStarted")) {
-                    continue;  // Skip event-specific timeSince
+                if (QOE_ENVELOPE_WHITELIST.contains(key) || customKeys.contains(key)) {
+                    qoeEvent.put(key, entry.getValue());
                 }
-
-                // Filter out buffer-specific attribute
-                if (key.equals("bufferType")) {
-                    continue;  // Skip buffer-specific attribute
-                }
-
-                // Include all other attributes
-                qoeEvent.put(key, entry.getValue());
             }
         } else {
             NRLog.w("QOE: No cached attributes available yet (this is normal for very first QOE before any video events)");

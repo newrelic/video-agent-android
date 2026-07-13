@@ -413,6 +413,40 @@ public class NRVideoTrackerQoeTest {
     }
 
     // =========================================================================
+    // Attribute envelope: iOS whitelist + custom attrs kept, everything else dropped
+    // =========================================================================
+
+    @Test
+    public void envelope_whitelistsContextKeepsCustomDropsRest() {
+        NRVideoConfiguration config = new NRVideoConfiguration.Builder("token")
+                .withQoeAggregateIntervalMultiplier(1)
+                .build();
+        QoeTestTracker t = new QoeTestTracker(config);
+        t.setAttribute("myCustomKey", "customValue");   // user-defined attribute
+        t.setPlayer(new Object());
+        t.sendRequest();
+        t.sendStart();
+
+        t.renditionWidth = 1920L; t.renditionHeight = 1080L;
+        t.networkDownloadBitrate = 5000L;               // -> contentNetworkDownloadBitrate (not whitelisted)
+        t.sendVideoEvent(CONTENT_HEARTBEAT, null);       // populates + caches the content-event attrs
+
+        Map<String, Object> qoe = t.generateQoeIfNeeded(new ArrayList<>(), 1);
+        assertNotNull(qoe);
+
+        // Whitelisted context attributes survive
+        assertTrue("viewId whitelisted", qoe.containsKey("viewId"));
+        assertEquals(1920L, ((Number) qoe.get("contentRenditionWidth")).longValue());
+        // User custom attribute survives
+        assertEquals("customValue", qoe.get("myCustomKey"));
+        // Non-whitelisted context attributes are dropped (iOS parity)
+        assertFalse("contentNetworkDownloadBitrate dropped", qoe.containsKey("contentNetworkDownloadBitrate"));
+        assertFalse("numberOfAds dropped", qoe.containsKey("numberOfAds"));
+
+        t.dispose();
+    }
+
+    // =========================================================================
     // Reset per view (sendEnd -> aggregator.reset())
     // =========================================================================
 
