@@ -383,6 +383,36 @@ public class NRVideoTrackerQoeTest {
     }
 
     // =========================================================================
+    // Error basis: startup vs playback decided by hasContentStarted (iOS parity),
+    // not totalPlaytime > 0
+    // =========================================================================
+
+    @Test
+    public void errorBasis_beforeContentStartIsStartupError() {
+        requestOnly();                              // CONTENT_REQUEST only — content not started
+        tracker.sendError(new Exception("boom"));
+
+        Map<String, Object> k = kpis();
+        assertTrue((Boolean) k.get("hadStartupError"));
+        assertFalse((Boolean) k.get("hadPlaybackError"));
+    }
+
+    /**
+     * The discriminating case for the fix: after CONTENT_START but before any playtime has
+     * accrued (totalPlaytime == 0). New basis (hasContentStarted) => playback error. The old
+     * basis (totalPlaytime > 0) would have misclassified this as a startup error.
+     */
+    @Test
+    public void errorBasis_afterStartIsPlaybackError_evenWithZeroPlaytime() {
+        startContent();                             // hasContentStarted = true, totalPlaytime still 0
+        tracker.sendError(new Exception("boom"));
+
+        Map<String, Object> k = kpis();
+        assertFalse((Boolean) k.get("hadStartupError"));
+        assertTrue((Boolean) k.get("hadPlaybackError"));
+    }
+
+    // =========================================================================
     // Reset per view (sendEnd -> aggregator.reset())
     // =========================================================================
 

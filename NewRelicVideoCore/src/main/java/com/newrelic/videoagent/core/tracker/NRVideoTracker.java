@@ -828,7 +828,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         if (state.isAd) {
             actionName = AD_ERROR;
         } else {
-            if (totalPlaytime != null && totalPlaytime > 0) {
+            if (qoeAggregator.hasContentStarted()) {
                 // Error occurred after content started playing, so it's a playback error
                 qoeAggregator.recordPlaybackError();
             } else {
