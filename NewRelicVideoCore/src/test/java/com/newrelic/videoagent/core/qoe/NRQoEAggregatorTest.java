@@ -150,16 +150,15 @@ public class NRQoEAggregatorTest {
         assertEquals(2L, lng(kpis(), "totalRenditions"));
     }
 
-    // ---- startup time (two exclusions + clamp) -----------------------------
+    // ---- startup time (ad exclusion + clamp) -------------------------------
 
     @Test
-    public void startupTime_subtractsAdAndPause() {
+    public void startupTime_subtractsAdOnly() {
         request();
-        agg.addStartupPauseTime(500L);          // before start -> counted
         agg.setStartupAdTime(1000L);
         feed(CONTENT_START, attrs("timeSinceRequested", 5000L));
-        // 5000 - 1000(ad) - 500(pause) = 3500
-        assertEquals(3500L, lng(kpis(), "startupTime"));
+        // iOS parity: startup = timeSinceRequested - ad time (no pause exclusion). 5000 - 1000 = 4000.
+        assertEquals(4000L, lng(kpis(), "startupTime"));
     }
 
     @Test
@@ -168,15 +167,6 @@ public class NRQoEAggregatorTest {
         agg.setStartupAdTime(9000L);
         feed(CONTENT_START, attrs("timeSinceRequested", 5000L));
         assertEquals(0L, lng(kpis(), "startupTime"));
-    }
-
-    @Test
-    public void startupPauseTime_ignoredAfterStart() {
-        request();
-        agg.setStartupAdTime(0L);
-        feed(CONTENT_START, attrs("timeSinceRequested", 5000L));
-        agg.addStartupPauseTime(2000L);         // after start -> ignored
-        assertEquals(5000L, lng(kpis(), "startupTime"));
     }
 
     // ---- rebuffering (skip-first) -----------------------------------------

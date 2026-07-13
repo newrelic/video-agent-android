@@ -32,7 +32,6 @@ public final class NRQoEAggregator {
 
     // ---- Startup-period exclusions -----------------------------------------
     private Long startupPeriodAdTime;
-    private Long startupPeriodPauseTime;
     private boolean hasContentStarted;
     private boolean initialBufferingHappened;
 
@@ -82,7 +81,6 @@ public final class NRQoEAggregator {
         qoeStartupTime = null;
 
         startupPeriodAdTime = 0L;
-        startupPeriodPauseTime = 0L;
         hasContentStarted = false;
         initialBufferingHappened = false;
 
@@ -249,7 +247,6 @@ public final class NRQoEAggregator {
         qoeLastTrackedBitrate = null;
         qoeStartupTime = null;
         startupPeriodAdTime = null;
-        startupPeriodPauseTime = 0L;
         hasContentStarted = false;
         initialBufferingHappened = false;
 
@@ -284,18 +281,6 @@ public final class NRQoEAggregator {
         startupPeriodAdTime = ms;
     }
 
-    /** Pause time during the startup period; ignored once content has started. */
-    public synchronized void addStartupPauseTime(long timeSincePaused) {
-        if (hasContentStarted || timeSincePaused <= 0) {
-            return;
-        }
-        try {
-            startupPeriodPauseTime = safeAdd(startupPeriodPauseTime, timeSincePaused);
-        } catch (ArithmeticException e) {
-            startupPeriodPauseTime = timeSincePaused;
-        }
-    }
-
     public synchronized void recordStartupError() {
         qoeHadStartupError = true;
     }
@@ -324,14 +309,10 @@ public final class NRQoEAggregator {
         Long timeSinceRequested = (tsr instanceof Long) ? (Long) tsr : null;
 
         if (timeSinceRequested != null && timeSinceRequested >= 0) {
-            long totalExclusionTime = 0L;
-            if (startupPeriodAdTime != null && startupPeriodAdTime > 0) {
-                totalExclusionTime += startupPeriodAdTime;
-            }
-            if (startupPeriodPauseTime != null && startupPeriodPauseTime > 0) {
-                totalExclusionTime += startupPeriodPauseTime;
-            }
-            qoeStartupTime = Math.max(timeSinceRequested - totalExclusionTime, 0L);
+            // startupTime = timeSinceRequested - pre-roll ad time. A pre-first-frame
+            // user pause is intentionally NOT excluded.
+            long adTime = (startupPeriodAdTime != null && startupPeriodAdTime > 0) ? startupPeriodAdTime : 0L;
+            qoeStartupTime = Math.max(timeSinceRequested - adTime, 0L);
         } else {
             qoeStartupTime = 0L;
         }

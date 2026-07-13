@@ -410,17 +410,6 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
             if(!state.isBuffering){
                 state.chrono.start();
             }
-
-            // QoE: accumulate startup-period pause time (excluded from startup time).
-            // Only meaningful before content starts; the aggregator ignores it once started.
-            if (!state.isAd && !qoeAggregator.hasContentStarted()) {
-                Map<String, Object> resumeAttributes = getAttributes(CONTENT_RESUME, null);
-                Object timeSincePaused = resumeAttributes.get("timeSincePaused");
-                if (timeSincePaused instanceof Long) {
-                    qoeAggregator.addStartupPauseTime((Long) timeSincePaused);
-                }
-            }
-
             if (state.isAd) {
                 sendVideoAdEvent(AD_RESUME);
             } else {
