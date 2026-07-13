@@ -640,32 +640,43 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     }
 
     /**
-     * Returns true when the linked ad tracker reports an active ad break
-     * (SSAI case — {@code player.isPlayingAd()} stays false for server-side
-     * stitched ads, so we also consult the paired ad tracker's state).
+     * True when the linked ad tracker reports an active SSAI ad break.
+     * For server-side stitched ads {@code player.isPlayingAd()} stays false,
+     * so the paired MediaTailor tracker's {@code isAdBreak} state is the only
+     * signal that an ad is on screen.
      */
     private boolean isLinkedAdBreakActive() {
         if (!(linkedTracker instanceof NRVideoTracker)) return false;
         return ((NRVideoTracker) linkedTracker).getState().isAdBreak;
     }
 
+    /**
+     * True when an ad is playing under either model — CSAI ({@code isPlayingAd()})
+     * or SSAI ({@link #isLinkedAdBreakActive()}). Used to suppress duplicate
+     * CONTENT_* events that the ad tracker already reports as AD_*.
+     * NOTE: deliberately NOT applied to the content START path — content READY
+     * is a one-shot for CSAI preroll, and gating it on the linked break flag
+     * permanently swallows CONTENT_START (only isPlayingAd is correct there).
+     */
+    private boolean isAdActive() {
+        return player.isPlayingAd() || isLinkedAdBreakActive();
+    }
+
     private void logOnPlayerStateChanged(boolean playWhenReady, int playbackState) {
         NRLog.d("onPlayerStateChanged, payback state = " + playbackState + " {");
-
-        boolean inAd = player.isPlayingAd() || isLinkedAdBreakActive();
 
         if (playbackState == Player.STATE_READY) {
             NRLog.d("\tVideo Is Ready");
 
-            if (getState().isBuffering && !inAd) {
+            if (getState().isBuffering) {
                 sendBufferEnd();
             }
 
-            if (getState().isSeeking && !inAd) {
+            if (getState().isSeeking) {
                 sendSeekEnd();
             }
 
-            if (getState().isRequested && !getState().isStarted && !inAd) {
+            if (getState().isRequested && !getState().isStarted) {
                 sendStart();
             }
         } else if (playbackState == Player.STATE_ENDED) {
@@ -686,7 +697,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
                 sendRequest();
             }
 
-            if (!getState().isBuffering && !inAd) {
+            if (!getState().isBuffering && !isAdActive()) {
                 sendBufferStart();
             }
         }
@@ -694,23 +705,25 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         if (playWhenReady && playbackState == Player.STATE_READY) {
             NRLog.d("\tVideo Playing");
 
-            if (getState().isRequested && !getState().isStarted && !inAd) {
+            if (getState().isRequested && !getState().isStarted) {
                 sendStart();
-            } else if (getState().isPaused && !inAd) {
+            } else if (getState().isPaused && !isAdActive()) {
                 sendResume();
             } else if (!getState().isRequested && !getState().isStarted) {
-                NRLog.d("LAST CHANCE TO SEND REQUEST START. inAd = " + inAd);
-                if (!inAd) {
-                    sendRequest();
-                    sendStart();
-                }
+                // Fallback: content never started. isPlayingAd() can still read
+                // true here as a CSAI preroll tears down, and STATE_READY is a
+                // one-shot — guarding on it permanently drops CONTENT_START.
+                // Only reachable when !isStarted, so firing once is safe.
+                NRLog.d("LAST CHANCE TO SEND REQUEST START. isPlayingAd = " + player.isPlayingAd());
+                sendRequest();
+                sendStart();
             }
         } else if (playWhenReady) {
             NRLog.d("\tVideo Not Playing");
         } else {
             NRLog.d("\tVideo Paused");
 
-            if (getState().isStarted && !getState().isPaused && !player.isPlayingAd()) {
+            if (getState().isStarted && !getState().isPaused && !isAdActive()) {
                 sendPause();
             }
         }
@@ -815,7 +828,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         int height = videoSize.height;
         NRLog.d("onVideoSizeChanged analytics, H = " + height + " W = " + width);
 
-        if (player.isPlayingAd() || isLinkedAdBreakActive()) return;
+        if (isAdActive()) return;
         // Media3 fires (0,0) when the renderer clears output between resolution
         // transitions. Treat as non-event: otherwise prevSize→0 emits a false
         // DOWN and the subsequent 0→newSize is silenced by the first-observation
