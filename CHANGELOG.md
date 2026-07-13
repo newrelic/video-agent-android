@@ -1,3 +1,9 @@
+## [4.3.1](https://github.com/newrelic/video-agent-android/compare/v4.3.0...v4.3.1) (2026-07-13)
+
+### Bug Fixes
+
+* CSAI preroll no longer drops CONTENT_START. ([948f229](https://github.com/newrelic/video-agent-android/commit/948f229cc59b99e9eba68e565e6504987092d759))
+  
 ## [4.3.0](https://github.com/newrelic/video-agent-android/compare/v4.2.0...v4.3.0) (2026-06-10)
 
 ### Features
