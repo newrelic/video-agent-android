@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   publish-release:
@@ -58,3 +59,12 @@ jobs:
             --title "$TAG_NAME" \
             --notes "$NOTES" \
             --target ${{ github.base_ref }}
+
+          echo "tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger Release Notes Docs PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run release-notes-docs-pr.yml --ref master --field tag=${{ steps.create_release.outputs.tag }} --field dry_run=false
+          echo "Triggered release-notes-docs-pr.yml for ${{ steps.create_release.outputs.tag }}"
