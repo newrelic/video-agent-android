@@ -129,8 +129,8 @@ public class VideoPlayer extends AppCompatActivity {
         Log.d("VideoPlayer", "GAMEDAY TC2 started");
         resetForNewSession();
         playVideo(GAMEDAY_ASSET_URL);
-        gamedayHandler.postDelayed(this::triggerBrokenUrl, 3_000);
-        gamedayHandler.postDelayed(this::seekNearEnd, 6_000);
+        gamedayHandler.postDelayed(this::seekNearEnd, 3_000);
+        gamedayHandler.postDelayed(this::triggerBrokenUrl, 6_000);
         gamedayHandler.postDelayed(this::fireOneCustomEvent, 9_000);
     }
 
