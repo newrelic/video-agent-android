@@ -111,9 +111,9 @@ public class VideoPlayer extends AppCompatActivity {
         playVideo(GAMEDAY_ASSET_URL);
         setMaxVideoBitrate(TC1_LOW_BITRATE);
         gamedayHandler.postDelayed(() -> setMaxVideoBitrate(TC1_MID_BITRATE), 20_000);
-        gamedayHandler.postDelayed(() -> setMaxVideoBitrate(TC1_TOP_BITRATE), 23_000);
-        gamedayHandler.postDelayed(() -> setMaxVideoBitrate(TC1_MID_BITRATE), 26_000);
-        gamedayHandler.postDelayed(this::pauseForTenSeconds, 29_000);
+        gamedayHandler.postDelayed(() -> setMaxVideoBitrate(TC1_TOP_BITRATE), 27_000);
+        gamedayHandler.postDelayed(() -> setMaxVideoBitrate(TC1_MID_BITRATE), 34_000);
+        gamedayHandler.postDelayed(this::pauseForTenSeconds, 41_000);
     }
 
     private void pauseForTenSeconds() {
