@@ -625,7 +625,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                     // Update snapshot for next dirty check
                     lastSentQoeKpis = new HashMap<>(currentKpis);
 
-                    NRLog.d("QOE_AGGREGATE generated for harvest cycle " + harvestCycleNumber + " (KPIs changed)");
+                    NRLog.d("QOE_AGGREGATE generated for harvest cycle " + harvestCycleNumber + " (KPIs changed): " + qoeEvent);
                     return qoeEvent;
                 } else {
                     NRLog.d("QOE_AGGREGATE skipped for harvest cycle " + harvestCycleNumber + " (no KPI changes)");
