@@ -2,6 +2,9 @@ package com.newrelic.nrvideoproject;
 
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.widget.Button;
 import com.google.ads.interactivemedia.v3.api.AdErrorEvent;
 import com.google.ads.interactivemedia.v3.api.AdEvent;
 import com.newrelic.videoagent.core.NRAdConfig;
@@ -30,11 +33,17 @@ import com.newrelic.videoagent.ima.tracker.NRTrackerIMA;
 @OptIn(markerClass = UnstableApi.class)
 public class VideoPlayerAds extends AppCompatActivity implements AdErrorEvent.AdErrorListener, AdEvent.AdEventListener {
 
+    // Progressive MP4, not adaptive DASH: adaptive content stalls behind IMA CSAI ad breaks
+    // on the emulator (confirmed independently; matches a known workaround already in progress
+    // elsewhere in this codebase). Fine for this test since ad-scope doesn't need switching.
+    private static final String GAMEDAY_ASSET_URL = "https://storage.googleapis.com/gvabox/media/samples/stock.mp4";
+
     private ExoPlayer player;
     private Integer trackerId;
     private ImaAdsLoader adsLoader;
     private PlayerView playerView;
     private com.newrelic.videoagent.ima.tracker.NRTrackerIMA adTracker;
+    private final Handler gamedayHandler = new Handler(Looper.getMainLooper());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,13 +73,38 @@ public class VideoPlayerAds extends AppCompatActivity implements AdErrorEvent.Ad
         else {
             Log.v("VideoPlayer","Unknown video");
         }
+
+        Button btnTc3 = findViewById(R.id.btn_tc3);
+        btnTc3.setOnClickListener(v -> runTC3());
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        NRVideo.releaseTracker(trackerId);
-        player.stop();
+        gamedayHandler.removeCallbacksAndMessages(null);
+        if (trackerId != null) {
+            NRVideo.releaseTracker(trackerId);
+        }
+        if (player != null) {
+            player.stop();
+        }
+    }
+
+    private void runTC3() {
+        Log.d("VideoPlayerAds", "GAMEDAY TC3 started");
+        gamedayHandler.removeCallbacksAndMessages(null);
+        if (player != null) {
+            if (trackerId != null) {
+                NRVideo.releaseTracker(trackerId);
+            }
+            player.release();
+            player = null;
+        }
+        if (adsLoader != null) {
+            adsLoader.release();
+            adsLoader = null;
+        }
+        playVideo(GAMEDAY_ASSET_URL);
     }
 
     private void playVideo(String videoUrl) {

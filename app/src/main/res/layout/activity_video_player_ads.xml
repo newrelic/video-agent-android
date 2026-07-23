@@ -14,4 +14,12 @@ tools:context=".VideoPlayerAds">
     app:layout_constraintStart_toStartOf="parent"
     app:layout_constraintTop_toTopOf="parent"/>
 
+<Button
+    android:id="@+id/btn_tc3"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="Run TC3: Ad Scope"
+    app:layout_constraintTop_toBottomOf="@id/player"
+    app:layout_constraintStart_toStartOf="parent"/>
+
 </androidx.constraintlayout.widget.ConstraintLayout>
