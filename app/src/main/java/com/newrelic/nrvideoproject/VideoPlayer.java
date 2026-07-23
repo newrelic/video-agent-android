@@ -26,9 +26,12 @@ import java.util.Map;
 public class VideoPlayer extends AppCompatActivity {
 
     private static final String GAMEDAY_ASSET_URL = "https://turtle-tube.appspot.com/t/t2/dash.mpd";
-    private static final int TC1_LOW_BITRATE = 600_000;
-    private static final int TC1_MID_BITRATE = 1_000_000;
-    private static final int TC1_TOP_BITRATE = 3_000_000;
+    // This manifest's actual video representations are 360p@330053bps,
+    // 480p@701318bps, 720p@932697bps. These caps are chosen to bracket those
+    // exact thresholds so each step lands on a distinct rendition tier.
+    private static final int TC1_LOW_BITRATE = 400_000;
+    private static final int TC1_MID_BITRATE = 800_000;
+    private static final int TC1_TOP_BITRATE = 1_200_000;
 
     private ExoPlayer player;
     private Integer trackerId;
