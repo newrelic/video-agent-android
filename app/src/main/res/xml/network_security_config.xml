@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Dev-only trust relaxation for debugging MediaTailor segment playback on
+  emulators with stale cert stores. Trusts the system CAs plus the user CAs
+  (so you can install your own root for proxying with Charles/mitmproxy).
+  Do NOT ship this in release builds of production apps.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system"/>
+            <certificates src="user"/>
+        </trust-anchors>
+    </base-config>
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system"/>
+            <certificates src="user"/>
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>

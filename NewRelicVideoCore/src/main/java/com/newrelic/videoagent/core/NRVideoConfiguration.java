@@ -4,8 +4,12 @@ import android.app.ActivityManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import com.newrelic.videoagent.core.utils.NRLog;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -42,6 +46,16 @@ public final class NRVideoConfiguration {
     private final boolean memoryOptimized;
     private final boolean debugLoggingEnabled;
     private final boolean isTV;
+    private final String collectorAddress;
+    private final int qoeAggregateIntervalMultiplier;
+    // React analogy: this is like a frozen array in JS — Collections.unmodifiableList()
+    // means nobody can accidentally push() to it after the config is built.
+    private final List<ObfuscationRule> obfuscationRules;
+
+    // Runtime configuration fields (mutable, thread-safe) - Using AtomicBoolean for better performance
+    private final AtomicBoolean qoeAggregateEnabled = new AtomicBoolean(true);
+    private final AtomicBoolean runtimeConfigInitialized = new AtomicBoolean(false);
+
 
     // Performance optimization constants
     private static final int DEFAULT_HARVEST_CYCLE_SECONDS = 5 * 60; // 5 minutes
@@ -78,6 +92,17 @@ public final class NRVideoConfiguration {
         this.memoryOptimized = builder.memoryOptimized;
         this.debugLoggingEnabled = builder.debugLoggingEnabled;
         this.isTV = builder.isTV;
+        this.collectorAddress = builder.collectorAddress;
+        this.qoeAggregateIntervalMultiplier = builder.qoeAggregateIntervalMultiplier;
+        // Make a defensive copy and wrap it as unmodifiable.
+        // React analogy: like Object.freeze([...builder.obfuscationRules]) — same idea.
+        this.obfuscationRules = Collections.unmodifiableList(
+            new ArrayList<>(builder.obfuscationRules)
+        );
+
+        // Initialize runtime configuration
+        this.qoeAggregateEnabled.set(builder.qoeAggregateEnabled);
+        this.runtimeConfigInitialized.set(true);
     }
 
     // Immutable getters
@@ -91,6 +116,41 @@ public final class NRVideoConfiguration {
     public boolean isMemoryOptimized() { return memoryOptimized; }
     public boolean isDebugLoggingEnabled() { return debugLoggingEnabled; }
     public boolean isTV() { return isTV; }
+    public String getCollectorAddress() { return collectorAddress; }
+    public int getQoeAggregateIntervalMultiplier() { return qoeAggregateIntervalMultiplier; }
+    public List<ObfuscationRule> getObfuscationRules() { return obfuscationRules; }
+
+    // Runtime configuration getters and setters
+    /**
+     * Check if QOE_AGGREGATE events should be sent during harvest cycles
+     * @return true if QOE_AGGREGATE should be sent, false otherwise
+     */
+    public boolean isQoeAggregateEnabled() {
+        if (!runtimeConfigInitialized.get()) {
+            throw new IllegalStateException("NRVideoConfiguration not initialized! Call build() first.");
+        }
+        return qoeAggregateEnabled.get();
+    }
+
+    /**
+     * Set whether QOE_AGGREGATE events should be sent during harvest cycles
+     * Lock-free, thread-safe runtime configuration using AtomicBoolean
+     * @param enabled true to enable QOE_AGGREGATE, false to disable
+     */
+    public void setQoeAggregateEnabled(boolean enabled) {
+        this.qoeAggregateEnabled.set(enabled);
+    }
+
+    /**
+     * Initialize configuration with client settings
+     * @param clientQoeAggregateEnabled QOE aggregate setting from client (null if not provided)
+     */
+    public void initializeFromClient(Boolean clientQoeAggregateEnabled) {
+        // If client provides a value, use it; otherwise keep current default
+        if (clientQoeAggregateEnabled != null) {
+            this.qoeAggregateEnabled.set(clientQoeAggregateEnabled);
+        }
+    }
 
     /**
      * Get dead letter retry interval in milliseconds
@@ -107,8 +167,35 @@ public final class NRVideoConfiguration {
     }
 
     /**
-     * Enterprise-grade region identification with multiple fallback strategies
-     * Thread-safe and optimized for performance
+     * Parse region code from application token prefix
+     * Matches NewRelic iOS Agent pattern: extracts region prefix before 'x'
+     * Examples: "EUxABCD..." -> "EU", "APxABCD..." -> "AP", "AA..." -> ""
+     */
+    private static String parseRegionFromToken(String applicationToken) {
+        if (applicationToken == null || applicationToken.length() < 3) {
+            return "";
+        }
+
+        // Find the first 'x' in the token
+        int xIndex = applicationToken.indexOf('x');
+        if (xIndex == -1) {
+            return ""; // No region prefix found
+        }
+
+        // Extract everything before the first 'x'
+        String regionCode = applicationToken.substring(0, xIndex);
+
+        // Remove any trailing 'x' characters
+        while (regionCode.length() > 0 && regionCode.charAt(regionCode.length() - 1) == 'x') {
+            regionCode = regionCode.substring(0, regionCode.length() - 1);
+        }
+
+        return regionCode;
+    }
+
+    /**
+     * Identify region with proper token parsing and fallback logic
+     * Behavior similar to NewRelic iOS Agent's NRMAAgentConfiguration
      */
     private static String identifyRegion(String applicationToken) {
         if (applicationToken == null || applicationToken.length() < 10) {
@@ -158,6 +245,11 @@ public final class NRVideoConfiguration {
         private boolean memoryOptimized = true;
         private boolean debugLoggingEnabled = false;
         private boolean isTV = false;
+        private String collectorAddress = null;
+        private boolean qoeAggregateEnabled = true; // Default enabled
+        private int qoeAggregateIntervalMultiplier = 2; // Default 2 (send every other harvest cycle)
+        // React analogy: this starts as an empty array [] — no rules by default.
+        private List<ObfuscationRule> obfuscationRules = new ArrayList<>();
 
         public Builder(String applicationToken) {
             this.applicationToken = applicationToken;
@@ -235,6 +327,69 @@ public final class NRVideoConfiguration {
             return this;
         }
 
+        /**
+         * Set custom collector domain address for /connect and /data endpoints (optional)
+         * Example: "staging-mobile-collector.newrelic.com" or "mobile-collector.newrelic.com"
+         * If not set, will be auto-detected from application token region
+         */
+        public Builder withCollectorAddress(String collectorAddress) {
+            this.collectorAddress = collectorAddress;
+            return this;
+        }
+
+        /**
+         * Enable QOE aggregate events (default: enabled)
+         * @return Builder instance for method chaining
+         */
+        public Builder enableQoeAggregate() {
+            this.qoeAggregateEnabled = true;
+            return this;
+        }
+
+        /**
+         * Configure QOE aggregate events
+         * @param enabled true to enable QOE_AGGREGATE events, false to disable
+         * @return Builder instance for method chaining
+         */
+        public Builder enableQoeAggregate(boolean enabled) {
+            this.qoeAggregateEnabled = enabled;
+            return this;
+        }
+
+        /**
+         * Set QOE aggregate interval multiplier to reduce frequency of QOE_AGGREGATE events.
+         * If standard harvest cycle is 30s and this is set to 3, QOE events send every 90s.
+         * First and last harvest cycles of a view always send QOE_AGGREGATE regardless of this setting.
+         * @param multiplier Interval multiplier (must be a positive integer >= 1).
+         *                   Any value < 1 will default to 1. Decimal values are not supported.
+         * @return Builder instance for method chaining
+         */
+        public Builder withQoeAggregateIntervalMultiplier(int multiplier) {
+            if (multiplier < 1) {
+                NRLog.w("Invalid QOE aggregate interval multiplier: " + multiplier + ". Defaulting to 1.");
+                this.qoeAggregateIntervalMultiplier = 1;
+            } else {
+                this.qoeAggregateIntervalMultiplier = multiplier;
+            }
+            return this;
+        }
+
+        /**
+         * Set regex-based rules to mask sensitive data before events are transmitted.
+         * Rules are applied in order — each rule's output becomes the next rule's input.
+         *
+         * React analogy: this is like passing an array prop to a component:
+         *   <VideoAgent obfuscationRules={[{ pattern: "account-\\d+", replacement: "ACCOUNT_ID" }]} />
+         *
+         * @param rules List of ObfuscationRule objects. Pass an empty list to disable obfuscation.
+         */
+        public Builder withObfuscationRules(List<ObfuscationRule> rules) {
+            if (rules != null) {
+                this.obfuscationRules = rules;
+            }
+            return this; // returning 'this' is what makes the dot-chaining work
+        }
+
         private void applyTVOptimizations() {
             this.harvestCycleSeconds = TV_HARVEST_CYCLE_SECONDS;
             this.liveHarvestCycleSeconds = TV_LIVE_HARVEST_CYCLE_SECONDS;
@@ -251,7 +406,10 @@ public final class NRVideoConfiguration {
         }
 
         public NRVideoConfiguration build() {
-            return new NRVideoConfiguration(this);
+            NRVideoConfiguration config = new NRVideoConfiguration(this);
+            // Mark runtime configuration as initialized
+            config.runtimeConfigInitialized.set(true);
+            return config;
         }
     }
 

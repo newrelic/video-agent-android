@@ -5,6 +5,8 @@ import android.os.Handler;
 import android.os.Looper;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.OptIn;
+import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaLibraryInfo;
 import androidx.media3.common.MediaMetadata;
@@ -17,6 +19,7 @@ import androidx.media3.exoplayer.analytics.AnalyticsListener;
 import androidx.media3.exoplayer.source.LoadEventInfo;
 import androidx.media3.exoplayer.source.MediaLoadData;
 
+import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.exoplayer.BuildConfig;
@@ -37,18 +40,25 @@ import static com.newrelic.videoagent.core.NRDef.*;
 
 /**
  * New Relic Video tracker for ExoPlayer.
+ * <p>
+ * @OptIn is required for Media3 APIs which are marked as @UnstableApi.
+ * This is by design as per Google's Media3 documentation.
+ * @see <a href="https://developer.android.com/media/media3/exoplayer/customization#unstable-api">Media3 Unstable API Documentation</a>
  */
+@OptIn(markerClass = UnstableApi.class)
 public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listener, AnalyticsListener {
 
     protected ExoPlayer player;
 
-    protected long bitrateEstimate;
+    protected long segmentDownloadBitrate;
     protected int lastHeight;
     protected int lastWidth;
     protected List<Uri> playlist;
     protected int lastWindow;
     protected String renditionChangeShift;
     protected long actualBitrate;
+    protected long renditionBitrate;
+    protected long networkDownloadBitrate;
     private static final long DEFAULT_AGGREGATION_WINDOW_MS = 5000; // 5 seconds
     private static final int MAX_EVENTS_PER_AGGREGATE = 50;
     private volatile boolean droppedFrameAggregationEnabled = true;
@@ -66,15 +76,39 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     /**
      * Init a new ExoPlayer tracker.
      */
+    public NRTrackerExoPlayer(NRVideoConfiguration configuration) {
+        super(configuration);
+    }
+
+    /**
+     * Create a new NRTrackerExoPlayer (deprecated - use constructor with configuration).
+     * @deprecated Use NRTrackerExoPlayer(NRVideoConfiguration) constructor instead
+     */
+    @Deprecated
     public NRTrackerExoPlayer() {
+        super();
     }
 
     /**
      * Init a new ExoPlayer tracker.
      *
+     * @param configuration Video configuration
      * @param player ExoPlayer instance.
      */
+    public NRTrackerExoPlayer(NRVideoConfiguration configuration, ExoPlayer player) {
+        super(configuration);
+        setPlayer(player);
+    }
+
+    /**
+     * Init a new ExoPlayer tracker (deprecated).
+     *
+     * @param player ExoPlayer instance.
+     * @deprecated Use NRTrackerExoPlayer(NRVideoConfiguration, ExoPlayer) constructor instead
+     */
+    @Deprecated
     public NRTrackerExoPlayer(ExoPlayer player) {
+        super();
         setPlayer(player);
     }
 
@@ -166,11 +200,44 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      * @return Attribute.
      */
     public Long getBitrate() {
-        return bitrateEstimate;
+        return segmentDownloadBitrate;
     }
 
     public Long getActualBitrate() {
         return actualBitrate;
+    }
+
+    /**
+     * Get manifest (indicated) bitrate in bits per second.
+     *
+     * @return Attribute.
+     */
+    public Long getManifestBitrate() {
+        if (renditionBitrate > 0) {
+            return renditionBitrate;
+        }
+        return null;
+    }
+
+    /**
+     * Get measured bitrate in bits per second.
+     *
+     * @return Attribute.
+     */
+    public Long getSegmentDownloadBitrate() {
+        return segmentDownloadBitrate;
+    }
+
+    /**
+     * Get download bitrate in bits per second.
+     *
+     * @return Attribute.
+     */
+    public Long getNetworkDownloadBitrate() {
+        if (networkDownloadBitrate > 0) {
+            return networkDownloadBitrate;
+        }
+        return null;
     }
 
     /**
@@ -179,7 +246,10 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      * @return Attribute.
      */
     public Long getRenditionBitrate() {
-        return getBitrate();
+        if (renditionBitrate > 0) {
+            return renditionBitrate;
+        }
+        return null;
     }
 
     /**
@@ -366,11 +436,13 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     }
 
     private void resetState() {
-        bitrateEstimate = 0;
+        segmentDownloadBitrate = 0;
         lastWindow = 0;
         lastWidth = 0;
         lastHeight = 0;
         actualBitrate = 0;
+        renditionBitrate = 0;
+        networkDownloadBitrate = 0;
     }
 
     /**
@@ -567,6 +639,29 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         logOnPlayerStateChanged(player.getPlayWhenReady(), playbackState);
     }
 
+    /**
+     * True when the linked ad tracker reports an active SSAI ad break.
+     * For server-side stitched ads {@code player.isPlayingAd()} stays false,
+     * so the paired MediaTailor tracker's {@code isAdBreak} state is the only
+     * signal that an ad is on screen.
+     */
+    private boolean isLinkedAdBreakActive() {
+        if (!(linkedTracker instanceof NRVideoTracker)) return false;
+        return ((NRVideoTracker) linkedTracker).getState().isAdBreak;
+    }
+
+    /**
+     * True when an ad is playing under either model — CSAI ({@code isPlayingAd()})
+     * or SSAI ({@link #isLinkedAdBreakActive()}). Used to suppress duplicate
+     * CONTENT_* events that the ad tracker already reports as AD_*.
+     * NOTE: deliberately NOT applied to the content START path — content READY
+     * is a one-shot for CSAI preroll, and gating it on the linked break flag
+     * permanently swallows CONTENT_START (only isPlayingAd is correct there).
+     */
+    private boolean isAdActive() {
+        return player.isPlayingAd() || isLinkedAdBreakActive();
+    }
+
     private void logOnPlayerStateChanged(boolean playWhenReady, int playbackState) {
         NRLog.d("onPlayerStateChanged, payback state = " + playbackState + " {");
 
@@ -602,7 +697,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
                 sendRequest();
             }
 
-            if (!getState().isBuffering && !player.isPlayingAd()) {
+            if (!getState().isBuffering && !isAdActive()) {
                 sendBufferStart();
             }
         }
@@ -612,21 +707,23 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
 
             if (getState().isRequested && !getState().isStarted) {
                 sendStart();
-            } else if (getState().isPaused && !player.isPlayingAd()) {
+            } else if (getState().isPaused && !isAdActive()) {
                 sendResume();
             } else if (!getState().isRequested && !getState().isStarted) {
+                // Fallback: content never started. isPlayingAd() can still read
+                // true here as a CSAI preroll tears down, and STATE_READY is a
+                // one-shot — guarding on it permanently drops CONTENT_START.
+                // Only reachable when !isStarted, so firing once is safe.
                 NRLog.d("LAST CHANCE TO SEND REQUEST START. isPlayingAd = " + player.isPlayingAd());
-                if (!player.isPlayingAd()) {
-                    sendRequest();
-                    sendStart();
-                }
+                sendRequest();
+                sendStart();
             }
         } else if (playWhenReady) {
             NRLog.d("\tVideo Not Playing");
         } else {
             NRLog.d("\tVideo Paused");
 
-            if (getState().isPlaying && !player.isPlayingAd()) {
+            if (getState().isStarted && !getState().isPaused && !isAdActive()) {
                 sendPause();
             }
         }
@@ -637,7 +734,12 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     @Override
     public void onPlayerError(@NonNull PlaybackException error) {
         NRLog.d("onPlayerError");
-        sendError(error);
+        if (isLinkedAdBreakActive()) {
+            // SSAI ad break active — attribute the error to the ad, not content.
+            ((NRVideoTracker) linkedTracker).sendError(error);
+        } else {
+            sendError(error);
+        }
     }
 
     // ExoPlayer AnalyticsListener
@@ -647,7 +749,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         if (reason == Player.DISCONTINUITY_REASON_SEEK) {
             NRLog.d("onSeekStarted analytics");
 
-            if (!getState().isSeeking) {
+            if (!getState().isSeeking && !isLinkedAdBreakActive()) {
                 sendSeekStart();
             }
         }
@@ -668,7 +770,11 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     @Override
     public void onLoadError(@NonNull EventTime eventTime, @NonNull LoadEventInfo loadEventInfo, @NonNull MediaLoadData mediaLoadData, @NonNull IOException error, boolean wasCanceled) {
         NRLog.d("onLoadError analytics");
-        sendError(error);
+        if (isLinkedAdBreakActive()) {
+            ((NRVideoTracker) linkedTracker).sendError(error);
+        } else {
+            sendError(error);
+        }
     }
 
     @Override
@@ -676,8 +782,28 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA
                 && mediaLoadData.trackType == C.TRACK_TYPE_VIDEO
                 && loadEventInfo.loadDurationMs > 0) {
-            // Calculate the bitrate for this specific chunk in bits per second
-            this.actualBitrate = (loadEventInfo.bytesLoaded * 8 * 1000) / loadEventInfo.loadDurationMs;
+            // Set renditionBitrate from manifest/track format
+            if (mediaLoadData.trackFormat != null && mediaLoadData.trackFormat.bitrate != C.INDEX_UNSET && mediaLoadData.trackFormat.bitrate > 0) {
+                this.renditionBitrate = mediaLoadData.trackFormat.bitrate;
+            } else if (player != null && player.getVideoFormat() != null && player.getVideoFormat().bitrate != C.INDEX_UNSET) {
+                this.renditionBitrate = player.getVideoFormat().bitrate;
+            }
+
+            // Calculate actualBitrate using formula: (BytesTransferred * 8) / (CurrentTime / Playback Rate)
+            Long currentTime = getPlayhead();
+            Double playbackRate = getPlayrate();
+
+            if (loadEventInfo.bytesLoaded > 0 && currentTime != null && currentTime > 0 && playbackRate != null && playbackRate > 0) {
+                this.actualBitrate = (long) ((loadEventInfo.bytesLoaded * 8 * 1000 * playbackRate) / currentTime);
+            } else {
+                // Fallback to manifest bitrate if formula cannot be calculated
+                this.actualBitrate = this.renditionBitrate;
+            }
+
+            // Calculate download bitrate from bytes transferred and duration
+            if (loadEventInfo.bytesLoaded > 0 && loadEventInfo.loadDurationMs > 0) {
+                this.networkDownloadBitrate = (loadEventInfo.bytesLoaded * 8 * 1000) / loadEventInfo.loadDurationMs;
+            }
         }
     }
 
@@ -685,7 +811,7 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     public void onBandwidthEstimate(@NonNull AnalyticsListener.EventTime eventTime, int totalLoadTimeMs, long totalBytesLoaded, long bitrateEstimate) {
         NRLog.d("onBandwidthEstimate analytics");
 
-        this.bitrateEstimate = bitrateEstimate;
+        this.segmentDownloadBitrate = bitrateEstimate;
     }
 
     @Override
@@ -702,7 +828,12 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
         int height = videoSize.height;
         NRLog.d("onVideoSizeChanged analytics, H = " + height + " W = " + width);
 
-        if (player.isPlayingAd()) return;
+        if (isAdActive()) return;
+        // Media3 fires (0,0) when the renderer clears output between resolution
+        // transitions. Treat as non-event: otherwise prevSize→0 emits a false
+        // DOWN and the subsequent 0→newSize is silenced by the first-observation
+        // guard (lastMul == 0), eating every real shift.
+        if (width <= 0 || height <= 0) return;
 
         long currMul = (long) width * height;
         long lastMul = (long) lastWidth * lastHeight;

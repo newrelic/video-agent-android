@@ -190,7 +190,7 @@ public class NRTrackerState {
     public boolean goBufferEnd() {
         if (isRequested && isBuffering) {
             isBuffering = false;
-            isPlaying = true;
+            isPlaying = !isPaused;
             return true;
         } else {
             return false;
@@ -220,7 +220,7 @@ public class NRTrackerState {
     public boolean goSeekEnd() {
         if (isStarted && isSeeking) {
             isSeeking = false;
-            isPlaying = true;
+            isPlaying = !isPaused;
             return true;
         }
         else {

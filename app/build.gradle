@@ -10,14 +10,17 @@ if (localPropertiesFile.exists()) {
     }
 }
 def applicationToken = localProperties.getProperty('nr.applicationToken', "")
+def qoeAggregateEnabled = localProperties.getProperty('nr.qoeAggregate', "true").toBoolean()
 
 android {
-    compileSdkVersion 33
+    compileSdkVersion 34
+    buildToolsVersion "34.0.0"
     defaultConfig {
         buildConfigField "String", "NR_APPLICATION_TOKEN", "\"${applicationToken}\""
+        buildConfigField "boolean", "QOE_AGGREGATE_DEFAULT", "${qoeAggregateEnabled}"
         applicationId "com.newrelic.nrvideoproject"
-        minSdkVersion 16
-        targetSdkVersion 33
+        minSdkVersion 24
+        targetSdkVersion 34
         versionCode 2
         versionName "1.1"
 
@@ -33,8 +36,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
 
     packagingOptions {
@@ -56,6 +59,7 @@ dependencies {
     implementation project(path: ':NewRelicVideoCore')
     implementation project(path: ':NRExoPlayerTracker')
     implementation project(path: ':NRIMATracker')
+    implementation project(path: ':NRMediaTailorTracker')
     testImplementation 'junit:junit:4.13.2'
 
     // Updated AndroidX Test dependencies that are compatible with Android 12+
@@ -64,10 +68,10 @@ dependencies {
     androidTestImplementation 'androidx.test:runner:1.5.2'
     androidTestImplementation 'androidx.test:rules:1.5.0'
 
-    implementation 'androidx.media3:media3-exoplayer:1.1.0'
-    implementation 'androidx.media3:media3-ui:1.1.0'
-    implementation 'androidx.media3:media3-exoplayer-ima:1.1.0'
-    implementation 'androidx.media3:media3-exoplayer-dash:1.1.0'
+    implementation 'androidx.media3:media3-exoplayer:1.2.0'
+    implementation 'androidx.media3:media3-ui:1.2.0'
+    implementation 'androidx.media3:media3-exoplayer-ima:1.2.0'
+    implementation 'androidx.media3:media3-exoplayer-dash:1.2.0'
 
     implementation 'com.android.support:multidex:1.0.3'
 }

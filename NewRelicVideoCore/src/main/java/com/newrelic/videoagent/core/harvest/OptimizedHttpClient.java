@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.Arrays;
 import java.util.zip.GZIPOutputStream;
+import com.newrelic.videoagent.core.ObfuscationEngine;
 
 /**
  * Optimized HTTP client for mobile/TV environments
@@ -43,7 +44,6 @@ public class OptimizedHttpClient implements HttpClientInterface {
         REGIONAL_ENDPOINTS.put("EU", "https://mobile-collector.eu.newrelic.com/mobile/v3/data");
         REGIONAL_ENDPOINTS.put("AP", "https://mobile-collector.ap.newrelic.com/mobile/v3/data");
         REGIONAL_ENDPOINTS.put("GOV", "https://mobile-collector.gov.newrelic.com/mobile/v3/data");
-        REGIONAL_ENDPOINTS.put("STAGING", "https://mobile-collector.staging.newrelic.com/mobile/v3/data");
         REGIONAL_ENDPOINTS.put("DEFAULT", REGIONAL_ENDPOINTS.get("US"));
     }
 
@@ -59,10 +59,16 @@ public class OptimizedHttpClient implements HttpClientInterface {
         this.tokenManager = new TokenManager(context, configuration);
         this.deviceInfo = DeviceInformation.getInstance(context);
 
-        // Set endpoint URL based on region, defaulting to US if not found
-        String region = configuration.getRegion().toUpperCase();
-        String regionEndpoint = REGIONAL_ENDPOINTS.get(region);
-        this.endpointUrl = regionEndpoint != null ? regionEndpoint : REGIONAL_ENDPOINTS.get("DEFAULT");
+        // If collectorAddress is explicitly set, use it
+        if (configuration.getCollectorAddress() != null && !configuration.getCollectorAddress().isEmpty()) {
+            this.endpointUrl = "https://" + configuration.getCollectorAddress() + "/mobile/v3/data";
+        } else {
+            // Otherwise, auto-detect from region
+            String region = configuration.getRegion();
+            region = (region != null) ? region.toUpperCase() : "US";
+            String endpoint = REGIONAL_ENDPOINTS.get(region);
+            this.endpointUrl = (endpoint != null) ? endpoint : REGIONAL_ENDPOINTS.get("DEFAULT");
+        }
 
         if (configuration.isMemoryOptimized()) {
             connectionTimeoutMs = 6000;
@@ -74,7 +80,7 @@ public class OptimizedHttpClient implements HttpClientInterface {
         System.setProperty("http.keepAliveDuration", "300000"); // 5 minutes
         System.setProperty("http.maxConnections", "5");
 
-        NRLog.d("Initialized with region: " + region +
+        NRLog.d("Initialized with region: " + configuration.getRegion() +
               ", endpoint URL: " + endpointUrl);
     }
 
@@ -84,8 +90,19 @@ public class OptimizedHttpClient implements HttpClientInterface {
             return true;
         }
 
-        // Attempt to send with immediate retries
-        return sendEventsWithRetry(events);
+        // Apply obfuscation rules to a COPY of the events before sending.
+        //
+        // React analogy: like doing const safeEvents = events.map(e => mask(e)) before
+        // calling fetch() — the original array stays untouched.
+        //
+        // Why a copy and not mutating in place?
+        // If sendEventsWithRetry() fails, HarvestManager passes the same list to the
+        // dead letter handler for retry. If we had mutated in place, the retry would
+        // run obfuscation again on already-obfuscated values — double masking.
+        // By working on a copy, the original list stays clean for any retry path.
+        List<Map<String, Object>> safeEvents = ObfuscationEngine.apply(events, configuration.getObfuscationRules());
+
+        return sendEventsWithRetry(safeEvents);
     }
 
     private boolean sendEventsWithRetry(List<Map<String, Object>> events) {
@@ -154,6 +171,13 @@ public class OptimizedHttpClient implements HttpClientInterface {
 
             List<Object> payload = new ArrayList<>();
             payload.add(appToken);
+
+            // Build device metadata map
+            HashMap<String, Object> deviceMetadata = new HashMap<>();
+            deviceMetadata.put("size", deviceInfo.getSize());
+            deviceMetadata.put("platform", deviceInfo.getApplicationFramework());
+            deviceMetadata.put("platformVersion", deviceInfo.getApplicationFrameworkVersion());
+
             payload.add(Arrays.asList(
                     deviceInfo.getOsName(),
                     deviceInfo.getOsVersion(),
@@ -164,11 +188,7 @@ public class OptimizedHttpClient implements HttpClientInterface {
                     "",
                     "",
                     deviceInfo.getManufacturer(),
-                    new HashMap<String, Object>() {{
-                        put("size", deviceInfo.getSize());
-                        put("platform", deviceInfo.getApplicationFramework());
-                        put("platformVersion", deviceInfo.getApplicationFrameworkVersion());
-                    }}
+                    deviceMetadata
             ));
             payload.add(0);
             payload.add(new ArrayList<>()); // []

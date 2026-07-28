@@ -43,7 +43,10 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | contentId                | The ID of the video.                                                                                                                               |
 | contentTitle             | The title of the video.                                                                                                                            |
 | contentIsLive            | True if the video is live.                                                                                                                         |
-| contentBitrate           | Bitrate (in bits) of the video.                                                                                                                    |
+| contentBitrate           | Average bitrate (in bits) of the video.                                                                                                            |
+| contentManifestBitrate   | Indicated Bitrate: The throughput, in bits per second, required to play the stream as advertised by the server in the manifest.                     |
+| contentSegmentDownloadBitrate   | Observed Bitrate: The actual, empirical throughput measured in bits per second across all downloaded media.                                         |
+| contentNetworkDownloadBitrate   | The actual download throughput in bits per second.                                                                                                 |
 | contentRenditionName     | Name of the rendition (e.g., 1080p).                                                                                                               |
 | contentRenditionBitrate  | Target Bitrate of the rendition.                                                                                                                   |
 | contentRenditionHeight   | Rendition actual Height (before re-scaling).                                                                                                       |
@@ -92,6 +95,8 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 
 ### VideoAdAction
 
+> **About `(MediaTailor)` attributes below:** attributes tagged with *(MediaTailor)* are populated **only** on events emitted by `NRTrackerMediaTailor` (i.e. when the player is registered with `AdTrackerType.MEDIA_TAILOR`). They are **not** present on events from `NRTrackerIMA`. Filter NRQL by `trackerName = 'NRMTracker'` to scope queries to MediaTailor-only ad events.
+
 | Attribute Name           | Definition                                                                                                                                         |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | actionName               | The specific action being performed in the video player, such as play, pause, resume, content buffering, etc.                                      |
@@ -122,7 +127,15 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | adQuartile               | Quartile of the ad. 0 before first, 1 after first quartile, 2 after midpoint, 3 after third quartile, 4 when completed.                            |
 | adPosition               | The position of the ad.                                                                                                                            |
 | adCreativeId             | The creative ID of the ad.                                                                                                                         |
-| adPartner                | The ad partner, e.g., ima, freewheel.                                                                                                              |
+| adPartner                | The ad partner, e.g., ima, freewheel, aws-mediatailor.                                                                                             |
+| adSystem                 | *(MediaTailor)* The ad-server name returned in the VAST response — e.g., `GDFP`, `FreeWheel`, `SpringServe`, `Publica`.                            |
+| vastAdId                 | *(MediaTailor)* Hierarchical VAST ad identifier, useful for tracing back to ad-server logs.                                                       |
+| creativeSequence         | *(MediaTailor)* 1-based index of the creative within the ad pod.                                                                                   |
+| skipOffset               | *(MediaTailor)* `HH:MM:SS` offset after which the ad is skippable. Absent when the ad is non-skippable.                                            |
+| adProgramDateTime        | *(MediaTailor)* Wall-clock time the ad began in the personalized MPD/playlist. Useful for correlating live-stream events with ad-server logs.     |
+| availProgramDateTime     | *(MediaTailor)* Wall-clock time of the avail (ad break) containing this ad.                                                                        |
+| isBumper                 | *(MediaTailor)* `true` when the ad was served by a MediaTailor bumper configuration rather than a normal ad avail.                                |
+| nonLinearAvailsCount     | *(MediaTailor)* Number of non-linear (overlay / banner / companion) avails returned by the tracking API for this session. Non-zero means the app may want to render companion banners.  |
 | isBackgroundEvent        | If the player is hidden by another window.                                                                                                         |
 | bufferType               | When buffer starts, i.e., initial, seek, pause & connection.                                                                                       |
 | asn                      | Autonomous System Number: a unique number identifying a group of IP networks that serves the content to the end user.                              |
@@ -154,6 +167,7 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | AD_BREAK_END        | Ad break ended.                                                                             |
 | AD_QUARTILE         | Ad quartile happened.                                                                       |
 | AD_CLICK            | Ad has been clicked.                                                                        |
+| AD_SKIP             | *(MediaTailor)* User skipped a skippable ad.           |
 
 ### VideoErrorAction
 
@@ -196,6 +210,30 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | ERROR         | An error happened.   |
 | CRASH         | App crash happened.  |
 | CONTENT_ERROR | Content video error. |
+
+### QOE_AGGREGATE
+
+Quality of Experience aggregate attributes sent with `CONTENT_END` events.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `startupTime` | Long | Time from CONTENT_REQUEST to CONTENT_START (ms) |
+| `hadStartupError` | Boolean | Error occurred before first frame |
+| `totalRebufferingTime` | Long | Total rebuffering duration (ms) |
+| `rebufferingRatio` | Float | `(totalRebufferingTime / totalPlaytime) × 100` |
+| `peakBitrate` | Long | Maximum bitrate observed (bps) |
+| `averageBitrate` | Long | Time-weighted average bitrate (bps) |
+| `hadPlaybackError` | Boolean | Error occurred during playback |
+| `totalPlaytime` | Long | Actual viewing time (ms) |
+| `avgDownloadRate` | Long | Mean of observed network download throughput samples during content (bps). Omitted when no sample was observed. |
+| `minDownloadRate` | Long | Minimum observed network download throughput sample during content (bps). Omitted when no sample was observed. |
+| `maxDownloadRate` | Long | Maximum observed network download throughput sample during content (bps). Omitted when no sample was observed. |
+| `totalSwitchUps` | Long | Count of upward rendition (resolution) changes during content |
+| `totalSwitchDowns` | Long | Count of downward rendition (resolution) changes during content |
+| `totalTimeSwitchedDown` | Long | Cumulative time (ms) spent at a rendition below the highest rendition bitrate seen so far in the view; includes any open interval at emit time |
+| `totalPauseTime` | Long | Total content pause duration (ms); includes any open pause at emit time |
+| `totalRenditions` | Long | Count of distinct renditions (width × height) played during content |
+| `qoeAggregateVersion` | String | Algorithm version (e.g. "1.1.0") |
 
 ### VideoCustomAction
 

@@ -22,6 +22,7 @@ public final class NRVideo {
     private static final Object lock = new Object();
 
     private volatile HarvestManager harvestManager;
+    private volatile NRVideoConfiguration configuration;
     private final Map<String, Integer> trackerIds = new HashMap<>();
 
     // Private constructor for singleton
@@ -42,6 +43,25 @@ public final class NRVideo {
         return instance != null;
     }
 
+    /**
+     * Get configured harvest cycle in seconds
+     * @return harvest cycle seconds, or default 60 if not initialized
+     */
+    public static int getHarvestCycleSeconds() {
+        if (instance != null && instance.harvestManager != null) {
+            return instance.harvestManager.getFactory().getConfiguration().getHarvestCycleSeconds();
+        }
+        return 60; // Default harvest cycle
+    }
+
+    /**
+     * Get the HarvestManager instance for QOE provider registration
+     * @return HarvestManager instance, or null if not initialized
+     */
+    public HarvestManager getHarvestManager() {
+        return harvestManager;
+    }
+
     public static Integer addPlayer(NRVideoPlayerConfiguration config) {
         if (!isInitialized()) {
             NRLog.w("NRVideo not initialized - cannot add player");
@@ -49,16 +69,27 @@ public final class NRVideo {
         }
 
         // Create content tracker with ExoPlayer instance
-        NRTracker contentTracker = createContentTracker();
+        NRTracker contentTracker = createContentTracker(instance.configuration);
         NRTracker adsTracker = null;
-        if (config.isAdEnabled()) {
-            adsTracker = createAdTracker();
-            NRLog.d("add tracker is added");
+        NRAdConfig adConfig = config.getAdConfig();
+        if (adConfig != null) {
+            adsTracker = createAdTracker(instance.configuration, adConfig);
+            NRLog.d("[NRVideo] ad tracker created for " + adConfig);
+        } else {
+            NRLog.d("[NRVideo] no adConfig supplied — ad tracking disabled for player '"
+                    + config.getPlayerName() + "'");
         }
 
         // Now start the tracker system
         Integer trackerId = NewRelicVideoAgent.getInstance().start(contentTracker, adsTracker);
         ((NRVideoTracker) contentTracker).setPlayer(config.getPlayer());
+        // MediaTailor registers a Player.Listener so it needs the ExoPlayer reference.
+        // IMA wires via AdEventListener externally and does not need setPlayer here.
+        if (adsTracker instanceof NRVideoTracker
+                && adConfig != null
+                && adConfig.type == NRAdConfig.Type.SSAI_MT) {
+            ((NRVideoTracker) adsTracker).setPlayer(config.getPlayer());
+        }
         NRLog.i("NRVideo initialization completed successfully with tracker ID: " + trackerId + " and player name:" + config.getPlayerName());
         if (config.getCustomAttributes() != null && !config.getCustomAttributes().isEmpty()) {
             for (Map.Entry<String, Object> entry : config.getCustomAttributes().entrySet()) {
@@ -152,7 +183,7 @@ public final class NRVideo {
             NRTracker contentTracker = NewRelicVideoAgent.getInstance().getContentTracker(trackerId);
             if (contentTracker != null) {
                 contentTracker.sendEvent(action, attributes);
-            } 
+            }
         } else {
             // Global event - send to all trackers
             NRVideo videoInstance = getInstance();
@@ -217,6 +248,9 @@ public final class NRVideo {
         try {
             Context applicationContext = context.getApplicationContext();
 
+            // Store configuration for tracker creation
+            this.configuration = config;
+
             // Always use crash-safe storage - it's now the default behavior
             harvestManager = new HarvestManager(config, applicationContext);
 
@@ -224,7 +258,7 @@ public final class NRVideo {
             if (applicationContext instanceof Application) {
                 Application app = (Application) applicationContext;
                 NRVideoLifecycleObserver lifecycleObserver =
-                    new NRVideoLifecycleObserver(harvestManager.getFactory());
+                        new NRVideoLifecycleObserver(harvestManager.getFactory());
 
                 // Register with application
                 app.registerActivityLifecycleCallbacks(lifecycleObserver);
@@ -245,24 +279,51 @@ public final class NRVideo {
         }
     }
 
-    private static NRTracker createContentTracker() {
+    private static NRTracker createContentTracker(NRVideoConfiguration config) {
         try {
-            // Create ExoPlayer tracker with player instance
+            // Create ExoPlayer tracker with configuration
             Class<?> exoTrackerClass = Class.forName("com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer");
-            return (NRTracker) exoTrackerClass.newInstance();
+            return (NRTracker) exoTrackerClass.getConstructor(NRVideoConfiguration.class).newInstance(config);
         } catch (Exception e) {
-            // Fallback to basic video tracker
-            throw new RuntimeException("Failed to create NRTrackerExoPlayer", e);
+            // Fallback to deprecated constructor for backward compatibility
+            try {
+                Class<?> exoTrackerClass = Class.forName("com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer");
+                return (NRTracker) exoTrackerClass.newInstance();
+            } catch (Exception fallbackException) {
+                throw new RuntimeException("Failed to create NRTrackerExoPlayer", fallbackException);
+            }
         }
     }
 
-    private static NRTracker createAdTracker() {
-
+    private static NRTracker createAdTracker(NRVideoConfiguration config, NRAdConfig adConfig) {
+        String className;
+        switch (adConfig.type) {
+            case SSAI_MT:
+                className = "com.newrelic.videoagent.mediatailor.tracker.NRTrackerMediaTailor";
+                break;
+            case CSAI:
+            default:
+                className = "com.newrelic.videoagent.ima.tracker.NRTrackerIMA";
+                break;
+        }
+        NRLog.d("[NRVideo] loading ad tracker class: " + className);
         try {
-            // Always use IMA tracker for ads
-            Class<?> imaTrackerClass = Class.forName("com.newrelic.videoagent.ima.tracker.NRTrackerIMA");
-            return (NRTracker) imaTrackerClass.newInstance();
+            Class<?> clazz = Class.forName(className);
+            // Prefer the two-arg constructor (NRVideoConfiguration, NRAdConfig) so the
+            // tracker receives its full configuration (segmentPrefix, trackingUrl) at
+            // construction time. Fall back to the one-arg constructor for trackers
+            // (e.g. NRTrackerIMA) that do not need NRAdConfig.
+            try {
+                return (NRTracker) clazz
+                        .getConstructor(NRVideoConfiguration.class, NRAdConfig.class)
+                        .newInstance(config, adConfig);
+            } catch (NoSuchMethodException ignored) {
+                return (NRTracker) clazz
+                        .getConstructor(NRVideoConfiguration.class)
+                        .newInstance(config);
+            }
         } catch (Exception e) {
+            NRLog.w("[NRVideo] failed to load ad tracker " + className + ": " + e);
             return null;
         }
     }
