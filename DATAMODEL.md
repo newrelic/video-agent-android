@@ -92,6 +92,7 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | CONTENT_BUFFER_END       | Content video buffering ended.                                                                   |
 | CONTENT_HEARTBEAT        | Content video heartbeat, an event that happens once every 30 seconds while the video is playing. |
 | CONTENT_RENDITION_CHANGE | Content video stream quality changed.                                                            |
+| CONTENT_DROPPED_FRAMES   | ExoPlayer reported a batch of dropped video frames during content playback. Fired when the accumulated dropped frame count reaches the ExoPlayer threshold (default: 50 frames) or when playback stops. See [CONTENT_DROPPED_FRAMES attributes](#content_dropped_frames-and-ad_dropped_frames-attributes) below. |
 
 ### VideoAdAction
 
@@ -163,11 +164,71 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | AD_BUFFER_END       | Ad video buffering ended.                                                                   |
 | AD_HEARTBEAT        | Ad video heartbeat, an event that happens once every 30 seconds while the video is playing. |
 | AD_RENDITION_CHANGE | Ad video stream quality changed.                                                            |
+| AD_DROPPED_FRAMES   | ExoPlayer reported a batch of dropped video frames during ad playback. Same semantics as CONTENT_DROPPED_FRAMES. |
 | AD_BREAK_START      | Ad break (a block of ads) started.                                                          |
 | AD_BREAK_END        | Ad break ended.                                                                             |
 | AD_QUARTILE         | Ad quartile happened.                                                                       |
 | AD_CLICK            | Ad has been clicked.                                                                        |
 | AD_SKIP             | *(MediaTailor)* User skipped a skippable ad.           |
+
+---
+
+### CONTENT_DROPPED_FRAMES and AD_DROPPED_FRAMES attributes
+
+These events carry all standard VideoAction / VideoAdAction attributes plus the following dropped-frames-specific fields.
+
+ExoPlayer accumulates dropped frames internally and fires the callback when the accumulated count reaches its notification threshold (default: 50 frames via `DefaultRenderersFactory.MAX_DROPPED_VIDEO_FRAME_COUNT_TO_NOTIFY`) or when the renderer stops (pause, seek, end of stream). Each event is a **delta** — it reports frames dropped since the previous notification, not a cumulative session total.
+
+#### Always-present fields
+
+| Attribute Name      | Type   | Definition |
+| ------------------- | ------ | ---------- |
+| lostFrames          | int    | Number of frames dropped in this aggregation window. This is the sum of all ExoPlayer-reported drops across all callbacks merged into this event. |
+| lostFramesDuration  | int    | Sum of ExoPlayer's elapsed measurement windows (ms) across all callbacks in this event. This is ExoPlayer's own observation time — it is **not** `lostFrames / contentFps × 1000`. |
+| eventCount          | int    | Number of ExoPlayer `onDroppedVideoFrames` callbacks aggregated into this single event. `1` is the common case for healthy sessions with occasional bursts. |
+| contentFps          | double | Stream frame rate at the time of the event, in frames per second. |
+
+#### Fields present only when `eventCount > 1`
+
+These fields are absent when `eventCount = 1` because they would always be zero or identical to each other, providing no information.
+
+| Attribute Name                | Type | Definition |
+| ----------------------------- | ---- | ---------- |
+| firstDropTimestamp            | long | Agent wall-clock time (ms since epoch) when the first ExoPlayer callback arrived in this aggregation window. |
+| lastDropTimestamp             | long | Agent wall-clock time (ms since epoch) when the last ExoPlayer callback arrived in this aggregation window. |
+| actualAggregationDurationMs   | long | `lastDropTimestamp − firstDropTimestamp`. The actual elapsed time between the first and last ExoPlayer callback in this window. Use this as the denominator for drop rate when `eventCount > 1`. |
+
+#### Computing drop rate
+
+When `eventCount = 1`:
+```
+dropRate = lostFrames / (contentFps × lostFramesDuration / 1000)
+```
+
+When `eventCount > 1`:
+```
+dropRate = lostFrames / (contentFps × actualAggregationDurationMs / 1000)
+```
+
+A `dropRate` of 1.0 means all expected frames were dropped during the observation window.
+
+#### Example NRQL
+
+Total dropped frames per session (last hour):
+```sql
+SELECT SUM(lostFrames) FROM VideoAction
+WHERE actionName = 'CONTENT_DROPPED_FRAMES'
+FACET viewSession SINCE 1 hour ago
+```
+
+Sessions with sustained frame drops (multiple ExoPlayer callbacks aggregated):
+```sql
+SELECT viewSession, SUM(lostFrames), MAX(eventCount)
+FROM VideoAction WHERE actionName = 'CONTENT_DROPPED_FRAMES'
+AND eventCount > 1 SINCE 1 day ago
+```
+
+---
 
 ### VideoErrorAction
 
