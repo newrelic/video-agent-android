@@ -44,6 +44,7 @@ public class OptimizedHttpClient implements HttpClientInterface {
         REGIONAL_ENDPOINTS.put("EU", "https://mobile-collector.eu.newrelic.com/mobile/v3/data");
         REGIONAL_ENDPOINTS.put("AP", "https://mobile-collector.ap.newrelic.com/mobile/v3/data");
         REGIONAL_ENDPOINTS.put("GOV", "https://mobile-collector.gov.newrelic.com/mobile/v3/data");
+        REGIONAL_ENDPOINTS.put("JP", "https://mobile-collector.jp.nr-data.net/mobile/v3/data");
         REGIONAL_ENDPOINTS.put("DEFAULT", REGIONAL_ENDPOINTS.get("US"));
     }
 
