@@ -19,6 +19,9 @@ apply plugin: 'maven-publish'
 
 allprojects {
     repositories {
+        // Milestone 1: consumes the KMP shared-core aar published via publishToMavenLocal.
+        // Dev-only for now — see LIFECYCLE.md's "production shape" for hosted-Maven distribution.
+        mavenLocal()
         google()
         mavenCentral()
     }

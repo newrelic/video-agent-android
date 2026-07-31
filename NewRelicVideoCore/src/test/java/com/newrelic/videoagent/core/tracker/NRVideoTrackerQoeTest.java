@@ -6,9 +6,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 
-import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+
+import com.newrelic.videoagent.core.NRVideoConfiguration;
 
 import static com.newrelic.videoagent.core.NRDef.*;
 import static org.junit.Assert.*;
@@ -16,8 +19,8 @@ import static org.junit.Assert.*;
 /**
  * Unit tests for the QoE attributes added in qoeAggregateVersion 1.1.0:
  *   - avgDownloadRate / minDownloadRate / maxDownloadRate
- *   - totalSwitchUps / totalSwitchDowns / totalTimeSwitchedDown
- *   - totalPauseTime
+ *   - totalSwitchUps / totalSwitchDowns
+ *   - totalPauseTime (banks timeSincePaused; excludes ad-break pauses)
  *   - totalRenditions
  *
  * Strategy:
@@ -27,7 +30,7 @@ import static org.junit.Assert.*;
  *     path. Switch and pause metrics are driven through the real event pipeline
  *     (sendVideoEvent / sendPause / sendResume) so the NRTracker.processQoeEvents()
  *     wiring is exercised too.
- *   - KPI values are read back from the private calculateQOEKpiAttributes() via reflection.
+ *   - KPI values are read back from the extracted NRQoEAggregator via getQoeAggregator().
  *
  * Time-based assertions use small real sleeps with generous tolerance (the production
  * code uses System.currentTimeMillis()); this mirrors the existing playtime tests.
@@ -64,21 +67,29 @@ public class NRVideoTrackerQoeTest {
         Long renditionBitrate;
         Long networkDownloadBitrate;
 
+        QoeTestTracker() { super(); }
+        QoeTestTracker(NRVideoConfiguration config) { super(config); }
+
         @Override public Long getRenditionWidth()        { return renditionWidth; }
         @Override public Long getRenditionHeight()       { return renditionHeight; }
         @Override public Long getRenditionBitrate()      { return renditionBitrate; }
         @Override public Long getNetworkDownloadBitrate(){ return networkDownloadBitrate; }
     }
 
-    @SuppressWarnings("unchecked")
+    /**
+     * Phase 1: KPIs now come from the extracted aggregator (via the package-private accessor).
+     * Real-time playtime is supplied by the tracker in production; tests that don't exercise
+     * playtime pass 0. Returns null before a CONTENT_REQUEST (the aggregator's gate), so tests
+     * that read KPIs must establish a session (startContent() or requestOnly()) first.
+     */
     private Map<String, Object> kpis() {
-        try {
-            Method m = NRVideoTracker.class.getDeclaredMethod("calculateQOEKpiAttributes");
-            m.setAccessible(true);
-            return (Map<String, Object>) m.invoke(tracker);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        return tracker.getQoeAggregator().generateAggregateAttributes(0L);
+    }
+
+    /** Open the aggregator gate without starting playback (feeds CONTENT_REQUEST). */
+    private void requestOnly() {
+        tracker.setPlayer(new Object());
+        tracker.sendRequest();
     }
 
     private static long lng(Map<String, Object> m, String key) {
@@ -93,9 +104,9 @@ public class NRVideoTrackerQoeTest {
         tracker.sendStart();
     }
 
-    /** Drive one content event so the getAttributes() capture hooks run. */
+    /** Drive one content event through the real pipeline so the onQoeEvent feed hook runs. */
     private void emitContentEvent() {
-        tracker.getAttributes(CONTENT_HEARTBEAT, null);
+        tracker.sendVideoEvent(CONTENT_HEARTBEAT, null);
     }
 
     private void sendShift(String shift) {
@@ -107,9 +118,8 @@ public class NRVideoTrackerQoeTest {
     }
 
     /**
-     * Drive a CONTENT_RENDITION_CHANGE carrying a rendition bitrate. The bitrate is what
-     * totalTimeSwitchedDown is anchored on (session-max); requires the tracker to be started
-     * so getAttributes() populates contentRenditionBitrate.
+     * Drive a CONTENT_RENDITION_CHANGE carrying a rendition bitrate; requires the tracker to be
+     * started so getAttributes() populates contentRenditionBitrate. Used to drive switch counts.
      */
     private void renditionChange(String shift, long bitrate) {
         tracker.renditionBitrate = bitrate;
@@ -130,11 +140,11 @@ public class NRVideoTrackerQoeTest {
 
     @Test
     public void defaults_countersZero_downloadOmitted() {
+        requestOnly();
         Map<String, Object> k = kpis();
 
         assertEquals(0L, lng(k, "totalSwitchUps"));
         assertEquals(0L, lng(k, "totalSwitchDowns"));
-        assertEquals(0L, lng(k, "totalTimeSwitchedDown"));
         assertEquals(0L, lng(k, "totalPauseTime"));
         assertEquals(0L, lng(k, "totalRenditions"));
 
@@ -204,6 +214,7 @@ public class NRVideoTrackerQoeTest {
 
     @Test
     public void switches_countUpsAndDowns() {
+        requestOnly();
         sendShift("down");
         sendShift("down");
         sendShift("up");
@@ -216,80 +227,13 @@ public class NRVideoTrackerQoeTest {
 
     @Test
     public void switches_missingOrUnknownShiftIgnored() {
+        requestOnly();
         sendShift(null);          // no "shift" attribute
         sendShift("sideways");    // unrecognised value
 
         Map<String, Object> k = kpis();
         assertEquals(0L, lng(k, "totalSwitchUps"));
         assertEquals(0L, lng(k, "totalSwitchDowns"));
-        assertEquals(0L, lng(k, "totalTimeSwitchedDown"));
-    }
-
-    // =========================================================================
-    // totalTimeSwitchedDown
-    // =========================================================================
-
-    @Test
-    public void timeSwitchedDown_banksWhenRecoveringToPeak() {
-        startContent();
-
-        renditionChange("down", 5_000_000L);   // establishes session peak = 5M, no interval
-        renditionChange("down", 3_000_000L);   // below peak -> open interval
-        sleep(SLEEP_MS);
-        renditionChange("up",   5_000_000L);   // back to peak -> close, bank elapsed
-
-        long t = lng(kpis(), "totalTimeSwitchedDown");
-        assertTrue("below-peak time banked (was " + t + ")", t >= MIN_ELAPSED);
-    }
-
-    @Test
-    public void timeSwitchedDown_partialRecoveryStaysBelowPeak() {
-        // The defining session-max behavior: an upswitch that is still below the session
-        // peak must NOT close the interval (unlike the previous-rendition semantic).
-        startContent();
-
-        renditionChange("down", 5_000_000L);   // peak = 5M
-        renditionChange("down", 2_000_000L);   // open interval
-        sleep(SLEEP_MS);
-        renditionChange("up",   3_000_000L);   // 3M < 5M -> still below peak, interval stays OPEN
-
-        long v1 = lng(kpis(), "totalTimeSwitchedDown");
-        sleep(SLEEP_MS);
-        long v2 = lng(kpis(), "totalTimeSwitchedDown");
-        assertTrue("still counting below the session peak (" + v1 + " -> " + v2 + ")", v2 > v1);
-    }
-
-    @Test
-    public void timeSwitchedDown_consecutiveDownsKeepOneInterval() {
-        startContent();
-
-        renditionChange("down", 5_000_000L);   // peak = 5M
-        renditionChange("down", 3_000_000L);   // open interval
-        sleep(SLEEP_MS);
-        renditionChange("down", 2_000_000L);   // still below peak — interval start must NOT reset
-        sleep(SLEEP_MS);
-        renditionChange("up",   5_000_000L);   // recover to peak -> close
-
-        long t = lng(kpis(), "totalTimeSwitchedDown");
-        // One continuous interval spanning both sleeps.
-        assertTrue("continuous interval (was " + t + ")", t >= (2 * MIN_ELAPSED));
-    }
-
-    @Test
-    public void timeSwitchedDown_openIntervalSnapshotIsNonMutating() {
-        startContent();
-
-        renditionChange("down", 5_000_000L);   // peak = 5M
-        renditionChange("down", 3_000_000L);   // open, never recovered
-        sleep(SLEEP_MS);
-
-        long first = lng(kpis(), "totalTimeSwitchedDown");
-        assertTrue("open interval reflected at emit (was " + first + ")", first >= MIN_ELAPSED);
-
-        sleep(SLEEP_MS);
-        long second = lng(kpis(), "totalTimeSwitchedDown");
-        // Non-mutating snapshot: the interval is still open, so it keeps growing.
-        assertTrue("snapshot keeps growing (" + first + " -> " + second + ")", second > first);
     }
 
     // =========================================================================
@@ -365,7 +309,145 @@ public class NRVideoTrackerQoeTest {
     }
 
     // =========================================================================
-    // Reset per view (sendEnd -> resetQoeMetrics)
+    // Per-session harvest cadence (qoeCycleCount), independent of global harvest number
+    // =========================================================================
+
+    /**
+     * The periodic-QoE gate must count this session's own polls (reset at CONTENT_REQUEST),
+     * NOT the global harvest number passed in. We use multiplier=2 and pass a constant global
+     * cycle (2) that the old global-parity formula {@code (harvestCycleNumber-1)%2} maps to
+     * "skip" forever — so if the gate still used it, nothing would ever emit.
+     */
+    @Test
+    public void cadence_gatesOnPerSessionPolls_notGlobalHarvestNumber() {
+        NRVideoConfiguration config = new NRVideoConfiguration.Builder("token")
+                .withQoeAggregateIntervalMultiplier(2)
+                .build();
+        QoeTestTracker t = new QoeTestTracker(config);
+        t.setPlayer(new Object());
+        t.sendRequest();   // CONTENT_REQUEST -> qoeCycleCount reset to 0, gate opened
+        t.sendStart();
+
+        final int GLOBAL = 2;                       // old formula: (2-1)%2==1 -> would never send
+        final List<Map<String, Object>> batch = new ArrayList<>();
+
+        // Session poll 1 -> emits (first poll always fires, regardless of global cycle).
+        t.networkDownloadBitrate = 1000L; t.sendVideoEvent(CONTENT_HEARTBEAT, null);
+        assertNotNull("session poll 1 must emit regardless of global harvest number",
+                t.generateQoeIfNeeded(batch, GLOBAL));
+
+        // Session poll 2 -> skipped by multiplier=2 (KPI still changed, so only cadence gates it).
+        t.networkDownloadBitrate = 2000L; t.sendVideoEvent(CONTENT_HEARTBEAT, null);
+        assertNull("session poll 2 skipped by multiplier",
+                t.generateQoeIfNeeded(batch, GLOBAL));
+
+        // Session poll 3 -> emits again.
+        t.networkDownloadBitrate = 3000L; t.sendVideoEvent(CONTENT_HEARTBEAT, null);
+        assertNotNull("session poll 3 emits",
+                t.generateQoeIfNeeded(batch, GLOBAL));
+
+        t.dispose();
+    }
+
+    // =========================================================================
+    // Staleness: emitted totalPlaytime is fresh (extrapolated), not the cached snapshot
+    // =========================================================================
+
+    /**
+     * The QOE envelope copies cached last-event attributes, which include a stale totalPlaytime.
+     * iOS parity: the emitted totalPlaytime must be the fresh, extrapolated value
+     * (computeRealtimePlaytimeMs = cached + elapsed-while-playing), not the snapshot.
+     *
+     * At CONTENT_START the cached totalPlaytime is 0; after playing for a while the emitted value
+     * must reflect the elapsed top-up. Under the old (stale-wins) behavior this would emit 0.
+     */
+    @Test
+    public void staleness_totalPlaytimeIsFreshNotCachedSnapshot() {
+        NRVideoConfiguration config = new NRVideoConfiguration.Builder("token")
+                .withQoeAggregateIntervalMultiplier(1)   // every poll qualifies
+                .build();
+        QoeTestTracker t = new QoeTestTracker(config);
+        t.setPlayer(new Object());
+        t.sendRequest();
+        t.sendStart();                 // caches totalPlaytime=0, arms playtime top-up (isPlaying + timestamp)
+
+        sleep(SLEEP_MS);               // time passes while playing -> fresh playtime > cached snapshot (0)
+
+        Map<String, Object> qoe = t.generateQoeIfNeeded(new ArrayList<>(), 1);
+        assertNotNull(qoe);
+        long emitted = lng(qoe, "totalPlaytime");
+        assertTrue("emitted totalPlaytime must be the fresh extrapolated value, not the stale cached "
+                + "snapshot (was " + emitted + ")", emitted >= MIN_ELAPSED);
+
+        t.dispose();
+    }
+
+    // =========================================================================
+    // Error basis: startup vs playback decided by hasContentStarted (iOS parity),
+    // not totalPlaytime > 0
+    // =========================================================================
+
+    @Test
+    public void errorBasis_beforeContentStartIsStartupError() {
+        requestOnly();                              // CONTENT_REQUEST only — content not started
+        tracker.sendError(new Exception("boom"));
+
+        Map<String, Object> k = kpis();
+        assertTrue((Boolean) k.get("hadStartupError"));
+        assertFalse((Boolean) k.get("hadPlaybackError"));
+    }
+
+    /**
+     * The discriminating case for the fix: after CONTENT_START but before any playtime has
+     * accrued (totalPlaytime == 0). New basis (hasContentStarted) => playback error. The old
+     * basis (totalPlaytime > 0) would have misclassified this as a startup error.
+     */
+    @Test
+    public void errorBasis_afterStartIsPlaybackError_evenWithZeroPlaytime() {
+        startContent();                             // hasContentStarted = true, totalPlaytime still 0
+        tracker.sendError(new Exception("boom"));
+
+        Map<String, Object> k = kpis();
+        assertFalse((Boolean) k.get("hadStartupError"));
+        assertTrue((Boolean) k.get("hadPlaybackError"));
+    }
+
+    // =========================================================================
+    // Attribute envelope: iOS whitelist + custom attrs kept, everything else dropped
+    // =========================================================================
+
+    @Test
+    public void envelope_whitelistsContextKeepsCustomDropsRest() {
+        NRVideoConfiguration config = new NRVideoConfiguration.Builder("token")
+                .withQoeAggregateIntervalMultiplier(1)
+                .build();
+        QoeTestTracker t = new QoeTestTracker(config);
+        t.setAttribute("myCustomKey", "customValue");   // user-defined attribute
+        t.setPlayer(new Object());
+        t.sendRequest();
+        t.sendStart();
+
+        t.renditionWidth = 1920L; t.renditionHeight = 1080L;
+        t.networkDownloadBitrate = 5000L;               // -> contentNetworkDownloadBitrate (not whitelisted)
+        t.sendVideoEvent(CONTENT_HEARTBEAT, null);       // populates + caches the content-event attrs
+
+        Map<String, Object> qoe = t.generateQoeIfNeeded(new ArrayList<>(), 1);
+        assertNotNull(qoe);
+
+        // Whitelisted context attributes survive
+        assertTrue("viewId whitelisted", qoe.containsKey("viewId"));
+        assertEquals(1920L, ((Number) qoe.get("contentRenditionWidth")).longValue());
+        // User custom attribute survives
+        assertEquals("customValue", qoe.get("myCustomKey"));
+        // Non-whitelisted context attributes are dropped (iOS parity)
+        assertFalse("contentNetworkDownloadBitrate dropped", qoe.containsKey("contentNetworkDownloadBitrate"));
+        assertFalse("numberOfAds dropped", qoe.containsKey("numberOfAds"));
+
+        t.dispose();
+    }
+
+    // =========================================================================
+    // Reset per view (sendEnd -> aggregator.reset())
     // =========================================================================
 
     @Test
@@ -380,22 +462,28 @@ public class NRVideoTrackerQoeTest {
         tracker.sendPause(); sleep(SLEEP_MS); tracker.sendResume();
         sleep(SLEEP_MS);
 
-        // Sanity: state accumulated (incl. an OPEN switched-down interval).
+        // Sanity: state accumulated.
         Map<String, Object> before = kpis();
         assertEquals(1L, lng(before, "totalSwitchUps"));
         assertEquals(1L, lng(before, "totalSwitchDowns"));
-        assertTrue(lng(before, "totalTimeSwitchedDown") > 0);
         assertTrue(lng(before, "totalPauseTime") > 0);
         assertTrue(lng(before, "totalRenditions") >= 1);
         assertTrue(before.containsKey("avgDownloadRate"));
 
-        // End the view -> resetQoeMetrics().
+        // End the view -> aggregator.reset() (closes the gate too).
         tracker.sendEnd();
+        assertNull("gate closed after view end", kpis());
 
+        // A fresh view (new CONTENT_REQUEST) starts clean. Clear the player-data getters so the
+        // new session carries no rendition/download samples yet.
+        tracker.renditionWidth = null;
+        tracker.renditionHeight = null;
+        tracker.renditionBitrate = null;
+        tracker.networkDownloadBitrate = null;
+        tracker.sendRequest();
         Map<String, Object> after = kpis();
         assertEquals(0L, lng(after, "totalSwitchUps"));
         assertEquals(0L, lng(after, "totalSwitchDowns"));
-        assertEquals(0L, lng(after, "totalTimeSwitchedDown"));
         assertEquals(0L, lng(after, "totalPauseTime"));
         assertEquals(0L, lng(after, "totalRenditions"));
         assertFalse("download rate cleared", after.containsKey("avgDownloadRate"));

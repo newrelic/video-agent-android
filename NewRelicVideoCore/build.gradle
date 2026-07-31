@@ -52,6 +52,13 @@ dependencies {
     implementation 'androidx.media3:media3-exoplayer:1.2.0'
     implementation 'androidx.media3:media3-exoplayer-ima:1.2.0'
 
+    // Milestone 1: QoE aggregator + model package now live in the KMP shared-core, consumed here
+    // as a same-FQN drop-in (the Java originals are deleted; the Kotlin classes from this aar
+    // resolve to the identical package+class names). Must be `api`, not `implementation` — these
+    // classes (e.g. NRTrackerState) are part of NewRelicVideoCore's public API; the tracker modules
+    // (NRExoPlayerTracker, NRIMATracker) subclass/use them, and `implementation` would hide them.
+    api 'com.newrelic.videoagent:shared-core-android:0.2.0'
+
     // Add androidx.leanback for accurate Android TV detection
 //    implementation 'androidx.leanback:leanback:1.0.0'
 
