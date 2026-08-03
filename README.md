@@ -52,16 +52,17 @@ Add the dependencies inside your app's `build.gradle`:
 
 ```groovy
 dependencies {
-    ...
+    // Required: Core library
+    implementation 'com.github.newrelic.video-agent-android:NewRelicVideoCore:v4.1.0'
 
-    // Add this to install the NewRelicVideoCore (required)
-    implementation 'com.github.newrelic.video-agent-android:NewRelicVideoCore:4.+'
-    
-    // Add this to install the ExoPlayer tracker
-    implementation 'com.github.newrelic.video-agent-android:NRExoPlayerTracker:4.+'
-    
-    // Add this to install the Google IMA library tracker
-    implementation 'com.github.newrelic.video-agent-android:NRIMATracker:4.+'
+    // ExoPlayer (Media3) tracker
+    implementation 'com.github.newrelic.video-agent-android:NRExoPlayerTracker:v4.1.0'
+
+    // Google IMA ad tracker (optional — for client-side ad insertion)
+    implementation 'com.github.newrelic.video-agent-android:NRIMATracker:v4.1.0'
+
+    // AWS MediaTailor ad tracker (optional — for server-side ad insertion / SSAI)
+    implementation 'com.github.newrelic.video-agent-android:NRMediaTailorTracker:v4.1.0'
 }
 ```
 
