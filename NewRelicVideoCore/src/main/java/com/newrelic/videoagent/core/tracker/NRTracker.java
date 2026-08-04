@@ -183,7 +183,8 @@ public class NRTracker {
                 it.remove();
             }
         }
-        NRLog.d("SEND EVENT " + action + " , attr = " + attributes);
+        final Map<String, Object> finalAttrs = attributes;
+        NRLog.d(() -> "SEND EVENT " + action + " , attr = " + finalAttrs);
         if (preSend(action, attributes)) {
             attributes.put("actionName", action);
             NRVideo.recordEvent(eventType, attributes);
