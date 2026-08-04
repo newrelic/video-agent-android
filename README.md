@@ -459,13 +459,15 @@ NRVideo.recordCustomEvent(attrs, trackerId);
 ### `NRTrackerExoPlayer` (ExoPlayer Tracker)
 
 #### `tracker.setDroppedFrameAggregationEnabled(enabled)`
-Enable or disable dropped frame aggregation (5-second window, max 50 events).
+Enable or disable dropped frame aggregation (5-second sliding window, max 50 ExoPlayer callbacks per window). Enabled by default.
 
 ```java
 NRTrackerExoPlayer tracker =
         (NRTrackerExoPlayer) NewRelicVideoAgent.getInstance().getContentTracker(trackerId);
 tracker.setDroppedFrameAggregationEnabled(true);
 ```
+
+For a full description of `CONTENT_DROPPED_FRAMES` event fields and their semantics, see [DATAMODEL.md](DATAMODEL.md#content_dropped_frames-and-ad_dropped_frames-attributes).
 
 ### Example: Complete Integration
 
@@ -495,11 +497,6 @@ NRVideoPlayerConfiguration playerConfig =
         new NRVideoPlayerConfiguration("main-player", player, false, customAttrs);
 
 Integer trackerId = NRVideo.addPlayer(playerConfig);
-
-// Enable dropped frame tracking
-NRTrackerExoPlayer tracker =
-        (NRTrackerExoPlayer) NewRelicVideoAgent.getInstance().getContentTracker(trackerId);
-tracker.setDroppedFrameAggregationEnabled(true);
 
 // Cleanup
 @Override

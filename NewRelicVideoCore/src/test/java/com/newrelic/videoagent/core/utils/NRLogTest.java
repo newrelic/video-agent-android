@@ -154,7 +154,7 @@ public class NRLogTest {
     @Test
     public void testLogWithNullMessage() {
         NRLog.enable();
-        NRLog.d(null);
+        NRLog.d((String) null);
 
         assertEquals(1, ShadowLog.getLogs().size());
         assertNull(ShadowLog.getLogs().get(0).msg);

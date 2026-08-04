@@ -14,17 +14,6 @@ import org.robolectric.RuntimeEnvironment;
 
 import java.util.Map;
 
-/**
- * Comprehensive unit tests for NRTrackerExoPlayer frame drop aggregation functionality.
- *
- * This test class covers:
- * - Core aggregation logic (single/multiple frame drops)
- * - "Last track always" pattern verification
- * - Configuration management (enable/disable aggregation)
- * - Event attributes validation
- * - State management and reset functionality
- * - Data consistency verification
- */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28, manifest = Config.NONE)
 public class NRTrackerExoPlayerFrameDropAggregationTest {
@@ -35,218 +24,184 @@ public class NRTrackerExoPlayerFrameDropAggregationTest {
     public void setUp() {
         Context context = RuntimeEnvironment.getApplication();
         ExoPlayer realPlayer = new ExoPlayer.Builder(context).build();
-
         tracker = new MockNRTrackerExoPlayer();
         tracker.setPlayer(realPlayer);
-        tracker.setDroppedFrameAggregationEnabled(true);
+        // Clear TRACKER_READY / PLAYER_READY events fired during setup
+        tracker.clearEvents();
+    }
+
+    // -------------------------------------------------------------------------
+    // Single-event payload shape (eventCount=1)
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void singleEvent_payloadContainsCoreFields() {
+        tracker.sendDroppedFrame(50, 1800);
+        tracker.simulateFlush();
+
+        Map<String, Object> attrs = tracker.getLastEventAttributes();
+        assertNotNull("Event should have been emitted", attrs);
+        assertEquals("lostFrames should match", 50, attrs.get("lostFrames"));
+        assertEquals("lostFramesDuration should match", 1800, attrs.get("lostFramesDuration"));
+        assertEquals("eventCount should be 1", 1, attrs.get("eventCount"));
     }
 
     @Test
-    public void testSingleFrameDropEvent() {
-        tracker.sendDroppedFrame(5, 100);
+    public void singleEvent_timingFieldsAbsent() {
+        tracker.sendDroppedFrame(50, 1800);
+        tracker.simulateFlush();
 
-        Map<String, Object> lastTrackData = tracker.getLastTrackData();
-
-        assertEquals("Last frame drop count should match", 5, lastTrackData.get("lastFrameDropCount"));
-        assertEquals("Last frame drop duration should match", 100, lastTrackData.get("lastFrameDropDuration"));
-        assertNotNull("Last frame drop time should be set", lastTrackData.get("lastFrameDropTime"));
-        assertNotNull("Last update time should be set", lastTrackData.get("lastUpdateTime"));
-
-        // Verify aggregation state
-        assertEquals("Current total frames should match", 5, lastTrackData.get("currentTotalFrames"));
-        assertEquals("Current total duration should match", 100, lastTrackData.get("currentTotalDuration"));
-        assertEquals("Current event count should be 1", 1, lastTrackData.get("currentEventCount"));
+        Map<String, Object> attrs = tracker.getLastEventAttributes();
+        assertNull("firstDropTimestamp must be absent when eventCount=1", attrs.get("firstDropTimestamp"));
+        assertNull("lastDropTimestamp must be absent when eventCount=1", attrs.get("lastDropTimestamp"));
+        assertNull("actualAggregationDurationMs must be absent when eventCount=1", attrs.get("actualAggregationDurationMs"));
     }
 
     @Test
-    public void testMultipleFrameDropAggregation() {
+    public void singleEvent_aggregationWindowMsNeverPresent() {
+        tracker.sendDroppedFrame(50, 1800);
+        tracker.simulateFlush();
+
+        assertNull("aggregationWindowMs must never appear in the event",
+                tracker.getLastEventAttributes().get("aggregationWindowMs"));
+    }
+
+    // -------------------------------------------------------------------------
+    // Multi-event payload shape (eventCount > 1)
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void multipleEvents_framesAndDurationAreSummed() {
         tracker.sendDroppedFrame(5, 100);
         tracker.sendDroppedFrame(3, 50);
         tracker.sendDroppedFrame(2, 25);
+        tracker.simulateFlush();
 
-        Map<String, Object> status = tracker.getCurrentAggregationStatus();
-
-        assertEquals("Should have active aggregation", true, status.get("hasActiveAggregation"));
-        assertEquals("Total frames should be sum", 10, status.get("totalLostFrames")); // 5+3+2
-        assertEquals("Total duration should be sum", 175, status.get("totalLostFramesDuration")); // 100+50+25
-        assertEquals("Event count should be 3", 3, status.get("eventCount"));
-
-        Map<String, Object> lastTrack = tracker.getLastTrackData();
-        assertEquals("Last event count should be latest", 2, lastTrack.get("lastFrameDropCount"));
-        assertEquals("Last event duration should be latest", 25, lastTrack.get("lastFrameDropDuration"));
-        assertEquals("Aggregated total should be maintained", 10, lastTrack.get("currentTotalFrames"));
+        Map<String, Object> attrs = tracker.getLastEventAttributes();
+        assertEquals("lostFrames should be sum of all callbacks", 10, attrs.get("lostFrames"));
+        assertEquals("lostFramesDuration should be sum of all elapsed windows", 175, attrs.get("lostFramesDuration"));
+        assertEquals("eventCount should be 3", 3, attrs.get("eventCount"));
     }
 
     @Test
-    public void testAggregationWindowExpiry() throws InterruptedException {
-        tracker.sendDroppedFrame(5, 100);
-        tracker.simulateTimeExpiry();
-        tracker.sendDroppedFrame(3, 50);
-
-        Map<String, Object> status = tracker.getCurrentAggregationStatus();
-        assertEquals("Should start new aggregation window", 3, status.get("totalLostFrames"));
-        assertEquals("Event count should reset to 1", 1, status.get("eventCount"));
-
-        assertTrue("Should have sent aggregated event", tracker.wasEventSent());
-        assertEquals("Should send content dropped frames event", "CONTENT_DROPPED_FRAMES", tracker.getLastEventType());
-
-        Map<String, Object> eventAttrs = tracker.getLastEventAttributes();
-        assertEquals("Event should contain aggregated frames", 5, eventAttrs.get("lostFrames"));
-        assertEquals("Event should contain aggregated duration", 100, eventAttrs.get("lostFramesDuration"));
-        assertEquals("Event should contain event count", 1, eventAttrs.get("eventCount"));
-    }
-
-    @Test
-    public void testMaxEventsFlushTrigger() {
-        for (int i = 0; i < 50; i++) { // MAX_EVENTS_PER_AGGREGATE = 50
-            tracker.sendDroppedFrame(1, 10);
-        }
-
-        assertTrue("Should flush when max events reached", tracker.wasEventSent());
-
-        tracker.clearEvents();
-        tracker.sendDroppedFrame(2, 20);
-
-        Map<String, Object> status = tracker.getCurrentAggregationStatus();
-        assertEquals("Should start new window", 2, status.get("totalLostFrames"));
-        assertEquals("Event count should reset", 1, status.get("eventCount"));
-        assertFalse("Should not send immediate event in aggregation mode", tracker.wasEventSent());
-    }
-
-    @Test
-    public void testLastTrackAlwaysAccessible() {
-        tracker.sendDroppedFrame(10, 200);
-
-        Map<String, Object> data1 = tracker.getLastTrackData();
-        assertNotNull("Data should never be null", data1);
-        assertEquals("Should contain latest frame drop count", 10, data1.get("lastFrameDropCount"));
-
-        tracker.sendDroppedFrame(5, 100);
-
-        Map<String, Object> data2 = tracker.getLastTrackData();
-        assertEquals("Should update to latest frame drop", 5, data2.get("lastFrameDropCount"));
-        assertEquals("Should maintain aggregated total", 15, data2.get("currentTotalFrames"));
-        assertSame("Should return same underlying map instance", data1, data2);
-    }
-
-    @Test
-    public void testDataPreservationAcrossStates() {
-        tracker.sendDroppedFrame(7, 140);
-
-        Map<String, Object> beforeDisable = tracker.getLastTrackData();
-        assertEquals("Should have data before disable", 7, beforeDisable.get("lastFrameDropCount"));
-
-        tracker.setDroppedFrameAggregationEnabled(false);
-
-        Map<String, Object> afterDisable = tracker.getLastTrackData();
-        assertNotNull("Data should be preserved after disable", afterDisable);
-        assertEquals("Frame drop count should be preserved", 7, afterDisable.get("lastFrameDropCount"));
-
-        tracker.setDroppedFrameAggregationEnabled(true);
-
-        Map<String, Object> afterEnable = tracker.getLastTrackData();
-        assertEquals("Data should persist after re-enable", 7, afterEnable.get("lastFrameDropCount"));
-    }
-
-    @Test
-    public void testAggregationToggle() {
-        assertTrue("Aggregation should be enabled by default", tracker.isDroppedFrameAggregationEnabled());
-
-        tracker.sendDroppedFrame(5, 100);
-        tracker.setDroppedFrameAggregationEnabled(false);
-
-        assertTrue("Should flush pending events when disabled", tracker.wasEventSent());
-
-        tracker.clearEvents();
-        tracker.sendDroppedFrame(3, 50);
-
-        assertTrue("Should send immediate event when disabled", tracker.wasEventSent());
-
-        Map<String, Object> eventAttrs = tracker.getLastEventAttributes();
-        assertEquals("Should send individual frame count", 3, eventAttrs.get("lostFrames"));
-        assertEquals("Should send individual duration", 50, eventAttrs.get("lostFramesDuration"));
-        assertNull("Should not have eventCount in immediate mode", eventAttrs.get("eventCount"));
-    }
-
-    @Test
-    public void testAggregationReEnable() {
-        tracker.setDroppedFrameAggregationEnabled(false);
-        tracker.sendDroppedFrame(2, 40); // Immediate mode
-
-        tracker.clearEvents();
-        tracker.setDroppedFrameAggregationEnabled(true);
-
-        tracker.sendDroppedFrame(4, 80);
-        tracker.sendDroppedFrame(3, 60);
-
-        Map<String, Object> status = tracker.getCurrentAggregationStatus();
-        assertEquals("Should aggregate after re-enable", 7, status.get("totalLostFrames"));
-        assertEquals("Should count events after re-enable", 2, status.get("eventCount"));
-    }
-
-    @Test
-    public void testEventAttributesCompleteness() {
+    public void multipleEvents_timingFieldsPresent() {
         tracker.sendDroppedFrame(8, 160);
         tracker.sendDroppedFrame(4, 80);
         tracker.simulateFlush();
 
         Map<String, Object> attrs = tracker.getLastEventAttributes();
-
-        assertEquals("Should contain total lost frames", 12, attrs.get("lostFrames"));
-        assertEquals("Should contain total duration", 240, attrs.get("lostFramesDuration"));
-        assertEquals("Should contain event count", 2, attrs.get("eventCount"));
-        assertNotNull("Should contain aggregation window", attrs.get("aggregationWindowMs"));
-        assertNotNull("Should contain first drop timestamp", attrs.get("firstDropTimestamp"));
-        assertNotNull("Should contain last drop timestamp", attrs.get("lastDropTimestamp"));
-        assertNotNull("Should contain actual duration", attrs.get("actualAggregationDurationMs"));
+        assertNotNull("firstDropTimestamp must be present when eventCount > 1", attrs.get("firstDropTimestamp"));
+        assertNotNull("lastDropTimestamp must be present when eventCount > 1", attrs.get("lastDropTimestamp"));
+        assertNotNull("actualAggregationDurationMs must be present when eventCount > 1", attrs.get("actualAggregationDurationMs"));
     }
 
     @Test
-    public void testStateReset() {
-        tracker.sendDroppedFrame(10, 200);
-        tracker.sendDroppedFrame(5, 100);
-
-        Map<String, Object> status = tracker.getCurrentAggregationStatus();
-        assertEquals("Should have active aggregation", true, status.get("hasActiveAggregation"));
-        assertEquals("Should have aggregated frames", 15, status.get("totalLostFrames"));
-
-        tracker.resetAggregationState();
-
-        status = tracker.getCurrentAggregationStatus();
-        assertEquals("Should clear active aggregation", false, status.get("hasActiveAggregation"));
-        assertEquals("Should reset total frames", 0, status.get("totalLostFrames"));
-        assertEquals("Should reset event count", 0, status.get("eventCount"));
-        assertEquals("Should reset timestamps", 0L, status.get("firstDropTimestamp"));
-
-        Map<String, Object> lastTrack = tracker.getLastTrackData();
-        assertEquals("Should preserve last frame drop count", 5, lastTrack.get("lastFrameDropCount"));
-    }
-
-    @Test
-    public void testBasicConcurrentAccess() {
-        tracker.sendDroppedFrame(5, 100);
-
-        Map<String, Object> data = tracker.getLastTrackData();
-        assertNotNull("Data should always be accessible", data);
-
-        Map<String, Object> status = tracker.getCurrentAggregationStatus();
-        assertNotNull("Status should always be accessible", status);
-
-        assertEquals("Should maintain data consistency", 5, data.get("lastFrameDropCount"));
-        assertEquals("Should maintain status consistency", 5, status.get("totalLostFrames"));
-    }
-
-    @Test
-    public void testDataConsistency() {
+    public void multipleEvents_actualAggregationDurationMsIsNonNegative() {
         tracker.sendDroppedFrame(8, 160);
-        tracker.sendDroppedFrame(3, 60);
+        tracker.sendDroppedFrame(4, 80);
+        tracker.simulateFlush();
 
-        Map<String, Object> status = tracker.getCurrentAggregationStatus();
-        Map<String, Object> lastTrack = tracker.getLastTrackData();
-
-        assertEquals("Status should show total frames", 11, status.get("totalLostFrames"));
-        assertEquals("Last track should show current total", 11, lastTrack.get("currentTotalFrames"));
-        assertEquals("Last track should show latest individual event", 3, lastTrack.get("lastFrameDropCount"));
+        long duration = (long) tracker.getLastEventAttributes().get("actualAggregationDurationMs");
+        assertTrue("actualAggregationDurationMs must be >= 0", duration >= 0);
     }
 
+    @Test
+    public void multipleEvents_aggregationWindowMsStillAbsent() {
+        tracker.sendDroppedFrame(8, 160);
+        tracker.sendDroppedFrame(4, 80);
+        tracker.simulateFlush();
+
+        assertNull("aggregationWindowMs must never appear in the event",
+                tracker.getLastEventAttributes().get("aggregationWindowMs"));
+    }
+
+    // -------------------------------------------------------------------------
+    // Flush triggers
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void maxEventsThreshold_triggersFlushAtFiftyCallbacks() {
+        // Production checks isMaxEventsReached() before processing each call.
+        // 50 calls accumulate eventCount=50; the 51st call sees count>=50 and flushes.
+        for (int i = 0; i < 51; i++) {
+            tracker.sendDroppedFrame(1, 10);
+        }
+
+        assertTrue("Reaching MAX_EVENTS_PER_AGGREGATE should trigger an automatic flush",
+                tracker.wasEventSent());
+        assertEquals("CONTENT_DROPPED_FRAMES", tracker.getLastEventType());
+    }
+
+    @Test
+    public void afterMaxEventsFlush_nextCallbackStartsFreshWindow() {
+        for (int i = 0; i < 50; i++) {
+            tracker.sendDroppedFrame(1, 10);
+        }
+        tracker.clearEvents();
+
+        tracker.sendDroppedFrame(7, 70);
+        tracker.simulateFlush();
+
+        Map<String, Object> attrs = tracker.getLastEventAttributes();
+        assertEquals("New window should start fresh after flush", 7, attrs.get("lostFrames"));
+        assertEquals("eventCount should reset to 1", 1, attrs.get("eventCount"));
+    }
+
+    @Test
+    public void explicitFlush_emitsEventAndResetState() {
+        tracker.sendDroppedFrame(5, 100);
+        tracker.simulateFlush();
+
+        assertTrue(tracker.wasEventSent());
+        assertEquals("CONTENT_DROPPED_FRAMES", tracker.getLastEventType());
+
+        tracker.clearEvents();
+        tracker.simulateFlush();
+        assertFalse("Flush on empty window should not emit an event", tracker.wasEventSent());
+    }
+
+    // -------------------------------------------------------------------------
+    // Aggregation toggle
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void aggregationEnabled_byDefault() {
+        assertTrue(tracker.isDroppedFrameAggregationEnabled());
+    }
+
+    @Test
+    public void disablingAggregation_flushesPendingEvents() {
+        tracker.sendDroppedFrame(5, 100);
+        tracker.setDroppedFrameAggregationEnabled(false);
+
+        assertTrue("Disabling aggregation should flush pending events", tracker.wasEventSent());
+    }
+
+    @Test
+    public void immediateMode_sendsEventPerCallback() {
+        tracker.setDroppedFrameAggregationEnabled(false);
+        tracker.sendDroppedFrame(3, 50);
+
+        assertTrue(tracker.wasEventSent());
+        Map<String, Object> attrs = tracker.getLastEventAttributes();
+        assertEquals(3, attrs.get("lostFrames"));
+        assertEquals(50, attrs.get("lostFramesDuration"));
+        assertNull("eventCount must be absent in immediate mode", attrs.get("eventCount"));
+    }
+
+    @Test
+    public void reEnablingAggregation_aggregatesSubsequentEvents() {
+        tracker.setDroppedFrameAggregationEnabled(false);
+        tracker.sendDroppedFrame(2, 40);
+        tracker.clearEvents();
+
+        tracker.setDroppedFrameAggregationEnabled(true);
+        tracker.sendDroppedFrame(4, 80);
+        tracker.sendDroppedFrame(3, 60);
+        tracker.simulateFlush();
+
+        Map<String, Object> attrs = tracker.getLastEventAttributes();
+        assertEquals("Frames should be aggregated after re-enable", 7, attrs.get("lostFrames"));
+        assertEquals("eventCount should reflect two callbacks", 2, attrs.get("eventCount"));
+    }
 }

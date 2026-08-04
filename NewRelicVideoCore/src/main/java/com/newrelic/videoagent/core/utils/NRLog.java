@@ -1,6 +1,7 @@
 package com.newrelic.videoagent.core.utils;
 
 import android.util.Log;
+import java.util.function.Supplier;
 
 /**
  * `NRLog` contains methods for logging.
@@ -17,6 +18,18 @@ public class NRLog {
     public static void d(String s) {
         if (logging) {
             Log.d(TAG, s);
+        }
+    }
+
+    /**
+     * Print debug message using a supplier — the string is only built if logging is enabled.
+     * Use this instead of d(String) when building the message is expensive (e.g. Map.toString()).
+     *
+     * @param supplier Message supplier.
+     */
+    public static void d(Supplier<String> supplier) {
+        if (logging) {
+            Log.d(TAG, supplier.get());
         }
     }
 
