@@ -90,6 +90,11 @@ public class NRTracker {
      * @param attributes Specific attributes sent along the action.
      * @return Map of attributes.
      */
+    /** Keys of user-defined attributes (set via setAttribute), for carrying onto QOE_AGGREGATE. */
+    protected java.util.Set<String> getCustomAttributeKeys() {
+        return eventAttributes.getAllKeys();
+    }
+
     public Map<String, Object> getAttributes(String action, Map<String, Object> attributes) {
         attributes = eventAttributes.generateAttributes(action, attributes);
         return attributes;

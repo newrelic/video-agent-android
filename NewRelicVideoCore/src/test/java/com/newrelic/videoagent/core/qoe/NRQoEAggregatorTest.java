@@ -104,6 +104,16 @@ public class NRQoEAggregatorTest {
         assertEquals(4000L, lng(k, "avgDownloadRate"));
     }
 
+    @Test
+    public void downloadRate_dedupsConsecutiveIdenticalSamples() {
+        request();
+        feed(CONTENT_HEARTBEAT, attrs("contentNetworkDownloadBitrate", 1000L));
+        feed(CONTENT_HEARTBEAT, attrs("contentNetworkDownloadBitrate", 1000L)); // stale repeat -> skipped
+        feed(CONTENT_HEARTBEAT, attrs("contentNetworkDownloadBitrate", 3000L));
+        // (1000 + 3000) / 2 = 2000, not (1000 + 1000 + 3000) / 3
+        assertEquals(2000L, lng(kpis(), "avgDownloadRate"));
+    }
+
     // ---- peak bitrate ------------------------------------------------------
 
     @Test
@@ -140,16 +150,15 @@ public class NRQoEAggregatorTest {
         assertEquals(2L, lng(kpis(), "totalRenditions"));
     }
 
-    // ---- startup time (two exclusions + clamp) -----------------------------
+    // ---- startup time (ad exclusion + clamp) -------------------------------
 
     @Test
-    public void startupTime_subtractsAdAndPause() {
+    public void startupTime_subtractsAdOnly() {
         request();
-        agg.addStartupPauseTime(500L);          // before start -> counted
         agg.setStartupAdTime(1000L);
         feed(CONTENT_START, attrs("timeSinceRequested", 5000L));
-        // 5000 - 1000(ad) - 500(pause) = 3500
-        assertEquals(3500L, lng(kpis(), "startupTime"));
+        // iOS parity: startup = timeSinceRequested - ad time (no pause exclusion). 5000 - 1000 = 4000.
+        assertEquals(4000L, lng(kpis(), "startupTime"));
     }
 
     @Test
@@ -158,15 +167,6 @@ public class NRQoEAggregatorTest {
         agg.setStartupAdTime(9000L);
         feed(CONTENT_START, attrs("timeSinceRequested", 5000L));
         assertEquals(0L, lng(kpis(), "startupTime"));
-    }
-
-    @Test
-    public void startupPauseTime_ignoredAfterStart() {
-        request();
-        agg.setStartupAdTime(0L);
-        feed(CONTENT_START, attrs("timeSinceRequested", 5000L));
-        agg.addStartupPauseTime(2000L);         // after start -> ignored
-        assertEquals(5000L, lng(kpis(), "startupTime"));
     }
 
     // ---- rebuffering (skip-first) -----------------------------------------
@@ -208,16 +208,37 @@ public class NRQoEAggregatorTest {
         assertTrue((Boolean) k.get("hadPlaybackError"));
     }
 
-    // ---- pause time (time-based, tolerance) --------------------------------
+    // ---- pause time (banks the event's timeSincePaused) ---------
 
     @Test
-    public void pauseTime_banksOnResume() {
+    public void pauseTime_banksTimeSincePaused() {
         request();
         feed(CONTENT_START, attrs("timeSinceRequested", 0L));
         feed(CONTENT_PAUSE, attrs());
-        sleep(SLEEP_MS);
-        feed(CONTENT_RESUME, attrs());
-        assertTrue(lng(kpis(), "totalPauseTime") >= MIN_ELAPSED);
+        feed(CONTENT_RESUME, attrs("timeSincePaused", 5000L));
+        // Banked from the event attribute (deterministic), not a wall-clock delta.
+        assertEquals(5000L, lng(kpis(), "totalPauseTime"));
+    }
+
+    @Test
+    public void pauseTime_accumulatesAcrossPauses() {
+        request();
+        feed(CONTENT_START, attrs("timeSinceRequested", 0L));
+        feed(CONTENT_PAUSE, attrs());
+        feed(CONTENT_RESUME, attrs("timeSincePaused", 5000L));
+        feed(CONTENT_PAUSE, attrs());
+        feed(CONTENT_RESUME, attrs("timeSincePaused", 3000L));
+        assertEquals(8000L, lng(kpis(), "totalPauseTime"));
+    }
+
+    @Test
+    public void pauseTime_excludedDuringAdBreak() {
+        request();
+        feed(CONTENT_START, attrs("timeSinceRequested", 0L));
+        // adBreakActive = true -> the pause is the player pausing for an ad, not a user pause.
+        agg.processAction(CONTENT_PAUSE, attrs(), true, true);
+        agg.processAction(CONTENT_RESUME, attrs("timeSincePaused", 5000L), true, false);
+        assertEquals(0L, lng(kpis(), "totalPauseTime"));
     }
 
     @Test

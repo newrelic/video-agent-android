@@ -32,7 +32,6 @@ public final class NRQoEAggregator {
 
     // ---- Startup-period exclusions -----------------------------------------
     private Long startupPeriodAdTime;
-    private Long startupPeriodPauseTime;
     private boolean hasContentStarted;
     private boolean initialBufferingHappened;
 
@@ -41,6 +40,7 @@ public final class NRQoEAggregator {
     private Long qoeDownloadRateCount;
     private Long qoeMinDownloadRate;
     private Long qoeMaxDownloadRate;
+    private Long qoeLastDownloadRate;  // last download sample;
 
     // ---- Rendition switch metrics ------------------------------------------
     private long qoeTotalSwitchUps;
@@ -81,7 +81,6 @@ public final class NRQoEAggregator {
         qoeStartupTime = null;
 
         startupPeriodAdTime = 0L;
-        startupPeriodPauseTime = 0L;
         hasContentStarted = false;
         initialBufferingHappened = false;
 
@@ -89,12 +88,13 @@ public final class NRQoEAggregator {
         qoeLastRenditionChangeTime = null;
         qoeTotalBitrateWeightedTime = 0L;
         qoeTotalActiveTime = 0L;
-        qoeBitrateTimerPaused = false;
+        qoeBitrateTimerPaused = true;   // start "not running" until CONTENT_START
 
         qoeDownloadRateSum = 0L;
         qoeDownloadRateCount = 0L;
         qoeMinDownloadRate = null;
         qoeMaxDownloadRate = null;
+        qoeLastDownloadRate = null;
 
         qoeTotalSwitchUps = 0L;
         qoeTotalSwitchDowns = 0L;
@@ -123,6 +123,17 @@ public final class NRQoEAggregator {
             attributes = new HashMap<>();
         }
 
+        // Drive the bitrate timer from play state, replacing the explicit sender
+        // call-sites. state.isPlaying is set by the tracker's goXxx state machine before this runs
+        // and is false during pause/buffer/seek. Done before the extractors so a resume restarts
+        // the segment clock from "now".
+        boolean timerRunning = !qoeBitrateTimerPaused;
+        if (timerRunning && !isPlaying) {
+            pauseBitrateTimer();
+        } else if (!timerRunning && isPlaying) {
+            resumeBitrateTimer();
+        }
+
         // Always-on extractors (run for every content event, as getAttributes() did before).
         trackDownloadRateMetrics(attributes);
         trackBitrateFromProcessedAttributes(action, attributes);
@@ -137,9 +148,9 @@ public final class NRQoEAggregator {
         } else if (CONTENT_RENDITION_CHANGE.equals(action)) {
             handleRenditionChange(attributes);
         } else if (CONTENT_PAUSE.equals(action)) {
-            handlePause();
+            handlePause(adBreakActive);
         } else if (CONTENT_RESUME.equals(action)) {
-            handleResume();
+            handleResume(attributes);
         }
     }
 
@@ -216,8 +227,6 @@ public final class NRQoEAggregator {
 
         kpiAttributes.put("totalSwitchUps", qoeTotalSwitchUps);
         kpiAttributes.put("totalSwitchDowns", qoeTotalSwitchDowns);
-        long openMs = (qoeSwitchedDownSinceMs == null) ? 0L : System.currentTimeMillis() - qoeSwitchedDownSinceMs;
-        kpiAttributes.put("totalTimeSwitchedDown", safeAdd(qoeTotalTimeSwitchedDown, openMs));
 
         long openPauseMs = (qoePauseStartMs == null) ? 0L : System.currentTimeMillis() - qoePauseStartMs;
         kpiAttributes.put("totalPauseTime", safeAdd(qoeTotalPauseTime, openPauseMs));
@@ -238,7 +247,6 @@ public final class NRQoEAggregator {
         qoeLastTrackedBitrate = null;
         qoeStartupTime = null;
         startupPeriodAdTime = null;
-        startupPeriodPauseTime = 0L;
         hasContentStarted = false;
         initialBufferingHappened = false;
 
@@ -246,12 +254,13 @@ public final class NRQoEAggregator {
         qoeLastRenditionChangeTime = null;
         qoeTotalBitrateWeightedTime = 0L;
         qoeTotalActiveTime = 0L;
-        qoeBitrateTimerPaused = false;
+        qoeBitrateTimerPaused = true;   // start "not running" until CONTENT_START
 
         qoeDownloadRateSum = 0L;
         qoeDownloadRateCount = 0L;
         qoeMinDownloadRate = null;
         qoeMaxDownloadRate = null;
+        qoeLastDownloadRate = null;
 
         qoeTotalSwitchUps = 0L;
         qoeTotalSwitchDowns = 0L;
@@ -270,18 +279,6 @@ public final class NRQoEAggregator {
     /** Pre-roll ad time observed before CONTENT_START (excluded from startup time). */
     public synchronized void setStartupAdTime(long ms) {
         startupPeriodAdTime = ms;
-    }
-
-    /** Pause time during the startup period; ignored once content has started. */
-    public synchronized void addStartupPauseTime(long timeSincePaused) {
-        if (hasContentStarted || timeSincePaused <= 0) {
-            return;
-        }
-        try {
-            startupPeriodPauseTime = safeAdd(startupPeriodPauseTime, timeSincePaused);
-        } catch (ArithmeticException e) {
-            startupPeriodPauseTime = timeSincePaused;
-        }
     }
 
     public synchronized void recordStartupError() {
@@ -312,14 +309,10 @@ public final class NRQoEAggregator {
         Long timeSinceRequested = (tsr instanceof Long) ? (Long) tsr : null;
 
         if (timeSinceRequested != null && timeSinceRequested >= 0) {
-            long totalExclusionTime = 0L;
-            if (startupPeriodAdTime != null && startupPeriodAdTime > 0) {
-                totalExclusionTime += startupPeriodAdTime;
-            }
-            if (startupPeriodPauseTime != null && startupPeriodPauseTime > 0) {
-                totalExclusionTime += startupPeriodPauseTime;
-            }
-            qoeStartupTime = Math.max(timeSinceRequested - totalExclusionTime, 0L);
+            // startupTime = timeSinceRequested - pre-roll ad time. A pre-first-frame
+            // user pause is intentionally NOT excluded.
+            long adTime = (startupPeriodAdTime != null && startupPeriodAdTime > 0) ? startupPeriodAdTime : 0L;
+            qoeStartupTime = Math.max(timeSinceRequested - adTime, 0L);
         } else {
             qoeStartupTime = 0L;
         }
@@ -363,22 +356,30 @@ public final class NRQoEAggregator {
         }
     }
 
-    private void handlePause() {
+    private void handlePause(boolean adBreakActive) {
+        if (adBreakActive) {
+            return;
+        }
         qoePauseStartMs = System.currentTimeMillis();
     }
 
-    private void handleResume() {
-        if (qoePauseStartMs != null) {
-            qoeTotalPauseTime = safeAdd(qoeTotalPauseTime, System.currentTimeMillis() - qoePauseStartMs);
-            qoePauseStartMs = null;
+    private void handleResume(Map<String, Object> attributes) {
+        if (qoePauseStartMs == null) {
+            return;
         }
+        Object timeSincePaused = attributes.get("timeSincePaused");
+        if (timeSincePaused instanceof Long) {
+            qoeTotalPauseTime = safeAdd(qoeTotalPauseTime, (Long) timeSincePaused);
+        }
+        qoePauseStartMs = null;
     }
 
     // =========================================================================
     // Bitrate timer
     // =========================================================================
 
-    public synchronized void pauseBitrateTimer() {
+    // Driven by processAction from the isPlaying transition (already under the lock).
+    private void pauseBitrateTimer() {
         if (qoeBitrateTimerPaused) {
             return;
         }
@@ -402,7 +403,7 @@ public final class NRQoEAggregator {
         qoeBitrateTimerPaused = true;
     }
 
-    public synchronized void resumeBitrateTimer() {
+    private void resumeBitrateTimer() {
         if (!qoeBitrateTimerPaused) {
             return;
         }
@@ -486,6 +487,11 @@ public final class NRQoEAggregator {
         if (sample == null || sample <= 0) {
             return;
         }
+        // heartbeat; skip a sample identical to the previous one so stale repeats don't skew the avg.
+        if (qoeLastDownloadRate != null && qoeLastDownloadRate.equals(sample)) {
+            return;
+        }
+        qoeLastDownloadRate = sample;
         if (qoeDownloadRateCount < Long.MAX_VALUE - 1) {
             qoeDownloadRateSum = safeAdd(qoeDownloadRateSum, sample);
             qoeDownloadRateCount++;

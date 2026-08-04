@@ -71,4 +71,13 @@ public class NREventAttributes {
     public String toString() {
         return getClass().getName() + " = " + attributeBuckets;
     }
+
+     /** All attribute keys across every action-filter bucket (user-defined via setAttribute). */
+    public java.util.Set<String> getAllKeys() {
+        java.util.Set<String> keys = new java.util.HashSet<>();
+        for (Map<String, Object> bucket : attributeBuckets.values()) {
+            keys.addAll(bucket.keySet());
+        }
+        return keys;
+    }
 }
