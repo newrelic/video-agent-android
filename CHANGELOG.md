@@ -1,10 +1,10 @@
 ## [4.4.0](https://github.com/newrelic/video-agent-android/compare/v4.3.1...v4.4.0) (2026-08-04)
 
-### Features
+### New features
 
 * add JP region support ([e97c6ca](https://github.com/newrelic/video-agent-android/commit/e97c6caaac5ba1b261f8fa9812c8a262d49f09a4))
 
-### Bug Fixes
+### Bug fixes
 
 * Align totalPauseTime with iOS clock model; stop emitting totalTimeSwitchedDown ([924c7b9](https://github.com/newrelic/video-agent-android/commit/924c7b9ffcb5b65b5023bd7b41cf4515f964686b))
 * classify startup vs playback error by content-started (iOS parity) ([a6b3288](https://github.com/newrelic/video-agent-android/commit/a6b3288932f0ae60513ff58ca0214ae61b9432f2))
