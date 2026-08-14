@@ -395,7 +395,22 @@ Limits for custom attributes added to default mobile events:
 
 ### Live Stream Configuration
 
-For live streams, the agent automatically uses a shorter harvest cycle (30–60 seconds) for near-real-time data transmission. The `liveHarvestCycleSeconds` is configured internally based on content type.
+The agent uses a separate harvest interval for VOD and LIVE content:
+
+| Content Type | Default Interval | Range | Builder Method |
+| --- | --- | --- | --- |
+| VOD | 300s (Mobile) / 180s (TV) | 5–300s | `.withHarvestCycle(seconds)` |
+| LIVE | 30s (Mobile) / 10s (TV) | 1–60s | `.withLiveHarvestCycle(seconds)` |
+
+```java
+// Live stream — flush every 10 seconds on TV, 30s on Mobile (or override)
+NewRelicVideoAgent tracker = new NewRelicVideoAgent.Builder()
+    .withHarvestCycle(300)
+    .withLiveHarvestCycle(10)
+    .build();
+```
+
+> **Note:** Harvest intervals are immutable after `.build()`.
 
 ## API Reference
 
