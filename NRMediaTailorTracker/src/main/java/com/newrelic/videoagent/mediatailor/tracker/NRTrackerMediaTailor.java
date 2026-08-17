@@ -103,6 +103,13 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
     private String streamType;
     private String mediaTailorEndpoint;
     private String trackingUrl;
+    // Set when trackingUrl came from the URL-rewrite heuristic in activate(),
+    // which runs before any manifest is available and so can't see an
+    // operator-advertised EXT-X-DATERANGE CLASS="tracking" tag yet. A guess
+    // is provisional: the DATERANGE check in reparseManifest() is allowed to
+    // override it once the manifest loads. An explicit NRAdConfig.trackingUrl
+    // never sets this and is therefore never overridden.
+    private boolean trackingUrlFromGuess;
 
     private final List<MTAdBreak> adSchedule = Collections.synchronizedList(new ArrayList<MTAdBreak>());
     private MTAdBreak currentAdBreak;
@@ -350,6 +357,7 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         manifestType        = MTDetector.manifestType(uri);
 
         loggedTrackingResolution = false;
+        trackingUrlFromGuess = false;
         if (trackingUrl != null) {
             // Set before any manifest was seen — came from NRAdConfig.trackingUrl.
             logTrackingResolution(MTConstants.RESOLVE_EXPLICIT);
@@ -357,6 +365,7 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
             String derived = MTDetector.extractTrackingUrl(uri);
             if (derived != null) {
                 trackingUrl = derived;
+                trackingUrlFromGuess = true;
                 boolean fromQuery = uri.toString().contains("sessionId=");
                 logTrackingResolution(fromQuery
                         ? MTConstants.RESOLVE_QUERY
@@ -458,15 +467,25 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
             HlsManifest hls = (HlsManifest) manifest;
             // Publica/SpringServe-style operator configurations may advertise
             // the tracking endpoint directly via an EXT-X-DATERANGE tag with
-            // CLASS="tracking". When present that's authoritative and skips
-            // the URL-rewrite heuristic — customers on non-default CDN path
-            // layouts would otherwise be stuck calling setTrackingUrl(String)
-            // by hand.
-            if (trackingUrl == null) {
+            // CLASS="tracking". When present that's authoritative over the
+            // URL-rewrite heuristic — but activate() runs before any manifest
+            // is loaded, so a guess from that heuristic may already have set
+            // trackingUrl by the time the manifest (and this tag) arrives.
+            // Check regardless of whether trackingUrl is already a guess, and
+            // let a marker hit override it — otherwise operators on non-
+            // default CDN path layouts who advertise this tag would still be
+            // stuck calling setTrackingUrl(String) by hand whenever the guess
+            // happens to produce a wrong-but-non-null URL first.
+            if (trackingUrl == null || trackingUrlFromGuess) {
                 String fromTag = MTHlsParser.extractTrackingUrl(hls);
                 if (fromTag != null) {
                     trackingUrl = fromTag;
+                    trackingUrlFromGuess = false;
                     NRLog.d(MTConstants.LOG_TRACK + " trackingUrl from EXT-X-DATERANGE CLASS=tracking: " + trackingUrl);
+                    // Overrides whatever activate() already logged (if the
+                    // guess had fired first), since this is the authoritative
+                    // resolution.
+                    loggedTrackingResolution = false;
                     logTrackingResolution(MTConstants.RESOLVE_DATERANGE);
                 }
             }
