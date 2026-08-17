@@ -12,7 +12,6 @@ import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.SocketTimeoutException;
 import java.net.URL;
@@ -20,8 +19,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Fetches AWS MediaTailor's client-side tracking metadata via the documented
- * {@code POST /v1/tracking} contract.
+ * Fetches AWS MediaTailor's client-side tracking metadata via {@code GET
+ * /v1/tracking}. The response carries a short {@code Cache-Control: max-age}
+ * — this is a cacheable-GET polling contract, not a POST one; a CDN fronting
+ * MediaTailor may (and by default does) reject POST to this path entirely.
  *
  * <p>Instance lifecycle: <b>one client per playback session</b>, reused across
  * every poll. The pagination cursor is scoped to a single poll cycle: each
@@ -30,19 +31,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * not carried into the next cycle — doing so would page past the window and
  * skip avails that are still relevant.</p>
  *
- * <p>Request shape (per the AWS spec):</p>
+ * <p>Request shape:</p>
  * <ul>
- *   <li>First page of a cycle: {@code POST /v1/tracking/…} with body
- *       {@code {}} — returns the current manifest window and, if there is
+ *   <li>First page of a cycle: {@code GET /v1/tracking/…} with no query
+ *       params — returns the current manifest window and, if there is
  *       more, a {@code nextToken}.</li>
- *   <li>Subsequent pages <b>within the same cycle</b>: {@code POST
- *       /v1/tracking/…} with body {@code {"NextToken":"…"}} — returns the next
- *       page. The loop follows the cursor until the server stops issuing a new
- *       token or the page cap is hit, then merges every page's avails into one
- *       response.</li>
+ *   <li>Subsequent pages <b>within the same cycle</b>: {@code GET
+ *       /v1/tracking/…?NextToken=…} — returns the next page. The loop follows
+ *       the cursor until the server stops issuing a new token or the page cap
+ *       is hit, then merges every page's avails into one response.</li>
  *   <li>HTTP 400 on the first page: the token has expired. The client drops it
- *       and retries once with an empty body; if that also 400s the response is
- *       surfaced as {@code null} so the caller degrades to manifest-only.</li>
+ *       and retries once with no query param; if that also 400s the response
+ *       is surfaced as {@code null} so the caller degrades to manifest-only.</li>
  * </ul>
  *
  * <p>The cursor is deliberately <b>not</b> persisted across poll cycles.
@@ -171,22 +171,14 @@ public class MTTrackingClient {
     }
 
     private MTTrackingResponse fetchOnce(String trackingUrl, String token) throws IOException, JSONException {
-        URL url = new URL(trackingUrl);
+        URL url = new URL(buildRequestUrl(trackingUrl, token));
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         activeConnection = conn;
         try {
-            conn.setRequestMethod("POST");
-            conn.setDoOutput(true);
+            conn.setRequestMethod("GET");
             conn.setConnectTimeout(MTConstants.TRACKING_TIMEOUT_MS);
             conn.setReadTimeout(MTConstants.TRACKING_TIMEOUT_MS);
             conn.setRequestProperty("Accept", "application/json");
-            conn.setRequestProperty("Content-Type", "application/json");
-
-            byte[] body = buildRequestBody(token).getBytes(StandardCharsets.UTF_8);
-            conn.setFixedLengthStreamingMode(body.length);
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(body);
-            }
 
             int code = conn.getResponseCode();
             if (code == HttpURLConnection.HTTP_BAD_REQUEST) {
@@ -212,36 +204,15 @@ public class MTTrackingClient {
         }
     }
 
-    private String buildRequestBody(String token) {
-        if (token == null || token.isEmpty()) return "{}";
-        return "{\"NextToken\":\"" + escapeJson(token) + "\"}";
-    }
-
-    /**
-     * Escapes only the characters that must be escaped inside a JSON string.
-     * NextToken is base64-derived so in practice the loop finds nothing, but
-     * a defensive escape avoids a wire malformation if AWS ever widens the
-     * character set.
-     */
-    private static String escapeJson(String s) {
-        StringBuilder sb = new StringBuilder(s.length() + 8);
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            switch (c) {
-                case '"':  sb.append("\\\""); break;
-                case '\\': sb.append("\\\\"); break;
-                case '\n': sb.append("\\n"); break;
-                case '\r': sb.append("\\r"); break;
-                case '\t': sb.append("\\t"); break;
-                default:
-                    if (c < 0x20) {
-                        sb.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        sb.append(c);
-                    }
-            }
+    private static String buildRequestUrl(String trackingUrl, String token) {
+        if (token == null || token.isEmpty()) return trackingUrl;
+        try {
+            String encoded = java.net.URLEncoder.encode(token, "UTF-8");
+            return trackingUrl + (trackingUrl.contains("?") ? "&" : "?") + "NextToken=" + encoded;
+        } catch (java.io.UnsupportedEncodingException e) {
+            // UTF-8 is always supported; unreachable in practice.
+            return trackingUrl;
         }
-        return sb.toString();
     }
 
     static MTTrackingResponse parse(String json) throws JSONException {
