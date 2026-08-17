@@ -470,6 +470,25 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
                     logTrackingResolution(MTConstants.RESOLVE_DATERANGE);
                 }
             }
+            // Implicit-session rescue: activate() only ever saw the master
+            // playlist URI, which carries no sessionId. The sessionId is a
+            // path segment on the (often relative) variant URI the master
+            // points at — ExoPlayer resolves that for us into this media
+            // playlist's baseUri, so retry derivation against it now that
+            // it's loaded. Mirrors the DASH <Location> rescue above.
+            if (trackingUrl == null) {
+                String baseUri = hls.mediaPlaylist != null ? hls.mediaPlaylist.baseUri : null;
+                String derived = baseUri != null ? MTDetector.extractTrackingUrl(baseUri) : null;
+                if (derived != null) {
+                    trackingUrl = derived;
+                    NRLog.d(MTConstants.LOG_TRACK + " trackingUrl recovered from HLS media playlist URI: " + trackingUrl);
+                    logTrackingResolution(MTConstants.RESOLVE_IMPLICIT_PATH);
+                } else {
+                    NRLog.d(MTConstants.LOG_TRACK + " HLS implicit-path rescue found nothing — mediaPlaylist="
+                            + (hls.mediaPlaylist != null ? "present" : "null")
+                            + " baseUri=" + (baseUri != null ? baseUri : "null"));
+                }
+            }
             int segCount = hls.mediaPlaylist != null && hls.mediaPlaylist.segments != null
                     ? hls.mediaPlaylist.segments.size() : 0;
             List<MTAdBreak> parsed = MTHlsParser.parse(hls, adSegmentPrefix);
@@ -682,6 +701,20 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         MTAdBreak active;
         synchronized (adSchedule) {
             active = findActiveBreak(position);
+            if (active == null && !adSchedule.isEmpty() && !loggedScheduleMismatchOnce) {
+                loggedScheduleMismatchOnce = true;
+                StringBuilder sb = new StringBuilder();
+                sb.append(MTConstants.LOG_TAG).append(" DIAG no break matches position=").append(position);
+                for (MTAdBreak b : adSchedule) {
+                    sb.append(" | break[start=").append(b.startTimeMs)
+                      .append(",end=").append(b.endTimeMs)
+                      .append(",hasFiredEnd=").append(b.hasFiredEnd)
+                      .append(",confirmed=").append(b.confirmedByTracking).append("]");
+                }
+                NRLog.w(sb.toString());
+            } else if (active != null) {
+                loggedScheduleMismatchOnce = false;
+            }
         }
 
         if (active != null) {
@@ -692,6 +725,12 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
 
         pruneViewedBreaks(position);
     }
+
+    // Temporary diagnostic gate — logs the schedule/position mismatch once
+    // per occurrence (not every 250ms tick) while root-causing why a
+    // tracking-confirmed break in the schedule never gets picked up as
+    // active. Remove once the root cause of that mismatch is confirmed.
+    private boolean loggedScheduleMismatchOnce = false;
 
     /**
      * Drops breaks that ended more than {@link MTConstants#PRUNE_BUFFER_MS}
@@ -716,6 +755,13 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
 
     private MTAdBreak findActiveBreak(long positionMs) {
         for (MTAdBreak br : adSchedule) {
+            // A break that already fired AD_BREAK_END must never re-fire —
+            // the merger already refuses to match new data onto a closed
+            // break (see MTAdScheduleMerger#findByStart), but this is the
+            // backstop that actually gates event emission: even if a closed
+            // break somehow lingers in the schedule with a window that still
+            // covers the playhead, it may not be picked up as active again.
+            if (br.hasFiredEnd) continue;
             if (br.contains(positionMs)) return br;
         }
         return null;

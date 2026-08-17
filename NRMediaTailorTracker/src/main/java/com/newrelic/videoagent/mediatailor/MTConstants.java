@@ -43,7 +43,8 @@ public final class MTConstants {
     //   4. customer adSegmentPrefix   — override for non-/tm/ CDN paths (optional)
     public static final String MT_SEGMENT_PATTERN          = "segments.mediatailor";
     public static final String MT_DASHSEGMENT_PATH_PATTERN = "/v1/dashsegment/";
-    public static final String MT_HLSSEGMENT_PATH_PATTERN  = "/v1/hlssegment/";
+    /** AWS's actual default HLS ad-segment path — no "hls" in it, unlike the DASH one. */
+    public static final String MT_HLSSEGMENT_PATH_PATTERN  = "/v1/segment/";
     /** AWS-recommended CDN ad-segment path prefix (parity with VideoJS PR #106). */
     public static final String MT_DEFAULT_AD_SEGMENT_PATH  = "/tm/";
 

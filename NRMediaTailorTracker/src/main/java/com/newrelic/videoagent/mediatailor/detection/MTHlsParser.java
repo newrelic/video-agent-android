@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
  * four candidates in order:</p>
  * <ol>
  *   <li>{@code segments.mediatailor} — default AWS ad-segment hostname.</li>
- *   <li>{@code /v1/hlssegment/} — MediaTailor CDN rewrite path.</li>
+ *   <li>{@code /v1/segment/} — MediaTailor's default HLS ad-segment path.</li>
  *   <li>{@code /tm/} — AWS-recommended custom CDN prefix; always active.</li>
  *   <li>{@code adSegmentPrefix} — customer override; only checked when non-null.</li>
  * </ol>
@@ -120,7 +120,7 @@ public final class MTHlsParser {
     static String whichMarkerMatched(@Nullable String url, @Nullable String adSegmentPrefix) {
         if (url == null) return null;
         if (url.contains(MTConstants.MT_SEGMENT_PATTERN))         return "aws-hostname";
-        if (url.contains(MTConstants.MT_HLSSEGMENT_PATH_PATTERN)) return "hlssegment-path";
+        if (url.contains(MTConstants.MT_HLSSEGMENT_PATH_PATTERN)) return "segment-path";
         if (url.contains(MTConstants.MT_DEFAULT_AD_SEGMENT_PATH)) return "/tm/";
         if (adSegmentPrefix != null && url.contains(adSegmentPrefix)) return "custom:'" + adSegmentPrefix + "'";
         return null;

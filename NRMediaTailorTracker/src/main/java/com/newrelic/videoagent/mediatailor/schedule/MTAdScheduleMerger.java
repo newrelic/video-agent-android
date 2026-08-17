@@ -130,6 +130,15 @@ public final class MTAdScheduleMerger {
 
     private static MTAdBreak findByStart(List<MTAdBreak> list, long startMs) {
         for (MTAdBreak b : list) {
+            // A break that already fired AD_BREAK_END is done. Without
+            // availId+availProgramDateTime to identity-match on (live streams
+            // can report either as null), a later, genuinely different avail
+            // can land within the ±tolerance window of an old break's
+            // startTimeMs and get merged straight into it — reopening a
+            // "zombie" break the tracker already told the app had ended, with
+            // no new AD_BREAK_START to explain the sudden new AD_START.
+            // Once closed, a break is never a valid merge target again.
+            if (b.hasFiredEnd) continue;
             if (Math.abs(b.startTimeMs - startMs) < MTConstants.AD_TIMING_TOLERANCE_MS) {
                 return b;
             }
@@ -211,10 +220,19 @@ public final class MTAdScheduleMerger {
                 }
             }
         } else if (target.pods.size() == avail.ads.size()) {
-            // Manifest pod count and tracking ad count agree; index-align the
-            // metadata onto the existing (correctly-timed) manifest pods.
-            for (int i = 0; i < target.pods.size(); i++) {
-                copyAdToPod(avail.ads.get(i), target.pods.get(i), avail.availId);
+            // Manifest pod count and tracking ad count agree, but MediaTailor's
+            // avail.ads[] order isn't guaranteed to stay index-aligned with
+            // target.pods across polls. A blind positional copy would smear ad
+            // B's duration onto pod A's still-correct startTimeMs (copyAdToPod
+            // never touches startTimeMs), corrupting endTimeMs and making
+            // findActivePod flap the pod in and out of its own active window
+            // every poll — spurious AD_END/AD_START pairs on an otherwise
+            // unremarkable break. Match by identity first; index is only a
+            // last-resort fallback for the (adId-less, ambiguous-time) case.
+            for (int i = 0; i < avail.ads.size(); i++) {
+                MTTrackingResponse.Ad ad = avail.ads.get(i);
+                MTAdPod pod = findMatchingPod(target.pods, ad);
+                copyAdToPod(ad, pod != null ? pod : target.pods.get(i), avail.availId);
             }
         } else {
             // Counts disagree. This happens most often when the manifest parse
@@ -230,9 +248,54 @@ public final class MTAdScheduleMerger {
             // by startTimeMs within tolerance; leave the rest unadorned.
             target.podCountMismatch = true;
             for (MTAdPod pod : target.pods) {
-                MTTrackingResponse.Ad closest = closestAdWithinTolerance(pod.startTimeMs, avail.ads);
-                if (closest != null) copyAdToPod(closest, pod, avail.availId);
+                if (pod.adId != null) {
+                    // This pod's identity is already known from an earlier
+                    // poll. avail.ads.size() can flap between two values
+                    // across polls (e.g. a still-stabilizing live avail
+                    // reporting 1 ad on one poll, 2 on the next, back to 1),
+                    // which routes through this exact branch whenever the
+                    // count drops. Only touch the pod if THIS poll reconfirms
+                    // the SAME ad — falling back to closest-time when its ad
+                    // simply wasn't reported this cycle would risk smearing a
+                    // different ad's metadata onto it, flipping which pod
+                    // findActivePod treats as active.
+                    MTTrackingResponse.Ad match = findAdById(avail.ads, pod.adId);
+                    if (match != null) copyAdToPod(match, pod, avail.availId);
+                } else {
+                    // Never-identified pod (manifest-derived, no adId
+                    // concept) — time proximity is the only signal available.
+                    MTTrackingResponse.Ad closest = closestAdWithinTolerance(pod.startTimeMs, avail.ads);
+                    if (closest != null) copyAdToPod(closest, pod, avail.availId);
+                }
             }
+        }
+
+        // avail.durationMs describes the reserved slot, which for a still-open
+        // live avail MediaTailor can keep reporting as generously larger than
+        // the ads actually decisioned to fill it — trusting it verbatim above
+        // means the break's window never shrinks back down once the real ads
+        // are done, so it can never naturally go inactive and AD_BREAK_END
+        // never fires. Once tracking-built pods exist, their own (individually
+        // stable, confirmed) end times are the more accurate signal: clamp the
+        // break to actually end where its last known pod ends.
+        if (target.podsFromTracking) clampEndToPods(target);
+    }
+
+    /**
+     * Overwrites {@code target.endTimeMs}/{@code durationMs} to end where the
+     * break's own last pod ends, when it has pods. A no-op for a no-fill break
+     * (no pods to derive from), which keeps trusting whatever duration it was
+     * given.
+     */
+    private static void clampEndToPods(MTAdBreak target) {
+        if (target.pods.isEmpty()) return;
+        long maxPodEnd = target.startTimeMs;
+        for (MTAdPod pod : target.pods) {
+            if (pod.endTimeMs > maxPodEnd) maxPodEnd = pod.endTimeMs;
+        }
+        if (maxPodEnd > target.startTimeMs) {
+            target.endTimeMs = maxPodEnd;
+            target.durationMs = maxPodEnd - target.startTimeMs;
         }
     }
 
@@ -253,6 +316,13 @@ public final class MTAdScheduleMerger {
         }
         for (MTAdPod p : pods) {
             if (p.adId == null && p.startTimeMs == ad.startTimeMs) return p;
+        }
+        return null;
+    }
+
+    private static MTTrackingResponse.Ad findAdById(List<MTTrackingResponse.Ad> ads, String adId) {
+        for (MTTrackingResponse.Ad ad : ads) {
+            if (adId.equals(ad.adId)) return ad;
         }
         return null;
     }
@@ -318,6 +388,7 @@ public final class MTAdScheduleMerger {
                 b.pods.add(pod);
             }
             b.podsFromTracking = true;
+            clampEndToPods(b);
         }
         return b;
     }
