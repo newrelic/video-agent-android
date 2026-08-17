@@ -65,7 +65,7 @@ public final class MTHlsParser {
         HlsMediaPlaylist playlist = manifest.mediaPlaylist;
         if (playlist.segments == null || playlist.segments.isEmpty()) return breaks;
 
-        logDetectionMode(adSegmentPrefix);
+        MTDetector.logDetectionMode(MTConstants.LOG_PARSE_HLS, adSegmentPrefix);
 
         // ── Parse ad breaks ────────────────────────────────────────────────
         MTAdBreak currentBreak = null;
@@ -78,10 +78,26 @@ public final class MTHlsParser {
             long startMs = seg.relativeStartTimeUs / 1000L;
             long durMs   = Math.max(seg.durationUs / 1000L, 0L);
 
-            String matchedVia = whichMarkerMatched(seg.url, adSegmentPrefix);
+            String matchedVia = MTDetector.whichMarkerMatched(seg.url, adSegmentPrefix,
+                    MTConstants.MT_HLSSEGMENT_PATH_PATTERN, "segment-path");
             if (matchedVia != null) {
                 if (currentBreak == null) {
-                    currentBreak      = new MTAdBreak("hls-break-" + startMs, startMs, 0L);
+                    // A break's relativeStartTimeUs shifts on every poll as
+                    // the live window slides, so an id derived from it can't
+                    // survive across polls — MTAdScheduleMerger.mergeSchedule
+                    // (the manifest-refresh merge path) has no other identity
+                    // signal to match against and would otherwise treat the
+                    // same avail as a brand-new break each time the window
+                    // rotates past AD_TIMING_TOLERANCE_MS. The playlist's
+                    // absolute discontinuity sequence — base
+                    // (playlist.discontinuitySequence) plus this segment's
+                    // offset within it — does survive: MediaTailor's ad
+                    // insertion always introduces a discontinuity, and that
+                    // sequence number only increments, never resets, for the
+                    // life of the playback session.
+                    long absoluteDiscontinuity = playlist.discontinuitySequence
+                            + seg.relativeDiscontinuitySequence;
+                    currentBreak      = new MTAdBreak("hls-disc-" + absoluteDiscontinuity, startMs, 0L);
                     currentPod        = new MTAdPod(startMs, 0L);
                     lastDiscontinuity = seg.relativeDiscontinuitySequence;
                     firstMatchVia     = matchedVia;
@@ -105,25 +121,6 @@ public final class MTHlsParser {
 
         logResult(breaks, firstMatchVia);
         return breaks;
-    }
-
-    // ── Detection ──────────────────────────────────────────────────────────
-
-    /**
-     * Returns the name of the first detection marker that matched the URL,
-     * or {@code null} if the URL is not an ad segment.
-     *
-     * <p>The label is used in log output to show which path triggered detection
-     * (inspired by VideoJS PR #108's {@code whichAdSegmentMarker} helper).</p>
-     */
-    @Nullable
-    static String whichMarkerMatched(@Nullable String url, @Nullable String adSegmentPrefix) {
-        if (url == null) return null;
-        if (url.contains(MTConstants.MT_SEGMENT_PATTERN))         return "aws-hostname";
-        if (url.contains(MTConstants.MT_HLSSEGMENT_PATH_PATTERN)) return "segment-path";
-        if (url.contains(MTConstants.MT_DEFAULT_AD_SEGMENT_PATH)) return "/tm/";
-        if (adSegmentPrefix != null && url.contains(adSegmentPrefix)) return "custom:'" + adSegmentPrefix + "'";
-        return null;
     }
 
     // ── Tracking URL discovery from manifest markers ──────────────────────
@@ -167,15 +164,6 @@ public final class MTHlsParser {
     }
 
     // ── Logging ────────────────────────────────────────────────────────────
-
-    private static void logDetectionMode(@Nullable String adSegmentPrefix) {
-        if (adSegmentPrefix != null) {
-            NRLog.d(MTConstants.LOG_PARSE_HLS + " detection: aws-hostname | /tm/ | custom='"
-                    + adSegmentPrefix + "'");
-        } else {
-            NRLog.d(MTConstants.LOG_PARSE_HLS + " detection: aws-hostname | /tm/ (no custom prefix)");
-        }
-    }
 
     private static void logResult(List<MTAdBreak> breaks, @Nullable String firstMatchVia) {
         if (breaks.isEmpty()) {

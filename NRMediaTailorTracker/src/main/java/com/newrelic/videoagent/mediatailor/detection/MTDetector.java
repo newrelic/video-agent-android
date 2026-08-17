@@ -2,6 +2,9 @@ package com.newrelic.videoagent.mediatailor.detection;
 
 import android.net.Uri;
 
+import androidx.annotation.Nullable;
+
+import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.mediatailor.MTConstants;
 
 import java.util.regex.Matcher;
@@ -113,5 +116,34 @@ public final class MTDetector {
         int slash = path.lastIndexOf('/');
         if (slash < 0 || slash == path.length() - 1) return null;
         return path.substring(slash + 1);
+    }
+
+    /**
+     * Returns the name of the first ad-segment detection marker that matched
+     * the URL, or {@code null} if none did. Shared by {@code MTHlsParser} and
+     * {@code MTDashParser}, which differ only in which format-specific
+     * path pattern/label pair they check as the second candidate.
+     */
+    @Nullable
+    public static String whichMarkerMatched(@Nullable String url, @Nullable String adSegmentPrefix,
+                                             String formatPathPattern, String formatPathLabel) {
+        if (url == null) return null;
+        if (url.contains(MTConstants.MT_SEGMENT_PATTERN))       return "aws-hostname";
+        if (url.contains(formatPathPattern))                    return formatPathLabel;
+        if (url.contains(MTConstants.MT_DEFAULT_AD_SEGMENT_PATH)) return "/tm/";
+        if (adSegmentPrefix != null && url.contains(adSegmentPrefix)) return "custom:'" + adSegmentPrefix + "'";
+        return null;
+    }
+
+    /**
+     * Logs the one-line detection-mode summary shared by both manifest
+     * parsers, under the caller's own log prefix.
+     */
+    public static void logDetectionMode(String logPrefix, @Nullable String adSegmentPrefix) {
+        if (adSegmentPrefix != null) {
+            NRLog.d(logPrefix + " detection: aws-hostname | /tm/ | custom='" + adSegmentPrefix + "'");
+        } else {
+            NRLog.d(logPrefix + " detection: aws-hostname | /tm/ (no custom prefix)");
+        }
     }
 }

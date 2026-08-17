@@ -74,7 +74,7 @@ public final class MTDashParser {
         int periodCount = manifest.getPeriodCount();
         if (periodCount <= 0) return breaks;
 
-        logDetectionMode(adSegmentPrefix);
+        MTDetector.logDetectionMode(MTConstants.LOG_PARSE_DASH, adSegmentPrefix);
 
         // ── Parse ──────────────────────────────────────────────────────────
         NRLog.d(MTConstants.LOG_PARSE_DASH + " parsing " + periodCount + " period(s), type="
@@ -129,7 +129,11 @@ public final class MTDashParser {
             int n = Math.min(times.length, events.length);
 
             for (int i = 0; i < n; i++) {
-                long startMs    = times[i] / 1000L;
+                // presentationTimesUs is relative to the period's own start,
+                // same as the multi-period path above — a live single-period
+                // manifest with a non-zero @start needs period.startMs added
+                // or the cue lands at the wrong absolute position.
+                long startMs    = period.startMs + times[i] / 1000L;
                 long durationMs = events[i] != null ? events[i].durationMs : 0L;
                 if (durationMs < MTConstants.MIN_AD_DURATION_MS) continue;
 
@@ -168,7 +172,8 @@ public final class MTDashParser {
                 totalReps++;
                 for (BaseUrl b : rep.baseUrls) {
                     if (b == null || b.url == null) continue;
-                    String marker = whichMarkerMatched(b.url, adSegmentPrefix);
+                    String marker = MTDetector.whichMarkerMatched(b.url, adSegmentPrefix,
+                            MTConstants.MT_DASHSEGMENT_PATH_PATTERN, "dashsegment-path");
                     if (marker != null) {
                         adReps++;
                         if (firstMarker == null) firstMarker = marker;
@@ -188,30 +193,7 @@ public final class MTDashParser {
         return null;
     }
 
-    /**
-     * Returns the name of the first detection marker that matched the URL,
-     * or {@code null} if no marker matched.
-     */
-    @Nullable
-    static String whichMarkerMatched(@Nullable String url, @Nullable String adSegmentPrefix) {
-        if (url == null) return null;
-        if (url.contains(MTConstants.MT_SEGMENT_PATTERN))          return "aws-hostname";
-        if (url.contains(MTConstants.MT_DASHSEGMENT_PATH_PATTERN)) return "dashsegment-path";
-        if (url.contains(MTConstants.MT_DEFAULT_AD_SEGMENT_PATH))  return "/tm/";
-        if (adSegmentPrefix != null && url.contains(adSegmentPrefix))  return "custom:'" + adSegmentPrefix + "'";
-        return null;
-    }
-
     // ── Logging ────────────────────────────────────────────────────────────
-
-    private static void logDetectionMode(@Nullable String adSegmentPrefix) {
-        if (adSegmentPrefix != null) {
-            NRLog.d(MTConstants.LOG_PARSE_DASH + " detection: aws-hostname | /tm/ | custom='"
-                    + adSegmentPrefix + "'");
-        } else {
-            NRLog.d(MTConstants.LOG_PARSE_DASH + " detection: aws-hostname | /tm/ (no custom prefix)");
-        }
-    }
 
     private static void logResult(List<MTAdBreak> breaks) {
         if (breaks.isEmpty()) {
