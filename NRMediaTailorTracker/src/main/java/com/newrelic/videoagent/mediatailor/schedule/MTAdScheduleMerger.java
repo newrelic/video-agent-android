@@ -83,14 +83,27 @@ public final class MTAdScheduleMerger {
 
         for (MTTrackingResponse.Avail avail : tracking.avails) {
             if (avail == null) continue;
-            long availStart = resolveAvailStart(avail, pendingErrors);
+            boolean startWasMissing = avail.startTimeMs <= 0 && !avail.ads.isEmpty();
+            long availStart = resolveAvailStart(avail);
             if (availStart < 0) continue;
 
             MTAdBreak match = findMatchForAvail(out, avail, availStart);
+            MTAdBreak target;
             if (match != null) {
                 enrich(match, avail, playheadMs, pendingErrors);
+                target = match;
             } else {
-                out.add(fromAvail(avail, availStart));
+                target = fromAvail(avail, availStart);
+                out.add(target);
+            }
+            // A misconfigured avail keeps reporting no startTimeInSeconds on
+            // every poll for its whole lifetime — without this gate (mirroring
+            // hasFiredNoFillError below) MISSING_AVAIL_START would re-fire as
+            // an AD_ERROR every poll cycle instead of once per avail.
+            if (startWasMissing && !target.hasFiredMissingStartError) {
+                NRLog.w("MT tracking avail missing startTimeInSeconds; inferring from first ad");
+                pendingErrors.add(MTAdErrorCode.MISSING_AVAIL_START);
+                target.hasFiredMissingStartError = true;
             }
         }
         sortByStart(out);
@@ -106,6 +119,20 @@ public final class MTAdScheduleMerger {
         if (key != null) {
             for (MTAdBreak b : list) {
                 if (key.equals(b.identityKey())) return b;
+            }
+        }
+        // identityKey() is null for every fresh manifest parse — availId and
+        // availProgramDateTime only get attached once tracking enriches a
+        // break, which hasn't happened yet on this candidate's first pass
+        // through here. That makes this the actual matching path a live HLS
+        // window rotation goes through, so fall back to id equality before
+        // giving up to a tight time-tolerance match: MTHlsParser now derives
+        // a break's id from the playlist's absolute discontinuity sequence,
+        // which — unlike startTimeMs — stays the same for the same avail
+        // across a window slide.
+        if (candidate.id != null) {
+            for (MTAdBreak b : list) {
+                if (!b.hasFiredEnd && candidate.id.equals(b.id)) return b;
             }
         }
         return findByStart(list, candidate.startTimeMs);
@@ -157,6 +184,23 @@ public final class MTAdScheduleMerger {
         }
     }
 
+    /**
+     * Stamps the ad-attribute fields both {@link #enrich} and {@link
+     * #fromAvail} take from an avail's first ad — same fields, same order —
+     * so a future field addition only has to happen once instead of drifting
+     * between a break that existed before tracking data arrived and one
+     * created by it.
+     */
+    private static void stampFirstAdMetadata(MTAdBreak target, MTTrackingResponse.Ad first) {
+        if (first.adTitle != null) target.title = first.adTitle;
+        target.adId = first.adId;
+        target.creativeId = first.creativeId;
+        target.adSystem = first.adSystem;
+        target.creativeSequence = first.creativeSequence;
+        target.vastAdId = first.vastAdId;
+        target.skipOffset = first.skipOffset;
+    }
+
     private static void enrich(MTAdBreak target, MTTrackingResponse.Avail avail,
                                long playheadMs, List<MTAdErrorCode> pendingErrors) {
         if (avail.availId != null) target.id = avail.availId;
@@ -172,14 +216,7 @@ public final class MTAdScheduleMerger {
             target.endTimeMs = target.startTimeMs + avail.durationMs;
         }
         if (!avail.ads.isEmpty()) {
-            MTTrackingResponse.Ad first = avail.ads.get(0);
-            if (first.adTitle != null) target.title = first.adTitle;
-            target.adId = first.adId;
-            target.creativeId = first.creativeId;
-            target.adSystem = first.adSystem;
-            target.creativeSequence = first.creativeSequence;
-            target.vastAdId = first.vastAdId;
-            target.skipOffset = first.skipOffset;
+            stampFirstAdMetadata(target, avail.ads.get(0));
         }
 
         if (target.pods.isEmpty()) {
@@ -374,14 +411,7 @@ public final class MTAdScheduleMerger {
         // into the schedule.
         b.isNoFill = avail.ads.isEmpty();
         if (!avail.ads.isEmpty()) {
-            MTTrackingResponse.Ad first = avail.ads.get(0);
-            b.title = first.adTitle;
-            b.adId = first.adId;
-            b.creativeId = first.creativeId;
-            b.adSystem = first.adSystem;
-            b.creativeSequence = first.creativeSequence;
-            b.vastAdId = first.vastAdId;
-            b.skipOffset = first.skipOffset;
+            stampFirstAdMetadata(b, avail.ads.get(0));
             for (MTTrackingResponse.Ad ad : avail.ads) {
                 MTAdPod pod = new MTAdPod(ad.startTimeMs, ad.durationMs);
                 copyAdToPod(ad, pod, avail.availId);
@@ -393,19 +423,17 @@ public final class MTAdScheduleMerger {
         return b;
     }
 
-    private static long resolveAvailStart(MTTrackingResponse.Avail avail, List<MTAdErrorCode> pendingErrors) {
+    private static long resolveAvailStart(MTTrackingResponse.Avail avail) {
         if (avail.startTimeMs > 0) return avail.startTimeMs;
         if (!avail.ads.isEmpty()) {
             // startTimeInSeconds is a required field on the tracking-avail
-            // schema; when it's missing or zero the MediaTailor configuration
-            // is usually wrong on the operator side. Infer from the first ad
-            // so the break doesn't disappear from the schedule, but surface
-            // MISSING_AVAIL_START so someone knows the data is off. On mid-
-            // roll avails with a leading slate fragment this inference is
-            // wrong by whatever gap sits before the first ad's media, and
-            // the AD_BREAK_START ends up firing late.
-            NRLog.w("MT tracking avail missing startTimeInSeconds; inferring from first ad");
-            pendingErrors.add(MTAdErrorCode.MISSING_AVAIL_START);
+            // schema; when it's missing the MediaTailor configuration is
+            // usually wrong on the operator side. Infer from the first ad so
+            // the break doesn't disappear from the schedule — the caller
+            // reports MISSING_AVAIL_START once per avail so someone knows the
+            // data is off. On mid-roll avails with a leading slate fragment
+            // this inference is wrong by whatever gap sits before the first
+            // ad's media, and the AD_BREAK_START ends up firing late.
             return avail.ads.get(0).startTimeMs;
         }
         return -1L;

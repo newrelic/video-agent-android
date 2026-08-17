@@ -77,6 +77,7 @@ public class MTAdBreak {
     public boolean hasFiredEnd;
     public boolean hasFiredAdStart;
     public boolean hasFiredNoFillError;
+    public boolean hasFiredMissingStartError;
     public boolean hasFiredQ1;
     public boolean hasFiredQ2;
     public boolean hasFiredQ3;
