@@ -72,6 +72,32 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/video2" />
 
+    <EditText
+        android:id="@+id/direct_manifest_url"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="20dp"
+        android:layout_marginEnd="20dp"
+        android:hint="MediaTailor playback URL"
+        android:inputType="textUri"
+        android:text="https://d2ne8z1csjj3og.cloudfront.net/v1/master/a0d9bd8d3d84074bb3ac326c95ccda51127f88ec/LiveSSAIdemo/index.m3u8?aws.logMode=DEBUG"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/video4" />
+
+    <Button
+        android:id="@+id/play_direct_url"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="20dp"
+        android:text="Play Direct URL (no session-init)"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/direct_manifest_url" />
+
     <Switch
         android:id="@+id/qoe_switch"
         android:layout_width="wrap_content"

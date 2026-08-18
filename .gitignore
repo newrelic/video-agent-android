@@ -17,3 +17,4 @@ local.properties
 docs
 binaries
 build
+/logs

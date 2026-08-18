@@ -40,10 +40,11 @@ public final class MTConstants {
     //                               — MediaTailor CDN rewrite paths
     //   3. MT_DEFAULT_AD_SEGMENT_PATH — AWS-recommended custom CDN prefix,
     //                                   always checked for all customers
-    //   4. customer segmentPrefix   — override for non-/tm/ CDN paths (optional)
+    //   4. customer adSegmentPrefix   — override for non-/tm/ CDN paths (optional)
     public static final String MT_SEGMENT_PATTERN          = "segments.mediatailor";
     public static final String MT_DASHSEGMENT_PATH_PATTERN = "/v1/dashsegment/";
-    public static final String MT_HLSSEGMENT_PATH_PATTERN  = "/v1/hlssegment/";
+    /** AWS's actual default HLS ad-segment path — no "hls" in it, unlike the DASH one. */
+    public static final String MT_HLSSEGMENT_PATH_PATTERN  = "/v1/segment/";
     /** AWS-recommended CDN ad-segment path prefix (parity with VideoJS PR #106). */
     public static final String MT_DEFAULT_AD_SEGMENT_PATH  = "/tm/";
 
@@ -67,12 +68,30 @@ public final class MTConstants {
 
     public static final long PLAYHEAD_POLL_INTERVAL_MS = 250L;
 
+    /**
+     * A break whose end is older than the playhead by more than this buffer is
+     * pruned from the live schedule. The buffer keeps a just-ended break around
+     * long enough for a late final quartile / AD_END to still resolve before it
+     * is dropped, while bounding schedule growth on 24/7 live sessions.
+     */
+    public static final long PRUNE_BUFFER_MS = 30_000L;
+
     public static final int TRACKING_TIMEOUT_MS = 5000;
     public static final int TRACKING_MAX_RETRIES = 1;
 
     public static final double QUARTILE_Q1 = 0.25;
     public static final double QUARTILE_Q2 = 0.50;
     public static final double QUARTILE_Q3 = 0.75;
+
+    // ── Tracking-URL resolution path labels ────────────────────────────────
+    // Stable enum strings logged once per tracker init so downstream tooling
+    // can filter on how the tracking endpoint was resolved (or why it wasn't).
+    public static final String RESOLVE_EXPLICIT      = "explicit-option";
+    public static final String RESOLVE_QUERY         = "query-param";
+    public static final String RESOLVE_IMPLICIT_PATH = "implicit-media-playlist-path";
+    public static final String RESOLVE_DASH_LOCATION = "dash-location";
+    public static final String RESOLVE_DATERANGE     = "daterange";
+    public static final String RESOLVE_NOT_DERIVABLE = "mediatailor-url-not-derivable";
 
     // ── Log tag prefixes ───────────────────────────────────────────────────
     // All MediaTailor log lines start with [MT] followed by a subsystem tag.

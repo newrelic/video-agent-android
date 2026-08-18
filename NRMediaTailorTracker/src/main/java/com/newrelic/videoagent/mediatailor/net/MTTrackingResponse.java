@@ -1,5 +1,7 @@
 package com.newrelic.videoagent.mediatailor.net;
 
+import com.newrelic.videoagent.mediatailor.model.MTTrackingEvent;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,6 +23,15 @@ public class MTTrackingResponse {
     public final List<Avail> avails = new ArrayList<>();
     /** Overlay / banner / VPAID non-linear avails. */
     public final List<NonLinearAvail> nonLinearAvails = new ArrayList<>();
+    /**
+     * Server-issued cursor for the manifest window. Echoed back on the next
+     * request so MediaTailor can return only what's changed since. Null on the
+     * first response and on responses that carry no new beacons — in the
+     * latter case the server returns the same token to signal "nothing new".
+     * Tokens are valid for roughly 24 hours; the server responds with HTTP
+     * 400 once a token expires.
+     */
+    public String nextToken;
 
     public static class Avail {
         public String availId;
@@ -42,6 +53,7 @@ public class MTTrackingResponse {
         public String skipOffset;       // HH:MM:SS for skippable ads (null if not skippable)
         public String adProgramDateTime; // wall clock of ad start (Live correlation)
         public boolean isBumper;        // ad stitched in from a MediaTailor bumper configuration
+        public final List<MTTrackingEvent> trackingEvents = new ArrayList<>();
     }
 
     /**

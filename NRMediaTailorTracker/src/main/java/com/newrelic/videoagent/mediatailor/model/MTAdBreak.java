@@ -41,9 +41,43 @@ public class MTAdBreak {
     public String adPosition;
     public boolean confirmedByTracking;
 
+    /**
+     * The tracking response returned this avail with an empty {@code ads}
+     * array. MediaTailor treats that as a normal no-fill scenario — content
+     * plays through the slot — but the tracker must not fire AD_START or
+     * quartile events, otherwise the break appears as a rendered ad with
+     * zero impressions in reporting. Instead the tracker emits AD_BREAK_START
+     * followed by AD_ERROR(NO_FILL) followed by AD_BREAK_END.
+     */
+    public boolean isNoFill;
+
+    /**
+     * The manifest parser saw a different number of pods than the tracking
+     * response's {@code ads} array reported for this avail. Manifest pod
+     * boundaries were kept as ground truth (they come from actual segment /
+     * discontinuity data), and tracking metadata was matched to the closest
+     * pod within tolerance — some pods may therefore lack metadata, or some
+     * tracking ads may have been left unassigned. Surfaces the mismatch as a
+     * diagnostic without forcing quartile timing onto the wrong slot.
+     */
+    public boolean podCountMismatch;
+
+    /**
+     * The break's pods were built from the tracking API's {@code ads} array
+     * rather than from manifest segment / discontinuity boundaries. MediaTailor
+     * fills an avail's {@code ads} incrementally, so a pod that starts as one
+     * ad can grow to several across polls. When the pods are tracking-sourced,
+     * a later poll reporting more ads than pods appends the newcomers; when the
+     * pods came from the manifest, their boundaries are ground truth and the
+     * extra tracking ads are matched to the closest pod instead.
+     */
+    public boolean podsFromTracking;
+
     public boolean hasFiredStart;
     public boolean hasFiredEnd;
     public boolean hasFiredAdStart;
+    public boolean hasFiredNoFillError;
+    public boolean hasFiredMissingStartError;
     public boolean hasFiredQ1;
     public boolean hasFiredQ2;
     public boolean hasFiredQ3;
@@ -68,5 +102,28 @@ public class MTAdBreak {
             }
         }
         return null;
+    }
+
+    /**
+     * Stable identity for the underlying MediaTailor avail across polls.
+     *
+     * <p>On live streams the HLS sliding window rotates, so {@link #startTimeMs}
+     * (derived from segment time or the live edge) shifts on every manifest
+     * refresh. A tolerance-based time match is therefore not stable for the
+     * same avail across polls — the same ad break can appear at 100ms on one
+     * poll and 5100ms on the next, and pure time matching treats them as two
+     * distinct breaks.</p>
+     *
+     * <p>{@code availId} and {@code availProgramDateTime} both come from the
+     * tracking response, and together identify the avail unambiguously across
+     * window rotations. When either is absent (VOD, or the break is still
+     * only manifest-detected and hasn't been enriched by tracking yet), this
+     * returns {@code null} so callers fall back to time-based matching, which
+     * is safe on VOD where {@link #startTimeMs} is stable.</p>
+     */
+    public String identityKey() {
+        if (id == null || id.isEmpty()) return null;
+        if (availProgramDateTime == null || availProgramDateTime.isEmpty()) return null;
+        return id + "|" + availProgramDateTime;
     }
 }
