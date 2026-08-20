@@ -259,7 +259,7 @@ AND eventCount > 1 SINCE 1 day ago
 | viewId                   | Trackers will generate unique IDs for every new video iteration.                                                                                   |
 | contentId                | The ID of the video.                                                                                                                               |
 | contentTitle             | The title of the video.                                                                                                                            |
-| errorName                | Name of the error. *(verify — not confirmed across all platforms)*                                                                                                                                 |
+| errorMessage                | Message describing the error.                                                                                                                                                                               |
 | errorCode                | Error code if it's known.                                                                                                                          |
 | isBackgroundEvent        | If the player is hidden by another window.                                                                                                         |
 | contentSrc               | Content source URL.                                                                                                                                |
