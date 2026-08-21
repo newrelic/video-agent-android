@@ -64,7 +64,7 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | contentFps               | Current FPS (Frames per second).                                                                                                                   |
 | isBackgroundEvent        | If the player is hidden by another window.                                                                                                         |
 | totalAdPlaytime          | Total time ad is played for this video session.                                                                                                    |
-| elapsedTime              | Time that has passed since the last event.                                                                                                         |
+| elapsedTime              | Active content watched between two consecutive heartbeats, in milliseconds.                                                                                                         |
 | bufferType               | When buffer starts, i.e., initial, seek, pause & connection.                                                                                       |
 | asn                      | Autonomous System Number: a unique number identifying a group of IP networks that serves the content to the end user.                              |
 | asnLatitude              | The latitude of the geographic center of the postal code where the Autonomous System Network is registered. This is not the end user's latitude.   |
@@ -74,6 +74,18 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | instrumentation.provider | Player/agent name.                                                                                                                                 |
 | instrumentation.name     | Name of the instrumentation collecting the data.                                                                                                   |
 | instrumentation.version  | Agent’s version.                                                                                                                                   |
+
+| timeSinceRequested       | Time (in milliseconds) since the video was requested.                                                                                              |
+| timeSinceStarted         | Time (in milliseconds) since the video started playing.                                                                                            |
+| timeSinceTrackerReady    | Time (in milliseconds) since the tracker was initialized (TRACKER_READY).                                                                           |
+| timeSinceLastHeartbeat   | Time (in milliseconds) since the last heartbeat event.                                                                                             |
+| timeSinceBufferBegin     | Time (in milliseconds) since the last buffer event began.                                                                                          |
+| timeSincePaused          | Time (in milliseconds) since the video was last paused.                                                                                            |
+| timeSinceLastError       | Time (in milliseconds) since the last content error occurred. Only included after an error has occurred.                                            |
+| numberOfVideos           | Number of videos played in this session.                                                                                                           |
+| numberOfErrors           | Number of errors occurred in this session.                                                                                                         |
+| trackerName              | Name of the tracker/agent.                                                                                                                         |
+| trackerVersion           | Version of the tracker/agent.                                                                                                                      |
 
 #### List of possible Video Actions
 
@@ -144,7 +156,7 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | asnLongitude             | The longitude of the geographic center of the postal code where the Autonomous System Network is registered. This is not the end user's longitude. |
 | asnOrganization          | The organization that owns the Autonomous System Number. Often an ISP, sometimes a private company or institution.                                 |
 | timestamp                | The time (date, hour, minute, second) at which the interaction occurred.                                                                           |
-| elapsedTime              | Time that has passed since the last event.                                                                                                         |
+| elapsedTime              | Active content watched between two consecutive heartbeats, in milliseconds.                                                                                                         |
 | instrumentation.provider | Player/agent name.                                                                                                                                 |
 | instrumentation.name     | Name of the instrumentation collecting the data.                                                                                                   |
 | instrumentation.version  | Agent’s version.                                                                                                                                   |
@@ -247,9 +259,8 @@ AND eventCount > 1 SINCE 1 day ago
 | viewId                   | Trackers will generate unique IDs for every new video iteration.                                                                                   |
 | contentId                | The ID of the video.                                                                                                                               |
 | contentTitle             | The title of the video.                                                                                                                            |
-| errorName                | Name of the error.                                                                                                                                 |
+| errorMessage                | Message describing the error.                                                                                                                                                                               |
 | errorCode                | Error code if it's known.                                                                                                                          |
-| backTrace                | Stack trace of the error.                                                                                                                          |
 | isBackgroundEvent        | If the player is hidden by another window.                                                                                                         |
 | contentSrc               | Content source URL.                                                                                                                                |
 | contentCdn               | Content CDN URL.                                                                                                                                   |
@@ -257,7 +268,7 @@ AND eventCount > 1 SINCE 1 day ago
 | asnLatitude              | The latitude of the geographic center of the postal code where the Autonomous System Network is registered. This is not the end user's latitude.   |
 | asnLongitude             | The longitude of the geographic center of the postal code where the Autonomous System Network is registered. This is not the end user's longitude. |
 | asnOrganization          | The organization that owns the Autonomous System Number. Often an ISP, sometimes a private company or institution.                                 |
-| elapsedTime              | Time that has passed since the last event.                                                                                                         |
+| elapsedTime              | Active content watched between two consecutive heartbeats, in milliseconds.                                                                                                         |
 | timestamp                | The time (date, hour, minute, second) at which the interaction occurred.                                                                           |
 | instrumentation.provider | Player/agent name.                                                                                                                                 |
 | instrumentation.name     | Name of the instrumentation collecting the data.                                                                                                   |
