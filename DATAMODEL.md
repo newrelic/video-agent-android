@@ -285,8 +285,6 @@ AND eventCount > 1 SINCE 1 day ago
 
 ### QOE_AGGREGATE
 
-> **Note:** QoE aggregate events are opt-in and must be explicitly enabled. Reporting frequency is configurable per integration.
-
 Quality of Experience aggregate attributes sent with `CONTENT_END` events.
 
 | Attribute | Type | Description |
