@@ -1,7 +1,8 @@
 package com.newrelic.videoagent.core;
 
 import androidx.annotation.Nullable;
-import androidx.media3.exoplayer.ExoPlayer;
+
+import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 
 import java.util.Map;
 
@@ -48,8 +49,13 @@ public class NRVideoPlayerConfiguration {
         MEDIA_TAILOR
     }
 
+    public static final String PLAYER_TYPE_EXO  = "exo";
+    public static final String PLAYER_TYPE_THEO = "theo";
+
     private final String playerName;
-    private final ExoPlayer player;
+    private final String playerType;
+    private final Object player;
+    private final NRVideoTracker tracker;
     private final NRAdConfig adConfig;
     private final Map<String, Object> customAttributes;
 
@@ -65,12 +71,42 @@ public class NRVideoPlayerConfiguration {
      *                         emitted by this player's tracker. Pass {@code null}
      *                         if not needed.
      */
+    /** Approach 1: pre-built tracker — customer creates tracker explicitly. */
     public NRVideoPlayerConfiguration(String playerName,
-                                       ExoPlayer player,
+                                       NRVideoTracker tracker,
                                        @Nullable NRAdConfig adConfig,
                                        @Nullable Map<String, Object> customAttributes) {
         this.playerName       = playerName;
+        this.playerType       = null;
+        this.player           = null;
+        this.tracker          = tracker;
+        this.adConfig         = adConfig;
+        this.customAttributes = customAttributes;
+    }
+
+    /** Config-driven: customer passes playerType string ("exo" or "theo"). */
+    public NRVideoPlayerConfiguration(String playerName,
+                                       String playerType,
+                                       Object player,
+                                       @Nullable NRAdConfig adConfig,
+                                       @Nullable Map<String, Object> customAttributes) {
+        this.playerName       = playerName;
+        this.playerType       = playerType;
         this.player           = player;
+        this.tracker          = null;
+        this.adConfig         = adConfig;
+        this.customAttributes = customAttributes;
+    }
+
+    /** Legacy: pass player instance directly — NRVideo creates NRTrackerExoPlayer internally. */
+    public NRVideoPlayerConfiguration(String playerName,
+                                       Object player,
+                                       @Nullable NRAdConfig adConfig,
+                                       @Nullable Map<String, Object> customAttributes) {
+        this.playerName       = playerName;
+        this.playerType       = null;
+        this.player           = player;
+        this.tracker          = null;
         this.adConfig         = adConfig;
         this.customAttributes = customAttributes;
     }
@@ -81,7 +117,7 @@ public class NRVideoPlayerConfiguration {
      */
     @Deprecated
     public NRVideoPlayerConfiguration(String playerName,
-                                       ExoPlayer player,
+                                       Object player,
                                        boolean isAdEnabled,
                                        @Nullable Map<String, Object> customAttributes) {
         this(playerName, player, isAdEnabled ? NRAdConfig.csai() : null, customAttributes);
@@ -94,7 +130,7 @@ public class NRVideoPlayerConfiguration {
      */
     @Deprecated
     public NRVideoPlayerConfiguration(String playerName,
-                                       ExoPlayer player,
+                                       Object player,
                                        AdTrackerType adTrackerType,
                                        @Nullable Map<String, Object> customAttributes) {
         this(playerName, player, toAdConfig(adTrackerType), customAttributes);
@@ -110,8 +146,16 @@ public class NRVideoPlayerConfiguration {
         return playerName;
     }
 
-    public ExoPlayer getPlayer() {
+    public String getPlayerType() {
+        return playerType;
+    }
+
+    public Object getPlayer() {
         return player;
+    }
+
+    public NRVideoTracker getTracker() {
+        return tracker;
     }
 
     /** Returns the ad configuration, or {@code null} if ad tracking is disabled. */
