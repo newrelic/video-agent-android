@@ -4,13 +4,13 @@ plugins {
     id 'jacoco'
 }
 android {
-    compileSdkVersion 34
-    buildToolsVersion "34.0.0"
+    compileSdk 34
+    
     defaultConfig {
-        minSdkVersion 24
-        targetSdkVersion 34
         versionCode 9
         versionName GLOBAL_VERSION_NAME
+        minSdk 24
+        targetSdk 34
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
     }
@@ -18,14 +18,14 @@ android {
         debug {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            buildConfigField("long", "VERSION_CODE", "${defaultConfig.versionCode}")
+            buildConfigField("long", "VERSION_CODE", (defaultConfig.versionCode ?: 0).toString())
             buildConfigField("String","VERSION_NAME","\"${defaultConfig.versionName}\"")
             testCoverageEnabled true
         }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            buildConfigField("long", "VERSION_CODE", "${defaultConfig.versionCode}")
+            buildConfigField("long", "VERSION_CODE", (defaultConfig.versionCode ?: 0).toString())
             buildConfigField("String","VERSION_NAME","\"${defaultConfig.versionName}\"")
         }
     }
@@ -44,12 +44,15 @@ android {
         }
     }
     namespace 'com.newrelic.videoagent.core'
+    publishing { singleVariant('release') }
 }
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation 'com.google.android.material:material:1.1.0'
-    implementation 'androidx.media3:media3-exoplayer:1.2.0'
-    implementation 'androidx.media3:media3-exoplayer-ima:1.2.0'
+    // No player SDK dependencies — NewRelicVideoCore is now fully player-agnostic.
+    // Player-specific error handling (ExoPlayer PlaybackException, IMA AdError, etc.)
+    // is done in each tracker module (NRExoPlayerTracker, NRTHEOPlayerTracker, etc.)
+    // before calling sendError(int, String) on NRVideoTracker.
 
     // Add androidx.leanback for accurate Android TV detection
 //    implementation 'androidx.leanback:leanback:1.0.0'
