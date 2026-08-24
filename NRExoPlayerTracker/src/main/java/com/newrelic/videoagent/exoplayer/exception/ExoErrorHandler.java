@@ -15,7 +15,6 @@ import com.newrelic.videoagent.core.exception.PlayerErrorHandler;
  * Pattern: every player module creates its own implementation of PlayerErrorHandler
  *   NRExoPlayerTracker  → ExoErrorHandler     (PlaybackException, AdError, ...)
  *   NRTHEOPlayerTracker → TheoErrorHandler    (see NRTrackerTHEOPlayer)
- *   NRBitmovinTracker   → BitmovinErrorHandler (future)
  */
 public class ExoErrorHandler implements PlayerErrorHandler {
 

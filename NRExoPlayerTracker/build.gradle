@@ -3,14 +3,15 @@ plugins {
     id 'maven-publish'
 }
 android {
-    compileSdk 34
+    compileSdkVersion 34
+    buildToolsVersion "34.0.0"
     
 
     defaultConfig {
         versionCode 6
         versionName GLOBAL_VERSION_NAME
-        minSdk 24
-        targetSdk 34
+        minSdkVersion 24
+        targetSdkVersion 34
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
     }
