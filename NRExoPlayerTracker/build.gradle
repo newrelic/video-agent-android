@@ -37,8 +37,8 @@ android {
     publishing { singleVariant('release') }
 }
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.6.1'
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation 'com.google.android.material:material:1.2.1'
     implementation project(path: ':NewRelicVideoCore')
     // Both player SDKs are compileOnly — NOT bundled in the AAR.
     // The host app provides its own player SDK dependency:
@@ -47,7 +47,6 @@ dependencies {
     // This keeps the AAR lean regardless of which player the customer uses.
     compileOnly 'androidx.media3:media3-exoplayer:1.2.0'
     compileOnly 'androidx.media3:media3-exoplayer-ima:1.2.0'
-    // THEOplayer tracker lives in NRTHEOPlayerTracker — no THEOplayer dep needed here
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.robolectric:robolectric:4.10.3'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
