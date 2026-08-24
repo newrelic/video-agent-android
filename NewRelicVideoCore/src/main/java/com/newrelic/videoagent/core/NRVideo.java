@@ -75,13 +75,13 @@ public final class NRVideo {
         NRTracker contentTracker;
 
         if (config.getPlayerType() != null) {
-            // ── Path B: config-driven — resolve tracker class from playerType string
+            // ── Path A: config-driven — resolve tracker class from playerType string
             contentTracker = createTrackerForType(
                     config.getPlayerType(), instance.configuration, config.getPlayer());
             NRLog.d("[NRVideo] config-driven tracker resolved for playerType='" + config.getPlayerType() + "'");
 
         } else {
-            // ── Path C: legacy — defaults to ExoPlayer tracker for backward compatibility
+            // ── Path B: legacy — defaults to ExoPlayer tracker for backward compatibility
             contentTracker = createTrackerForType(
                     NRVideoPlayerConfiguration.PLAYER_TYPE_EXO, instance.configuration, config.getPlayer());
             NRLog.d("[NRVideo] created NRTrackerExoPlayer for ExoPlayer instance (legacy path)");
