@@ -18,7 +18,7 @@ import com.newrelic.videoagent.core.exception.PlayerErrorHandler;
  */
 public class ExoErrorHandler implements PlayerErrorHandler {
 
-    private static final int DEFAULT_ERROR_CODE = -1;
+    private static final int DEFAULT_ERROR_CODE = -9999;
 
     private final int errorCode;
     private final String errorMessage;

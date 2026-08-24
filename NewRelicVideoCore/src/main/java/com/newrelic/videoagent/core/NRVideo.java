@@ -74,15 +74,16 @@ public final class NRVideo {
 
         NRTracker contentTracker;
 
-        if (config.getTracker() != null) {
-            // ── Path A: pre-built tracker supplied directly (Approach 1 — explicit construction)
-            contentTracker = config.getTracker();
-            NRLog.d("[NRVideo] using pre-built tracker: " + contentTracker.getClass().getSimpleName());
+        if (config.getPlayerType() != null) {
+            // ── Path B: config-driven — resolve tracker class from playerType string
+            contentTracker = createTrackerForType(
+                    config.getPlayerType(), instance.configuration, config.getPlayer());
+            NRLog.d("[NRVideo] config-driven tracker resolved for playerType='" + config.getPlayerType() + "'");
 
         } else {
-            // ── Path C: legacy — create NRTrackerExoPlayer internally via reflection
-            contentTracker = createContentTracker(instance.configuration);
-            ((NRVideoTracker) contentTracker).setPlayer(config.getPlayer());
+            // ── Path C: legacy — defaults to ExoPlayer tracker for backward compatibility
+            contentTracker = createTrackerForType(
+                    NRVideoPlayerConfiguration.PLAYER_TYPE_EXO, instance.configuration, config.getPlayer());
             NRLog.d("[NRVideo] created NRTrackerExoPlayer for ExoPlayer instance (legacy path)");
         }
 
@@ -295,21 +296,45 @@ public final class NRVideo {
     }
 
 
-    private static NRTracker createContentTracker(NRVideoConfiguration config) {
+    private static NRTracker createTrackerForType(
+            String playerType, NRVideoConfiguration config, Object playerObject) {
+        String className;
+        switch (playerType.toLowerCase()) {
+            case NRVideoPlayerConfiguration.PLAYER_TYPE_EXO:
+                className = "com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer";
+                break;
+            case NRVideoPlayerConfiguration.PLAYER_TYPE_THEO:
+                className = "com.newrelic.videoagent.theoplayer.tracker.NRTrackerTHEOPlayer";
+                break;
+            default:
+                throw new IllegalArgumentException(
+                    "[NRVideo] Unknown playerType '" + playerType + "'. " +
+                    "Use NRVideoPlayerConfiguration.PLAYER_TYPE_EXO or PLAYER_TYPE_THEO.");
+        }
         try {
-            // Create ExoPlayer tracker with configuration
-            Class<?> exoTrackerClass = Class.forName("com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer");
-            return (NRTracker) exoTrackerClass.getConstructor(NRVideoConfiguration.class).newInstance(config);
-        } catch (Exception e) {
-            // Fallback to deprecated constructor for backward compatibility
+            Class<?> clazz = Class.forName(className);
             try {
-                Class<?> exoTrackerClass = Class.forName("com.newrelic.videoagent.exoplayer.tracker.NRTrackerExoPlayer");
-                return (NRTracker) exoTrackerClass.newInstance();
-            } catch (Exception fallbackException) {
-                throw new RuntimeException("Failed to create NRTrackerExoPlayer", fallbackException);
+                return (NRTracker) clazz
+                        .getConstructor(NRVideoConfiguration.class, Object.class)
+                        .newInstance(config, playerObject);
+            } catch (NoSuchMethodException ignored) {
+                NRTracker tracker = (NRTracker) clazz
+                        .getConstructor(NRVideoConfiguration.class)
+                        .newInstance(config);
+                ((NRVideoTracker) tracker).setPlayer(playerObject);
+                return tracker;
             }
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException(
+                "[NRVideo] Tracker class not found for playerType='" + playerType + "'. " +
+                "Make sure you have added the correct tracker module to your build.gradle. " +
+                "Expected class: " + className, e);
+        } catch (Exception e) {
+            throw new RuntimeException(
+                "[NRVideo] Failed to create tracker for playerType='" + playerType + "'", e);
         }
     }
+
 
     private static NRTracker createAdTracker(NRVideoConfiguration config, NRAdConfig adConfig) {
         String className;

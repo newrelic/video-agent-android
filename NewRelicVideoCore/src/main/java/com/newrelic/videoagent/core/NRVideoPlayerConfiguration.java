@@ -2,8 +2,6 @@ package com.newrelic.videoagent.core;
 
 import androidx.annotation.Nullable;
 
-import com.newrelic.videoagent.core.tracker.NRVideoTracker;
-
 import java.util.Map;
 
 /**
@@ -49,9 +47,14 @@ public class NRVideoPlayerConfiguration {
         MEDIA_TAILOR
     }
 
+    /** Pass to config-driven constructor to use NRTrackerExoPlayer. */
+    public static final String PLAYER_TYPE_EXO  = "exo";
+    /** Pass to config-driven constructor to use NRTrackerTHEOPlayer. */
+    public static final String PLAYER_TYPE_THEO = "theo";
+
     private final String playerName;
+    private final String playerType;
     private final Object player;
-    private final NRVideoTracker tracker;
     private final NRAdConfig adConfig;
     private final Map<String, Object> customAttributes;
 
@@ -67,14 +70,20 @@ public class NRVideoPlayerConfiguration {
      *                         emitted by this player's tracker. Pass {@code null}
      *                         if not needed.
      */
-    /** Approach 1: pre-built tracker — customer creates tracker explicitly. */
+    /**
+     * Config-driven constructor — Core resolves the tracker class from the playerType string.
+     * Customer still adds only the relevant module (NRExoPlayerTracker or NRTHEOPlayerTracker).
+     *
+     * @param playerType Use {@link #PLAYER_TYPE_EXO} or {@link #PLAYER_TYPE_THEO}.
+     */
     public NRVideoPlayerConfiguration(String playerName,
-                                       NRVideoTracker tracker,
+                                       Object player,
+                                       String playerType,
                                        @Nullable NRAdConfig adConfig,
                                        @Nullable Map<String, Object> customAttributes) {
         this.playerName       = playerName;
-        this.player           = null;
-        this.tracker          = tracker;
+        this.playerType       = playerType;
+        this.player           = player;
         this.adConfig         = adConfig;
         this.customAttributes = customAttributes;
     }
@@ -85,8 +94,8 @@ public class NRVideoPlayerConfiguration {
                                        @Nullable NRAdConfig adConfig,
                                        @Nullable Map<String, Object> customAttributes) {
         this.playerName       = playerName;
+        this.playerType       = null;
         this.player           = player;
-        this.tracker          = null;
         this.adConfig         = adConfig;
         this.customAttributes = customAttributes;
     }
@@ -126,12 +135,12 @@ public class NRVideoPlayerConfiguration {
         return playerName;
     }
 
-    public Object getPlayer() {
-        return player;
+    public String getPlayerType() {
+        return playerType;
     }
 
-    public NRVideoTracker getTracker() {
-        return tracker;
+    public Object getPlayer() {
+        return player;
     }
 
     /** Returns the ad configuration, or {@code null} if ad tracking is disabled. */
