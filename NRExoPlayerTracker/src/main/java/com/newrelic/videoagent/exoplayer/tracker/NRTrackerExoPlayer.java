@@ -1,5 +1,6 @@
 package com.newrelic.videoagent.exoplayer.tracker;
 
+import com.newrelic.videoagent.exoplayer.exception.ExoErrorHandler;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
@@ -711,11 +712,11 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     @Override
     public void onPlayerError(@NonNull PlaybackException error) {
         NRLog.d("onPlayerError");
+        ExoErrorHandler handler = new ExoErrorHandler(error);
         if (isLinkedAdBreakActive()) {
-            // SSAI ad break active — attribute the error to the ad, not content.
-            ((NRVideoTracker) linkedTracker).sendError(error);
+            ((NRVideoTracker) linkedTracker).sendError(handler.getErrorCode(), handler.getErrorMessage());
         } else {
-            sendError(error);
+            sendError(handler.getErrorCode(), handler.getErrorMessage());
         }
     }
 
@@ -747,10 +748,11 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     @Override
     public void onLoadError(@NonNull EventTime eventTime, @NonNull LoadEventInfo loadEventInfo, @NonNull MediaLoadData mediaLoadData, @NonNull IOException error, boolean wasCanceled) {
         NRLog.d("onLoadError analytics");
+        ExoErrorHandler handler = new ExoErrorHandler(error);
         if (isLinkedAdBreakActive()) {
-            ((NRVideoTracker) linkedTracker).sendError(error);
+            ((NRVideoTracker) linkedTracker).sendError(handler.getErrorCode(), handler.getErrorMessage());
         } else {
-            sendError(error);
+            sendError(handler.getErrorCode(), handler.getErrorMessage());
         }
     }
 
