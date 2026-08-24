@@ -116,6 +116,9 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      */
     @Override
     public void setPlayer(Object player) {
+        if (this.player != null) {
+            unregisterListeners();
+        }
         this.player = (ExoPlayer) player;
         registerListeners();
         super.setPlayer(player);

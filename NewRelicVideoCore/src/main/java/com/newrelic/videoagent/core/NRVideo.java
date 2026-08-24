@@ -62,10 +62,6 @@ public final class NRVideo {
         return harvestManager;
     }
 
-    public NRVideoConfiguration getConfiguration() {
-        return configuration;
-    }
-
     public static Integer addPlayer(NRVideoPlayerConfiguration config) {
         if (!isInitialized()) {
             NRLog.w("NRVideo not initialized - cannot add player");
@@ -298,6 +294,11 @@ public final class NRVideo {
 
     private static NRTracker createTrackerForType(
             String playerType, NRVideoConfiguration config, Object playerObject) {
+        if (playerType == null || playerType.isEmpty()) {
+            throw new IllegalArgumentException(
+                "[NRVideo] playerType must not be null or empty. " +
+                "Use NRVideoPlayerConfiguration.PLAYER_TYPE_EXO or PLAYER_TYPE_THEO.");
+        }
         String className;
         switch (playerType.toLowerCase()) {
             case NRVideoPlayerConfiguration.PLAYER_TYPE_EXO:
@@ -309,21 +310,15 @@ public final class NRVideo {
             default:
                 throw new IllegalArgumentException(
                     "[NRVideo] Unknown playerType '" + playerType + "'. " +
-                    "Use NRVideoPlayerConfiguration.PLAYER_TYPE_EXO or PLAYER_TYPE_THEO.");
+                    "Use one of the PLAYER_TYPE_* constants in NRVideoPlayerConfiguration.");
         }
         try {
             Class<?> clazz = Class.forName(className);
-            try {
-                return (NRTracker) clazz
-                        .getConstructor(NRVideoConfiguration.class, Object.class)
-                        .newInstance(config, playerObject);
-            } catch (NoSuchMethodException ignored) {
-                NRTracker tracker = (NRTracker) clazz
-                        .getConstructor(NRVideoConfiguration.class)
-                        .newInstance(config);
-                ((NRVideoTracker) tracker).setPlayer(playerObject);
-                return tracker;
-            }
+            NRTracker tracker = (NRTracker) clazz
+                    .getConstructor(NRVideoConfiguration.class)
+                    .newInstance(config);
+            ((NRVideoTracker) tracker).setPlayer(playerObject);
+            return tracker;
         } catch (ClassNotFoundException e) {
             throw new IllegalStateException(
                 "[NRVideo] Tracker class not found for playerType='" + playerType + "'. " +
