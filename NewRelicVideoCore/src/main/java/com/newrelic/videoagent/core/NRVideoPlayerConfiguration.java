@@ -49,11 +49,7 @@ public class NRVideoPlayerConfiguration {
         MEDIA_TAILOR
     }
 
-    public static final String PLAYER_TYPE_EXO  = "exo";
-    public static final String PLAYER_TYPE_THEO = "theo";
-
     private final String playerName;
-    private final String playerType;
     private final Object player;
     private final NRVideoTracker tracker;
     private final NRAdConfig adConfig;
@@ -77,23 +73,8 @@ public class NRVideoPlayerConfiguration {
                                        @Nullable NRAdConfig adConfig,
                                        @Nullable Map<String, Object> customAttributes) {
         this.playerName       = playerName;
-        this.playerType       = null;
         this.player           = null;
         this.tracker          = tracker;
-        this.adConfig         = adConfig;
-        this.customAttributes = customAttributes;
-    }
-
-    /** Config-driven: customer passes playerType string ("exo" or "theo"). */
-    public NRVideoPlayerConfiguration(String playerName,
-                                       String playerType,
-                                       Object player,
-                                       @Nullable NRAdConfig adConfig,
-                                       @Nullable Map<String, Object> customAttributes) {
-        this.playerName       = playerName;
-        this.playerType       = playerType;
-        this.player           = player;
-        this.tracker          = null;
         this.adConfig         = adConfig;
         this.customAttributes = customAttributes;
     }
@@ -104,7 +85,6 @@ public class NRVideoPlayerConfiguration {
                                        @Nullable NRAdConfig adConfig,
                                        @Nullable Map<String, Object> customAttributes) {
         this.playerName       = playerName;
-        this.playerType       = null;
         this.player           = player;
         this.tracker          = null;
         this.adConfig         = adConfig;
@@ -144,10 +124,6 @@ public class NRVideoPlayerConfiguration {
 
     public String getPlayerName() {
         return playerName;
-    }
-
-    public String getPlayerType() {
-        return playerType;
     }
 
     public Object getPlayer() {
