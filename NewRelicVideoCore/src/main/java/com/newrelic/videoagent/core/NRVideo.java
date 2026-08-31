@@ -310,7 +310,7 @@ public final class NRVideo {
         try {
             Class<?> clazz = Class.forName(className);
             // Prefer the two-arg constructor (NRVideoConfiguration, NRAdConfig) so the
-            // tracker receives its full configuration (segmentPrefix, trackingUrl) at
+            // tracker receives its full configuration (adSegmentPrefix, trackingUrl) at
             // construction time. Fall back to the one-arg constructor for trackers
             // (e.g. NRTrackerIMA) that do not need NRAdConfig.
             try {

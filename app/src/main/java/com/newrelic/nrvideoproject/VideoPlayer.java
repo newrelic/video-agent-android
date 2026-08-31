@@ -2,11 +2,14 @@ package com.newrelic.nrvideoproject;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.ui.PlayerView;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
+import android.widget.TextView;
 import com.newrelic.videoagent.core.NRAdConfig;
 import com.newrelic.videoagent.core.NRVideo;
 import com.newrelic.videoagent.core.NRVideoPlayerConfiguration;
@@ -85,6 +88,12 @@ public class VideoPlayer extends AppCompatActivity {
 
         PlayerView playerView = findViewById(R.id.player);
         playerView.setPlayer(player);
+        player.addListener(new Player.Listener() {
+            @Override
+            public void onEvents(Player player, Player.Events events) {
+                updateLiveUi(player, playerView);
+            }
+        });
         // Set the playlist URIs
         List<Uri> uris = new ArrayList<>();
         uris.add(Uri.parse(videoUrl));
@@ -92,5 +101,21 @@ public class VideoPlayer extends AppCompatActivity {
         // Prepare the player.
         player.setPlayWhenReady(true);
         player.prepare();
+    }
+
+    // Stock PlayerControlView has no live-aware UI (see androidx.media3.ui.PlayerControlView):
+    // exo_position/exo_duration/exo_progress always render as plain elapsed/total time, live or not.
+    private void updateLiveUi(Player player, PlayerView playerView) {
+        boolean isLive = player.isCurrentMediaItemLive();
+        TextView liveBadge = findViewById(R.id.live_badge);
+        liveBadge.setVisibility(isLive ? View.VISIBLE : View.GONE);
+
+        View position = playerView.findViewById(R.id.exo_position);
+        View duration = playerView.findViewById(R.id.exo_duration);
+        View progress = playerView.findViewById(R.id.exo_progress);
+        int visibility = isLive ? View.GONE : View.VISIBLE;
+        if (position != null) position.setVisibility(visibility);
+        if (duration != null) duration.setVisibility(visibility);
+        if (progress != null) progress.setVisibility(visibility);
     }
 }

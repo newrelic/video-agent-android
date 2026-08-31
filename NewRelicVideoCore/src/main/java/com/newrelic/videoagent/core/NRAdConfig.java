@@ -16,7 +16,7 @@ import androidx.annotation.Nullable;
  *   NRAdConfig.mediaTailor()
  *
  *   // AWS MediaTailor — custom CDN (AWS-recommended /tm/ path is auto-detected;
- *   // only set segmentPrefix if your CDN uses a different path)
+ *   // only set adSegmentPrefix if your CDN uses a different path)
  *   NRAdConfig.mediaTailor("/my-ads/")
  *
  *   // AWS MediaTailor — explicit tracking URL (POST /v1/session/ flow,
@@ -34,7 +34,7 @@ import androidx.annotation.Nullable;
  *       rewrite paths.</li>
  *   <li>{@code /tm/} — AWS-recommended CDN ad-segment prefix; detected
  *       automatically for all customers, no configuration needed.</li>
- *   <li>{@link #segmentPrefix} — custom override; only checked when non-null.
+ *   <li>{@link #adSegmentPrefix} — custom override; only checked when non-null.
  *       Use only if your CDN prefix differs from {@code /tm/}.</li>
  * </ol>
  */
@@ -62,7 +62,19 @@ public final class NRAdConfig {
      * not {@code segments.mediatailor} and not {@code /tm/} (both are detected
      * automatically). Example: {@code "/ads/"} for
      * {@code https://cdn.example.com/ads/segment_001.ts}.</p>
+     *
+     * <p>This is the canonical name, matching the VideoJS
+     * {@code mtOptions.adSegmentPrefix} option and the cross-platform spec.</p>
      */
+    @Nullable
+    public final String adSegmentPrefix;
+
+    /**
+     * @deprecated Renamed to {@link #adSegmentPrefix} for cross-platform
+     * naming parity. Holds the same value; will be removed in a future
+     * release. Read {@link #adSegmentPrefix} instead.
+     */
+    @Deprecated
     @Nullable
     public final String segmentPrefix;
 
@@ -109,34 +121,37 @@ public final class NRAdConfig {
      * {@code segments.mediatailor} hostname and not the AWS-recommended
      * {@code /tm/} path (which is checked automatically).</p>
      *
-     * @param segmentPrefix Substring matched against each segment URL to
-     *                      classify it as an ad segment. Pass {@code null}
-     *                      to rely on default detection only.
+     * @param adSegmentPrefix Substring matched against each segment URL to
+     *                        classify it as an ad segment. Pass {@code null}
+     *                        to rely on default detection only.
      */
-    public static NRAdConfig mediaTailor(@Nullable String segmentPrefix) {
-        return new NRAdConfig(Type.SSAI_MT, segmentPrefix, null);
+    public static NRAdConfig mediaTailor(@Nullable String adSegmentPrefix) {
+        return new NRAdConfig(Type.SSAI_MT, adSegmentPrefix, null);
     }
 
     /**
      * AWS Elemental MediaTailor SSAI — custom segment prefix and explicit
      * tracking URL.
      *
-     * @param segmentPrefix Substring matched against segment URLs to identify
-     *                      ad segments. Pass {@code null} for default detection.
-     * @param trackingUrl   Full MediaTailor tracking URL. Pass {@code null}
-     *                      to let the tracker derive it from the manifest URI.
+     * @param adSegmentPrefix Substring matched against segment URLs to identify
+     *                        ad segments. Pass {@code null} for default detection.
+     * @param trackingUrl     Full MediaTailor tracking URL. Pass {@code null}
+     *                        to let the tracker derive it from the manifest URI.
      */
-    public static NRAdConfig mediaTailor(@Nullable String segmentPrefix,
+    public static NRAdConfig mediaTailor(@Nullable String adSegmentPrefix,
                                          @Nullable String trackingUrl) {
-        return new NRAdConfig(Type.SSAI_MT, segmentPrefix, trackingUrl);
+        return new NRAdConfig(Type.SSAI_MT, adSegmentPrefix, trackingUrl);
     }
 
     // ── Private constructor ────────────────────────────────────────────────
 
-    private NRAdConfig(Type type, @Nullable String segmentPrefix, @Nullable String trackingUrl) {
-        this.type          = type;
-        this.segmentPrefix = segmentPrefix;
-        this.trackingUrl   = trackingUrl;
+    private NRAdConfig(Type type, @Nullable String adSegmentPrefix, @Nullable String trackingUrl) {
+        this.type            = type;
+        this.adSegmentPrefix = adSegmentPrefix;
+        // Legacy alias mirrors the canonical value so existing readers keep
+        // working until the field is removed.
+        this.segmentPrefix   = adSegmentPrefix;
+        this.trackingUrl     = trackingUrl;
     }
 
     // ── Object overrides ───────────────────────────────────────────────────
@@ -147,13 +162,13 @@ public final class NRAdConfig {
         if (!(o instanceof NRAdConfig)) return false;
         NRAdConfig that = (NRAdConfig) o;
         return type == that.type
-                && java.util.Objects.equals(segmentPrefix, that.segmentPrefix)
-                && java.util.Objects.equals(trackingUrl,   that.trackingUrl);
+                && java.util.Objects.equals(adSegmentPrefix, that.adSegmentPrefix)
+                && java.util.Objects.equals(trackingUrl,     that.trackingUrl);
     }
 
     @Override
     public int hashCode() {
-        return java.util.Objects.hash(type, segmentPrefix, trackingUrl);
+        return java.util.Objects.hash(type, adSegmentPrefix, trackingUrl);
     }
 
     @Override
@@ -162,7 +177,7 @@ public final class NRAdConfig {
             return "NRAdConfig{csai}";
         }
         StringBuilder sb = new StringBuilder("NRAdConfig{mediaTailor");
-        if (segmentPrefix != null) sb.append(", segmentPrefix='").append(segmentPrefix).append("'");
+        if (adSegmentPrefix != null) sb.append(", adSegmentPrefix='").append(adSegmentPrefix).append("'");
         if (trackingUrl   != null) sb.append(", trackingUrl set");
         sb.append("}");
         return sb.toString();

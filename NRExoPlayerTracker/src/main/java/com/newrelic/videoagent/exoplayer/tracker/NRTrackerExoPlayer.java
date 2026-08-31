@@ -276,12 +276,25 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     /**
      * Get stream duration.
      *
-     * @return Attribute.
+     * @return Attribute. Null for live content: the player reports the current
+     * DVR-window size (e.g. a rolling few seconds), not a meaningful video length.
      */
     public Long getDuration() {
         if (player == null) return null;
+        if (player.isCurrentMediaItemLive()) return null;
 
         return Math.max(player.getDuration() , 0);
+    }
+
+    /**
+     * Get whether the current media item is a live stream.
+     *
+     * @return Attribute.
+     */
+    public Boolean getIsLive() {
+        if (player == null) return null;
+
+        return player.isCurrentMediaItemLive();
     }
 
     /**
