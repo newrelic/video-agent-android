@@ -19,10 +19,12 @@ import androidx.media3.exoplayer.hls.HlsManifest;
 import androidx.media3.extractor.metadata.emsg.EventMessage;
 
 import com.newrelic.videoagent.core.NRAdConfig;
+import com.newrelic.videoagent.core.NRDef;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.mediatailor.BuildConfig;
+import com.newrelic.videoagent.mediatailor.MTAdErrorCode;
 import com.newrelic.videoagent.mediatailor.MTConstants;
 import com.newrelic.videoagent.mediatailor.detection.MTDashParser;
 import com.newrelic.videoagent.mediatailor.detection.MTDetector;
@@ -32,10 +34,13 @@ import com.newrelic.videoagent.mediatailor.model.MTAdPod;
 import com.newrelic.videoagent.mediatailor.net.MTTrackingClient;
 import com.newrelic.videoagent.mediatailor.net.MTTrackingResponse;
 import com.newrelic.videoagent.mediatailor.schedule.MTAdScheduleMerger;
+import com.newrelic.videoagent.mediatailor.schedule.MergedSchedule;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -55,16 +60,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *       (DASH / HLS) from the file extension, and derive the tracking URL
  *       either from the URI query or from {@code DashManifest.location}.</li>
  *   <li>Typed manifest parsing —
- *       {@link MTDashParser#parse(DashManifest)} or
- *       {@link MTHlsParser#parse(HlsManifest)} — builds an in-memory schedule
- *       of {@link MTAdBreak}s.</li>
+ *       {@link MTDashParser#parse(DashManifest, String)} or
+ *       {@link MTHlsParser#parse(HlsManifest, String)} — builds an in-memory
+ *       schedule of {@link MTAdBreak}s.</li>
  *   <li>Tracking API — {@link MTTrackingClient} fetches rich VAST metadata
  *       (titles, creative IDs, ad system, skip offsets, beacon URLs).
  *       {@link MTAdScheduleMerger} merges manifest + tracking data.</li>
- *   <li>250 ms playhead poll — compares the player's current position to the
- *       schedule, fires {@code AD_BREAK_START / AD_REQUEST / AD_START /
- *       AD_QUARTILE / AD_END / AD_BREAK_END} at the right transitions, and
- *       (optionally) fires VAST beacons client-side via {@link MTBeaconFirer}.</li>
+ *   <li>Playhead poll (250 ms by default; configurable) — compares the
+ *       player's current position to the schedule and fires
+ *       {@code AD_BREAK_START / AD_REQUEST / AD_START / AD_QUARTILE / AD_END /
+ *       AD_BREAK_END} at the right transitions.</li>
  * </ol>
  *
  * <p>Public API surfaces for app integration:</p>
@@ -80,16 +85,31 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
     private ExoPlayer player;
 
     // Set at construction time from NRAdConfig; null means no custom prefix.
-    private final String segmentPrefix;
+    private final String adSegmentPrefix;
     // True when the customer explicitly passed NRAdConfig.mediaTailor() —
     // activation is unconditional (no URL substring check required).
     private final boolean explicitlyConfigured;
+    /**
+     * Playhead-poll cadence in milliseconds. 250 ms is a reasonable default
+     * for the standard 15-30 s ad and produces sub-second quartile precision.
+     * Battery-constrained devices playing long-duration content where only
+     * break-entry / break-exit granularity matters can raise this to reduce
+     * main-thread wake-ups.
+     */
+    private final long pollIntervalMs;
 
     private boolean activated;
     private String manifestType;
     private String streamType;
     private String mediaTailorEndpoint;
     private String trackingUrl;
+    // Set when trackingUrl came from the URL-rewrite heuristic in activate(),
+    // which runs before any manifest is available and so can't see an
+    // operator-advertised EXT-X-DATERANGE CLASS="tracking" tag yet. A guess
+    // is provisional: the DATERANGE check in reparseManifest() is allowed to
+    // override it once the manifest loads. An explicit NRAdConfig.trackingUrl
+    // never sets this and is therefore never overridden.
+    private boolean trackingUrlFromGuess;
 
     private final List<MTAdBreak> adSchedule = Collections.synchronizedList(new ArrayList<MTAdBreak>());
     private MTAdBreak currentAdBreak;
@@ -98,6 +118,9 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
 
     private final AtomicBoolean isDisposed = new AtomicBoolean(false);
     private final AtomicBoolean hasAttemptedTrackingFetch = new AtomicBoolean(false);
+    // Ensures the tracking-URL resolution path is classified exactly once per
+    // activation, no matter which hook (activate / reparse) resolves it first.
+    private boolean loggedTrackingResolution;
 
     private Handler pollHandler;
     private Runnable pollRunnable;
@@ -110,34 +133,50 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
      * Primary constructor — called by {@link com.newrelic.videoagent.core.NRVideo#addPlayer}
      * when the customer passes {@link NRAdConfig#mediaTailor()}.
      *
-     * <p>Reads {@code segmentPrefix} and {@code trackingUrl} from the config so
+     * <p>Reads {@code adSegmentPrefix} and {@code trackingUrl} from the config so
      * both are available before the first manifest parse.</p>
      */
     public NRTrackerMediaTailor(NRVideoConfiguration configuration, NRAdConfig adConfig) {
+        this(configuration, adConfig, MTConstants.PLAYHEAD_POLL_INTERVAL_MS);
+    }
+
+    /**
+     * Constructor variant that additionally accepts a custom playhead-poll
+     * interval. Non-positive values fall back to the default — a zero
+     * interval would busy-loop the main looper.
+     */
+    public NRTrackerMediaTailor(NRVideoConfiguration configuration, NRAdConfig adConfig,
+                                long playheadPollIntervalMs) {
         super(configuration);
-        this.segmentPrefix        = adConfig != null ? adConfig.segmentPrefix : null;
+        this.adSegmentPrefix        = adConfig != null ? adConfig.adSegmentPrefix : null;
         this.explicitlyConfigured = adConfig != null;
+        this.pollIntervalMs       = playheadPollIntervalMs > 0
+                ? playheadPollIntervalMs
+                : MTConstants.PLAYHEAD_POLL_INTERVAL_MS;
         if (adConfig != null && adConfig.trackingUrl != null) {
             this.trackingUrl = adConfig.trackingUrl;
         }
         NRLog.d(MTConstants.LOG_CONFIG + " tracker created — " + adConfig
                 + " explicitActivation=true"
-                + (segmentPrefix != null ? " segmentPrefix='" + segmentPrefix + "'" : " segmentPrefix=none (aws-hostname + /tm/ active)"));
+                + (adSegmentPrefix != null ? " adSegmentPrefix='" + adSegmentPrefix + "'" : " adSegmentPrefix=none (aws-hostname + /tm/ active)")
+                + " pollIntervalMs=" + this.pollIntervalMs);
     }
 
     /** Fallback constructor used when no {@link NRAdConfig} is available. */
     public NRTrackerMediaTailor(NRVideoConfiguration configuration) {
         super(configuration);
-        this.segmentPrefix        = null;
+        this.adSegmentPrefix        = null;
         this.explicitlyConfigured = false;
+        this.pollIntervalMs       = MTConstants.PLAYHEAD_POLL_INTERVAL_MS;
         NRLog.d(MTConstants.LOG_CONFIG + " tracker created — no NRAdConfig (URL auto-detect mode)");
     }
 
     @Deprecated
     public NRTrackerMediaTailor() {
         super();
-        this.segmentPrefix        = null;
+        this.adSegmentPrefix        = null;
         this.explicitlyConfigured = false;
+        this.pollIntervalMs       = MTConstants.PLAYHEAD_POLL_INTERVAL_MS;
     }
 
     @Override
@@ -317,8 +356,21 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         mediaTailorEndpoint = uri.toString();
         manifestType        = MTDetector.manifestType(uri);
 
-        if (trackingUrl == null) {
-            trackingUrl = MTDetector.extractTrackingUrl(uri);
+        loggedTrackingResolution = false;
+        trackingUrlFromGuess = false;
+        if (trackingUrl != null) {
+            // Set before any manifest was seen — came from NRAdConfig.trackingUrl.
+            logTrackingResolution(MTConstants.RESOLVE_EXPLICIT);
+        } else {
+            String derived = MTDetector.extractTrackingUrl(uri);
+            if (derived != null) {
+                trackingUrl = derived;
+                trackingUrlFromGuess = true;
+                boolean fromQuery = uri.toString().contains("sessionId=");
+                logTrackingResolution(fromQuery
+                        ? MTConstants.RESOLVE_QUERY
+                        : MTConstants.RESOLVE_IMPLICIT_PATH);
+            }
         }
 
         hasAttemptedTrackingFetch.set(false);
@@ -326,16 +378,36 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         currentAdBreak = null;
         currentAdPod   = null;
 
-        String detectionDesc = segmentPrefix != null
-                ? "aws-hostname | /tm/ | custom='" + segmentPrefix + "'"
+        String detectionDesc = adSegmentPrefix != null
+                ? "aws-hostname | /tm/ | custom='" + adSegmentPrefix + "'"
                 : "aws-hostname | /tm/";
+        // An implicit-session stream exposes the sessionId only inside the
+        // media-playlist path, which ExoPlayer hasn't loaded yet at activation
+        // time — the reparse hook derives the tracking URL once it arrives.
+        // That is the normal path, so describe it as a deferral, not a failure.
+        String trackingState = trackingUrl != null
+                ? trackingUrl
+                : "will derive from media playlist once loaded";
         NRLog.d(MTConstants.LOG_DETECT + " activated"
                 + " format=" + manifestType
                 + " detection=[" + detectionDesc + "]"
-                + " trackingUrl=" + (trackingUrl != null ? trackingUrl : "pending")
+                + " trackingUrl=" + trackingState
                 + " endpoint=" + mediaTailorEndpoint);
 
         startPolling();
+    }
+
+    /**
+     * Emits exactly one classification line per activation naming which path
+     * resolved the tracking endpoint (or that a MediaTailor URL yielded none).
+     * The label is a stable enum string so downstream tooling can filter on it
+     * when diagnosing an ad-less stream.
+     */
+    private void logTrackingResolution(String resolvedPath) {
+        if (loggedTrackingResolution) return;
+        loggedTrackingResolution = true;
+        NRLog.d(MTConstants.LOG_TRACK + " resolution=" + resolvedPath
+                + " trackingUrl=" + (trackingUrl != null ? trackingUrl : "none"));
     }
 
     private void deactivate() {
@@ -378,9 +450,13 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
                 if (derived != null) {
                     trackingUrl = derived;
                     NRLog.d(MTConstants.LOG_TRACK + " trackingUrl recovered from DASH <Location>: " + trackingUrl);
+                    logTrackingResolution(MTConstants.RESOLVE_DASH_LOCATION);
+                } else {
+                    NRLog.d(MTConstants.LOG_TRACK + " DASH tracking URL not derivable from <Location>="
+                            + dash.location + " — falling back to manifest-marker detection");
                 }
             }
-            List<MTAdBreak> parsed = MTDashParser.parse(dash, segmentPrefix);
+            List<MTAdBreak> parsed = MTDashParser.parse(dash, adSegmentPrefix);
             NRLog.d(MTConstants.LOG_PARSE_DASH + " manifest parsed: periods=" + dash.getPeriodCount()
                     + " adBreaks=" + parsed.size()
                     + " location=" + (dash.location != null ? dash.location : "null"));
@@ -389,9 +465,52 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
             }
         } else if (manifest instanceof HlsManifest) {
             HlsManifest hls = (HlsManifest) manifest;
+            // Publica/SpringServe-style operator configurations may advertise
+            // the tracking endpoint directly via an EXT-X-DATERANGE tag with
+            // CLASS="tracking". When present that's authoritative over the
+            // URL-rewrite heuristic — but activate() runs before any manifest
+            // is loaded, so a guess from that heuristic may already have set
+            // trackingUrl by the time the manifest (and this tag) arrives.
+            // Check regardless of whether trackingUrl is already a guess, and
+            // let a marker hit override it — otherwise operators on non-
+            // default CDN path layouts who advertise this tag would still be
+            // stuck calling setTrackingUrl(String) by hand whenever the guess
+            // happens to produce a wrong-but-non-null URL first.
+            if (trackingUrl == null || trackingUrlFromGuess) {
+                String fromTag = MTHlsParser.extractTrackingUrl(hls);
+                if (fromTag != null) {
+                    trackingUrl = fromTag;
+                    trackingUrlFromGuess = false;
+                    NRLog.d(MTConstants.LOG_TRACK + " trackingUrl from EXT-X-DATERANGE CLASS=tracking: " + trackingUrl);
+                    // Overrides whatever activate() already logged (if the
+                    // guess had fired first), since this is the authoritative
+                    // resolution.
+                    loggedTrackingResolution = false;
+                    logTrackingResolution(MTConstants.RESOLVE_DATERANGE);
+                }
+            }
+            // Implicit-session rescue: activate() only ever saw the master
+            // playlist URI, which carries no sessionId. The sessionId is a
+            // path segment on the (often relative) variant URI the master
+            // points at — ExoPlayer resolves that for us into this media
+            // playlist's baseUri, so retry derivation against it now that
+            // it's loaded. Mirrors the DASH <Location> rescue above.
+            if (trackingUrl == null) {
+                String baseUri = hls.mediaPlaylist != null ? hls.mediaPlaylist.baseUri : null;
+                String derived = baseUri != null ? MTDetector.extractTrackingUrl(baseUri) : null;
+                if (derived != null) {
+                    trackingUrl = derived;
+                    NRLog.d(MTConstants.LOG_TRACK + " trackingUrl recovered from HLS media playlist URI: " + trackingUrl);
+                    logTrackingResolution(MTConstants.RESOLVE_IMPLICIT_PATH);
+                } else {
+                    NRLog.d(MTConstants.LOG_TRACK + " HLS implicit-path rescue found nothing — mediaPlaylist="
+                            + (hls.mediaPlaylist != null ? "present" : "null")
+                            + " baseUri=" + (baseUri != null ? baseUri : "null"));
+                }
+            }
             int segCount = hls.mediaPlaylist != null && hls.mediaPlaylist.segments != null
                     ? hls.mediaPlaylist.segments.size() : 0;
-            List<MTAdBreak> parsed = MTHlsParser.parse(hls, segmentPrefix);
+            List<MTAdBreak> parsed = MTHlsParser.parse(hls, adSegmentPrefix);
             NRLog.d(MTConstants.LOG_PARSE_HLS + " manifest parsed: segments=" + segCount
                     + " adBreaks=" + parsed.size());
             if (!parsed.isEmpty()) {
@@ -402,6 +521,13 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
                     + manifest.getClass().getName());
         } else {
             NRLog.d(MTConstants.LOG_TAG + " getCurrentManifest() returned null — not loaded yet");
+        }
+        // A manifest has now been parsed. If no resolution path has claimed the
+        // tracking URL by this point, this is a MediaTailor stream whose
+        // endpoint can't be derived — record it once so an ad-less stream is
+        // diagnosable as "never resolved" rather than "resolved but empty".
+        if (trackingUrl == null && manifest != null) {
+            logTrackingResolution(MTConstants.RESOLVE_NOT_DERIVABLE);
         }
         maybeFetchTracking();
     }
@@ -468,17 +594,37 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
     }
 
     private void startTrackingFetch() {
-        cancelTrackingFetch();
-        trackingClient = new MTTrackingClient();
+        // Abort any in-flight fetch but reuse the client instance to avoid
+        // per-poll allocation churn. Pagination is scoped to a single fetch
+        // cycle inside the client, so no cursor state needs to survive here.
+        abortInFlightTracking();
+        if (trackingClient == null) trackingClient = new MTTrackingClient();
+        final MTTrackingClient client = trackingClient;
         final String url = trackingUrl;
         NRLog.d(MTConstants.LOG_TRACK + " fetching: " + url);
         trackingWorker = new Thread(new Runnable() {
             @Override
             public void run() {
-                MTTrackingResponse resp = trackingClient.fetch(url);
+                MTTrackingResponse resp = client.fetch(url);
                 if (isDisposed.get()) return;
                 if (resp == null) {
                     NRLog.w(MTConstants.LOG_TRACK + " fetch returned null (failed or cancelled)");
+                    // Distinguish a customer-visible fetch failure from a
+                    // cancellation caused by our own teardown — the latter is
+                    // routine (activate/deactivate cycles the client) and
+                    // shouldn't fire AD_ERROR.
+                    final MTAdErrorCode err = client.getLastError();
+                    if (err != null) {
+                        Handler main = pollHandler;
+                        if (main == null) main = new Handler(Looper.getMainLooper());
+                        main.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (isDisposed.get()) return;
+                                sendAdErrorEvent(err, null);
+                            }
+                        });
+                    }
                     return;
                 }
                 applyTrackingResponse(resp);
@@ -488,15 +634,19 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         trackingWorker.start();
     }
 
-    private void cancelTrackingFetch() {
-        if (trackingClient != null) {
-            trackingClient.cancel();
-            trackingClient = null;
-        }
+    private void abortInFlightTracking() {
+        if (trackingClient != null) trackingClient.cancel();
         if (trackingWorker != null) {
             trackingWorker.interrupt();
             trackingWorker = null;
         }
+    }
+
+    private void cancelTrackingFetch() {
+        // Session teardown: release the client so the next activation starts a
+        // fresh MediaTailor session with no carry-over connection state.
+        abortInFlightTracking();
+        trackingClient = null;
     }
 
     private void applyTrackingResponse(final MTTrackingResponse resp) {
@@ -509,13 +659,20 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
             public void run() {
                 if (isDisposed.get()) return;
                 nonLinearAvailsCount = resp.nonLinearAvails.size();
+                long playhead = player != null ? player.getCurrentPosition() : -1L;
+                MergedSchedule merged;
                 synchronized (adSchedule) {
-                    List<MTAdBreak> enriched = MTAdScheduleMerger.enrichWithTracking(
-                            new ArrayList<>(adSchedule), resp);
+                    merged = MTAdScheduleMerger.enrichWithTracking(
+                            new ArrayList<>(adSchedule), resp, playhead);
                     adSchedule.clear();
-                    adSchedule.addAll(enriched);
+                    adSchedule.addAll(merged.breaks);
                     NRLog.d(MTConstants.LOG_TRACK + " schedule enriched: " + adSchedule.size()
                             + " breaks, confirmed=" + countConfirmed(adSchedule));
+                }
+                // Emit outside the adSchedule lock so an error-event listener
+                // that touches the schedule can't deadlock against us.
+                for (MTAdErrorCode code : merged.pendingErrors) {
+                    sendAdErrorEvent(code, null);
                 }
             }
         });
@@ -540,12 +697,12 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
                     tick();
                 } finally {
                     if (!isDisposed.get() && pollHandler != null) {
-                        pollHandler.postDelayed(this, MTConstants.PLAYHEAD_POLL_INTERVAL_MS);
+                        pollHandler.postDelayed(this, pollIntervalMs);
                     }
                 }
             }
         };
-        pollHandler.postDelayed(pollRunnable, MTConstants.PLAYHEAD_POLL_INTERVAL_MS);
+        pollHandler.postDelayed(pollRunnable, pollIntervalMs);
     }
 
     private void stopPolling() {
@@ -563,6 +720,20 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         MTAdBreak active;
         synchronized (adSchedule) {
             active = findActiveBreak(position);
+            if (active == null && !adSchedule.isEmpty() && !loggedScheduleMismatchOnce) {
+                loggedScheduleMismatchOnce = true;
+                StringBuilder sb = new StringBuilder();
+                sb.append(MTConstants.LOG_TAG).append(" DIAG no break matches position=").append(position);
+                for (MTAdBreak b : adSchedule) {
+                    sb.append(" | break[start=").append(b.startTimeMs)
+                      .append(",end=").append(b.endTimeMs)
+                      .append(",hasFiredEnd=").append(b.hasFiredEnd)
+                      .append(",confirmed=").append(b.confirmedByTracking).append("]");
+                }
+                NRLog.w(sb.toString());
+            } else if (active != null) {
+                loggedScheduleMismatchOnce = false;
+            }
         }
 
         if (active != null) {
@@ -570,10 +741,46 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         } else if (currentAdBreak != null) {
             handleExitingBreak();
         }
+
+        pruneViewedBreaks(position);
+    }
+
+    // Temporary diagnostic gate — logs the schedule/position mismatch once
+    // per occurrence (not every 250ms tick) while root-causing why a
+    // tracking-confirmed break in the schedule never gets picked up as
+    // active. Remove once the root cause of that mismatch is confirmed.
+    private boolean loggedScheduleMismatchOnce = false;
+
+    /**
+     * Drops breaks that ended more than {@link MTConstants#PRUNE_BUFFER_MS}
+     * before the playhead so a 24/7 live schedule stays bounded and per-tick
+     * scans stay flat. Only runs on live — a VOD schedule is finite and a
+     * viewer can seek back into an earlier break. The active break and any
+     * upcoming break are always kept; the buffer leaves a just-ended break
+     * around long enough for a trailing quartile / AD_END to resolve.
+     */
+    private void pruneViewedBreaks(long positionMs) {
+        if (!MTConstants.STREAM_TYPE_LIVE.equals(streamType)) return;
+        long cutoff = positionMs - MTConstants.PRUNE_BUFFER_MS;
+        synchronized (adSchedule) {
+            for (java.util.Iterator<MTAdBreak> it = adSchedule.iterator(); it.hasNext(); ) {
+                MTAdBreak b = it.next();
+                if (b != currentAdBreak && b.endTimeMs < cutoff) {
+                    it.remove();
+                }
+            }
+        }
     }
 
     private MTAdBreak findActiveBreak(long positionMs) {
         for (MTAdBreak br : adSchedule) {
+            // A break that already fired AD_BREAK_END must never re-fire —
+            // the merger already refuses to match new data onto a closed
+            // break (see MTAdScheduleMerger#findByStart), but this is the
+            // backstop that actually gates event emission: even if a closed
+            // break somehow lingers in the schedule with a window that still
+            // covers the playhead, it may not be picked up as active again.
+            if (br.hasFiredEnd) continue;
             if (br.contains(positionMs)) return br;
         }
         return null;
@@ -588,8 +795,32 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
             active.hasFiredStart = true;
         }
 
+        // A no-fill avail is a break with no ad to render — content plays
+        // through. Firing AD_START / AD_QUARTILE here would create phantom
+        // impressions for an ad that never existed, so emit AD_ERROR(NO_FILL)
+        // once and skip the pod/no-pods paths entirely. The AD_BREAK_END is
+        // still fired by handleExitingBreak when the playhead leaves.
+        if (active.isNoFill) {
+            if (!active.hasFiredNoFillError) {
+                NRLog.d(MTConstants.LOG_EVENT + " AD_ERROR NO_FILL at " + active.startTimeMs + "ms");
+                sendAdErrorEvent(MTAdErrorCode.NO_FILL, null);
+                active.hasFiredNoFillError = true;
+            }
+            return;
+        }
+
         if (!active.pods.isEmpty()) {
             MTAdPod pod = active.findActivePod(position);
+            // Pod ends before its enclosing break does — either the manifest
+            // has a gap between the last pod's end and the break's end, or
+            // the pod's endTimeMs was clamped down at parse time. Fire the
+            // AD_END here rather than waiting until handleExitingBreak so
+            // the pod's runtime isn't attributed to the tail of the break.
+            if (pod == null && currentAdPod != null) {
+                NRLog.d(MTConstants.LOG_EVENT + " AD_END (pod ended before break end)");
+                sendEnd();
+                currentAdPod = null;
+            }
             if (pod != null && pod != currentAdPod) {
                 if (currentAdPod != null) {
                     NRLog.d(MTConstants.LOG_EVENT + " AD_END (pod transition)");
@@ -632,6 +863,20 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         }
         currentAdBreak = null;
         currentQuartile = null;
+    }
+
+    /**
+     * Emits an {@code AD_ERROR} event carrying a semantic string {@code
+     * errorCode}. The base class's {@code sendError(int, String)} path stores
+     * the code as an int, which would force downstream to memorise a numeric
+     * mapping; going through {@code sendVideoErrorEvent} directly keeps the
+     * attribute readable in NRDB.
+     */
+    private void sendAdErrorEvent(MTAdErrorCode code, String message) {
+        Map<String, Object> attr = new HashMap<>();
+        attr.put("errorCode", code.name());
+        attr.put("errorMessage", message != null ? message : code.defaultMessage());
+        super.sendVideoErrorEvent(NRDef.AD_ERROR, attr);
     }
 
     private void trackQuartiles(Object target, long progressMs) {
@@ -770,7 +1015,7 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
      *
      * <p>Attributes added: {@code adSystem}, {@code vastAdId},
      * {@code creativeSequence}, {@code skipOffset}, {@code adProgramDateTime},
-     * {@code availProgramDateTime}, {@code isBumper},
+     * {@code availProgramDateTime}, {@code adPrimaryId}, {@code isBumper},
      * {@code nonLinearAvailsCount}.</p>
      */
     @Override
@@ -791,8 +1036,22 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
         if (vastAdId != null) attr.put("vastAdId", vastAdId);
         if (creativeSequence != null) attr.put("creativeSequence", creativeSequence);
         if (skipOffset != null) attr.put("skipOffset", skipOffset);
-        if (adProgramDateTime != null) attr.put("adProgramDateTime", adProgramDateTime);
-        if (availProgramDateTime != null) attr.put("availProgramDateTime", availProgramDateTime);
+        // These wall-clock fields are the join key for correlating an event
+        // stream across HLS/DASH boundaries and across live sessions in NRDB.
+        // Omitting them when null makes a query like `WHERE availProgramDateTime
+        // IS NOT NULL` return inconsistent populations depending on whether the
+        // customer is on HLS-live (populated) or DASH-VOD (usually absent), so
+        // dashboards silently drift when the source stream type changes. Emit
+        // the empty string instead so the schema stays stable.
+        attr.put("adProgramDateTime", adProgramDateTime != null ? adProgramDateTime : "");
+        attr.put("availProgramDateTime", availProgramDateTime != null ? availProgramDateTime : "");
+        // Emit a stable per-creative identifier alongside adId. Ad servers
+        // can wrap the same creative in different <Ad> envelopes across
+        // sessions, so a `SELECT count(DISTINCT adId)` query inflates the
+        // creative count. MediaTailor itself indexes by <Creative> id, and
+        // queries on `adPrimaryId` follow the same rule.
+        String primaryId = currentAdPod != null ? currentAdPod.primaryKey() : null;
+        if (primaryId != null) attr.put("adPrimaryId", primaryId);
         if (currentAdPod != null && currentAdPod.isBumper) {
             attr.put("isBumper", Boolean.TRUE);
         } else if (currentAdBreak != null) {

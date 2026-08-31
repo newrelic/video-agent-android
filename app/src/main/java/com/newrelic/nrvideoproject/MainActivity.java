@@ -4,6 +4,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.Switch;
 
 import com.newrelic.videoagent.core.NRVideo;
@@ -23,13 +24,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        NRVideoConfiguration config = new NRVideoConfiguration.Builder(BuildConfig.NR_APPLICATION_TOKEN)
-                .autoDetectPlatform(getApplicationContext())
-                .withHarvestCycle(30)
-                .enableLogging()
-                .enableQoeAggregate(BuildConfig.QOE_AGGREGATE_DEFAULT)
-                .build();
-        NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
+        NRVideoConfiguration config = ((NRVideoApplication) getApplication()).getConfig();
         setContentView(R.layout.activity_main);
 
         adsSwitch = findViewById(R.id.ads_switch);
@@ -66,6 +61,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 Map<String, Object> emptyAttr = new HashMap<>();
                 NRVideo.recordCustomEvent(emptyAttr);
             }
+        });
+
+        EditText directManifestUrl = findViewById(R.id.direct_manifest_url);
+        findViewById(R.id.play_direct_url).setOnClickListener(v -> {
+            String url = directManifestUrl.getText().toString().trim();
+            if (url.isEmpty()) {
+                android.widget.Toast.makeText(this, "Enter a MediaTailor playback URL first", android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            }
+            Intent intent = new Intent(this, VideoPlayerMediaTailor.class);
+            intent.putExtra("manifestUrl", url);
+            startActivity(intent);
         });
 
         Map<String, Object> attr = new HashMap<>();

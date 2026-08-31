@@ -6,8 +6,12 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import android.view.View;
+import android.widget.TextView;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.ui.PlayerView;
 
@@ -61,9 +65,8 @@ public class VideoPlayerMediaTailor extends AppCompatActivity {
     private static final String MT_DASH_MANIFEST_PATH = "index.mpd";
 
     private static final String MT_HLS_SESSION_INIT_PREFIX =
-            "https://<HASH>.mediatailor.<REGION>.amazonaws.com"
-                    + "/v1/session/<ACCOUNT>/<HLS_CONFIG>/";
-    private static final String MT_HLS_MANIFEST_PATH = "master.m3u8";
+            "http://10.0.2.2:9099/v1/session/mock/mock/";
+    private static final String MT_HLS_MANIFEST_PATH = "index.m3u8";
 
     // Which protocol to exercise. Can be overridden at runtime via the
     // `protocol` intent extra (values: "dash" | "hls").
@@ -94,6 +97,17 @@ public class VideoPlayerMediaTailor extends AppCompatActivity {
         // quick-tunnel or a local proxy with a user-installed root CA), rely
         // on res/xml/network_security_config.xml's <debug-overrides>, which
         // trusts user CAs only in debug builds. Do not bypass SSL in code.
+
+        // Implicit session: caller already has a sessionized (or session-creating)
+        // playback URL — e.g. a MediaTailor "/v1/master/.../index.m3u8" endpoint —
+        // and there's nothing to POST. Hand it straight to ExoPlayer; the tracker
+        // rescues the session id from the manifest once it loads.
+        String directManifestUrl = getIntent().getStringExtra("manifestUrl");
+        if (directManifestUrl != null && !directManifestUrl.isEmpty()) {
+            Log.v(TAG, "Implicit session, direct manifest URL: " + directManifestUrl);
+            startPlayback(directManifestUrl, null);
+            return;
+        }
 
         String protocol = getIntent().getStringExtra("protocol");
         if (protocol == null || protocol.isEmpty()) protocol = DEFAULT_PROTOCOL;
@@ -165,10 +179,32 @@ public class VideoPlayerMediaTailor extends AppCompatActivity {
 
         PlayerView playerView = findViewById(R.id.player);
         playerView.setPlayer(player);
+        player.addListener(new Player.Listener() {
+            @Override
+            public void onEvents(Player player, Player.Events events) {
+                updateLiveUi(player, playerView);
+            }
+        });
 
         player.setMediaItem(MediaItem.fromUri(Uri.parse(manifestUrl)));
         player.setPlayWhenReady(true);
         player.prepare();
+    }
+
+    // Stock PlayerControlView has no live-aware UI: exo_position/exo_duration/
+    // exo_progress always render as plain elapsed/total time, live or not.
+    private void updateLiveUi(Player player, PlayerView playerView) {
+        boolean isLive = player.isCurrentMediaItemLive();
+        TextView liveBadge = findViewById(R.id.live_badge);
+        liveBadge.setVisibility(isLive ? View.VISIBLE : View.GONE);
+
+        View position = playerView.findViewById(R.id.exo_position);
+        View duration = playerView.findViewById(R.id.exo_duration);
+        View progress = playerView.findViewById(R.id.exo_progress);
+        int visibility = isLive ? View.GONE : View.VISIBLE;
+        if (position != null) position.setVisibility(visibility);
+        if (duration != null) duration.setVisibility(visibility);
+        if (progress != null) progress.setVisibility(visibility);
     }
 
     // ── explicit session init ────────────────────────────────────────────────
