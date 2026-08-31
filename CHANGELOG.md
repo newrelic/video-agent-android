@@ -1,3 +1,41 @@
+## [4.5.0](https://github.com/newrelic/video-agent-android/compare/v4.4.0...v4.5.0) (2026-08-31)
+
+### Features
+
+* **sample-app:** show a LIVE badge instead of a countdown for live streams ([ba35923](https://github.com/newrelic/video-agent-android/commit/ba35923105da851ad5402447fbaa4b23210cb1f6))
+* **sample-app:** support direct manifest URL playback and mock-server testing ([ce2c475](https://github.com/newrelic/video-agent-android/commit/ce2c4754aed20564ce8798f8b2ccfcdef29f29b6))
+
+### Bug Fixes
+
+* **exoplayer:** report contentIsLive and omit contentDuration for live streams ([67c4fd9](https://github.com/newrelic/video-agent-android/commit/67c4fd931f263def47f31059efc8798ebaa5308d))
+* **mediatailor:** append newly-reported ads when a tracking-built avail grows ([fd2b5fd](https://github.com/newrelic/video-agent-android/commit/fd2b5fd3496e503f109ca786a9afc58b9e0ab63e)), closes [#2](https://github.com/newrelic/video-agent-android/issues/2) [#3](https://github.com/newrelic/video-agent-android/issues/3)
+* **mediatailor:** centralise trailing-segment sessionId extraction ([f0feb4c](https://github.com/newrelic/video-agent-android/commit/f0feb4cd93241b047c48c6985fa3ad0880adad23))
+* **mediatailor:** classify how the tracking endpoint was resolved ([87dcb30](https://github.com/newrelic/video-agent-android/commit/87dcb304ebd983201002929aa2262b272e5d0e13))
+* **mediatailor:** correct DASH cue offset and give HLS breaks a stable id ([4ba3b21](https://github.com/newrelic/video-agent-android/commit/4ba3b21b5b8cf4e81ad4d34f964b3799eb0bbca6))
+* **mediatailor:** derive tracking URL from implicit-session DASH playlist path ([be33fa0](https://github.com/newrelic/video-agent-android/commit/be33fa0643feba0100f7fa1d455d854fba8f9e27))
+* **mediatailor:** derive tracking URL from implicit-session HLS playlist path ([4e31bcb](https://github.com/newrelic/video-agent-android/commit/4e31bcb349118628b597e3e7a2aff1940042fcc3))
+* **mediatailor:** describe pending implicit-session tracking URL as deferral ([f0513d4](https://github.com/newrelic/video-agent-android/commit/f0513d49f18290784fdb428ed9200b3ce2617d3d))
+* **mediatailor:** emit AD_ERROR when tracking fetch fails silently ([2750947](https://github.com/newrelic/video-agent-android/commit/2750947b965f4fa18beaa783e5266f3c6da5d05f))
+* **mediatailor:** expose creativeId-first primary key for per-ad metrics ([c8de5dd](https://github.com/newrelic/video-agent-android/commit/c8de5ddc05bdef18c202d628f1ad8574db1846f2))
+* **mediatailor:** harden schedule merge against zombie breaks and pod drift ([83b1eec](https://github.com/newrelic/video-agent-android/commit/83b1eec298304415133b9093f19cb2dbe5f444aa))
+* **mediatailor:** keep manifest pod boundaries when tracking ad count disagrees ([3f3ce3f](https://github.com/newrelic/video-agent-android/commit/3f3ce3fe2450bdea46d2e5e1bf7fd821a0f33822))
+* **mediatailor:** let EXT-X-DATERANGE override an earlier trackingUrl guess ([f1cceac](https://github.com/newrelic/video-agent-android/commit/f1cceac1c0603e3c04be36aa136927d8fe026cfd))
+* **mediatailor:** make playhead poll interval configurable at construction ([cad7625](https://github.com/newrelic/video-agent-android/commit/cad76253aac6ae39509d0206d31b63acbbc5dfaf))
+* **mediatailor:** match growing-avail ads by start time when adId is absent ([b92394b](https://github.com/newrelic/video-agent-android/commit/b92394b16c90aca446f3c84274c537f637149a6b))
+* **mediatailor:** match manifest breaks by id, gate MISSING_AVAIL_START once ([d846520](https://github.com/newrelic/video-agent-android/commit/d846520406609a7593fc6a2c4369c52985e858bc))
+* **mediatailor:** paginate NextToken within one poll instead of across polls ([9d52fb9](https://github.com/newrelic/video-agent-android/commit/9d52fb904ed1e2040369441162694675d0568189))
+* **mediatailor:** parse tracking-event beacons with ad-start-relative timing ([1b54387](https://github.com/newrelic/video-agent-android/commit/1b54387b2d834cc0726e0d1101a6e9b6506df20e))
+* **mediatailor:** pod endTimeMs must not exceed its enclosing break ([036b17d](https://github.com/newrelic/video-agent-android/commit/036b17d53b05b5ecd605a27886b6e9d10a34f243))
+* **mediatailor:** prune viewed avails from the live schedule ([333cc0f](https://github.com/newrelic/video-agent-android/commit/333cc0f565f172ae50bf2f6975aa2e28b149aebd))
+* **mediatailor:** read HLS tracking URL from EXT-X-DATERANGE when advertised ([8d5fb50](https://github.com/newrelic/video-agent-android/commit/8d5fb507cbe2363f706f352f2fd22e7f7299f7e7))
+* **mediatailor:** rename segmentPrefix to canonical adSegmentPrefix ([7988167](https://github.com/newrelic/video-agent-android/commit/79881679bee7d366e726f005b072a60ad176581e))
+* **mediatailor:** require unanimous representation agreement for DASH ad periods ([f872c9d](https://github.com/newrelic/video-agent-android/commit/f872c9de0b8202da1bcc168e3c6b2f97faf6c240))
+* **mediatailor:** revert tracking requests from POST back to GET ([8420b02](https://github.com/newrelic/video-agent-android/commit/8420b0250a7f7f5ff24775ede20a09f55024d947))
+* **mediatailor:** round-trip NextToken across tracking polls ([9e0dbcf](https://github.com/newrelic/video-agent-android/commit/9e0dbcfc1cd7ece6388609baa50832863e1dd324))
+* **mediatailor:** stabilise avail identity across live window rotations ([bd8397b](https://github.com/newrelic/video-agent-android/commit/bd8397bc6d1e0eb1e8ab485a8a1522e1e98155c6))
+* **mediatailor:** surface avails missing startTimeInSeconds as an error ([8147f87](https://github.com/newrelic/video-agent-android/commit/8147f87521f0b35a33f0669517ea87c7c31d24ae))
+* **mediatailor:** surface pods appended after the playhead left their window ([9044d79](https://github.com/newrelic/video-agent-android/commit/9044d795303dccfdff684f00629d06aca937f2a7))
+* **mediatailor:** treat empty avails as no-fill instead of firing AD_START ([d32ac96](https://github.com/newrelic/video-agent-android/commit/d32ac96c72d838eebf9b20e1a9333e222b811736))
 ## [4.4.0](https://github.com/newrelic/video-agent-android/compare/v4.3.1...v4.4.0) (2026-08-04)
 
 ### New features
