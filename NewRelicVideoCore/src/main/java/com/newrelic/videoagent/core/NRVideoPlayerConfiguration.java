@@ -31,7 +31,7 @@ public class NRVideoPlayerConfiguration {
      * built against v4.2.0 and earlier.
      *
      * @deprecated Construct an {@link NRAdConfig} via its factory methods and
-     * pass it to {@link #NRVideoPlayerConfiguration(String, ExoPlayer, NRAdConfig, Map)}.
+     * pass it to {@link #NRVideoPlayerConfiguration(String, Object, NRAdConfig, Map)}.
      * <pre>
      *   AdTrackerType.NONE          →  null
      *   AdTrackerType.IMA           →  NRAdConfig.csai()
@@ -93,15 +93,11 @@ public class NRVideoPlayerConfiguration {
                                        Object player,
                                        @Nullable NRAdConfig adConfig,
                                        @Nullable Map<String, Object> customAttributes) {
-        this.playerName       = playerName;
-        this.playerType       = null;
-        this.player           = player;
-        this.adConfig         = adConfig;
-        this.customAttributes = customAttributes;
+        this(playerName, player, null, adConfig, customAttributes);
     }
 
     /**
-     * @deprecated Use {@link #NRVideoPlayerConfiguration(String, ExoPlayer, NRAdConfig, Map)}
+     * @deprecated Use {@link #NRVideoPlayerConfiguration(String, Object, NRAdConfig, Map)}
      * with {@link NRAdConfig#csai()} for ads or {@code null} for no ads.
      */
     @Deprecated
@@ -113,7 +109,7 @@ public class NRVideoPlayerConfiguration {
     }
 
     /**
-     * @deprecated Use {@link #NRVideoPlayerConfiguration(String, ExoPlayer, NRAdConfig, Map)}.
+     * @deprecated Use {@link #NRVideoPlayerConfiguration(String, Object, NRAdConfig, Map)}.
      * Map values: {@code NONE} → {@code null}, {@code IMA} → {@link NRAdConfig#csai()},
      * {@code MEDIA_TAILOR} → {@link NRAdConfig#mediaTailor()}.
      */

@@ -68,20 +68,13 @@ public final class NRVideo {
             throw new IllegalStateException("NRVideo is not initialized. Call NRVideo.newBuilder(context).withConfiguration(config).build() first.");
         }
 
-        NRTracker contentTracker;
-
-        if (config.getPlayerType() != null) {
-            // ── Path A: config-driven — resolve tracker class from playerType string
-            contentTracker = createTrackerForType(
-                    config.getPlayerType(), instance.configuration, config.getPlayer());
-            NRLog.d("[NRVideo] config-driven tracker resolved for playerType='" + config.getPlayerType() + "'");
-
-        } else {
-            // ── Path B: legacy — defaults to ExoPlayer tracker for backward compatibility
-            contentTracker = createTrackerForType(
-                    NRVideoPlayerConfiguration.PLAYER_TYPE_EXO, instance.configuration, config.getPlayer());
-            NRLog.d("[NRVideo] created NRTrackerExoPlayer for ExoPlayer instance (legacy path)");
-        }
+        // Config-driven path uses the supplied playerType; legacy path defaults to ExoPlayer.
+        String playerType = config.getPlayerType() != null
+                ? config.getPlayerType()
+                : NRVideoPlayerConfiguration.PLAYER_TYPE_EXO;
+        NRTracker contentTracker = createTrackerForType(
+                playerType, instance.configuration, config.getPlayer());
+        NRLog.d("[NRVideo] tracker resolved for playerType='" + playerType + "'");
 
         NRTracker adsTracker = null;
         NRAdConfig adConfig = config.getAdConfig();
