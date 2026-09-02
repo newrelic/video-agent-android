@@ -1,6 +1,7 @@
 package com.newrelic.videoagent.ima.tracker;
 
 import com.google.ads.interactivemedia.v3.api.Ad;
+import com.google.ads.interactivemedia.v3.api.AdError;
 import com.google.ads.interactivemedia.v3.api.AdErrorEvent;
 import com.google.ads.interactivemedia.v3.api.AdEvent;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
@@ -44,7 +45,12 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
         if (adErrorEvent == null) return;
 
         NRLog.d("AdErrorEvent = " + adErrorEvent);
-        sendError(adErrorEvent.getError());
+        AdError adError = adErrorEvent.getError();
+        if (adError != null) {
+            sendError(adError.getErrorCodeNumber(), adError.getMessage());
+        } else {
+            sendError(-9999, "Unknown IMA error");
+        }
     }
 
     @Override

@@ -116,6 +116,12 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
      */
     @Override
     public void setPlayer(Object player) {
+        if (!(player instanceof ExoPlayer)) {
+            throw new IllegalArgumentException(
+                "[NRTrackerExoPlayer] Expected an ExoPlayer instance but received: " +
+                (player == null ? "null" : player.getClass().getName()) +
+                ". Pass PLAYER_TYPE_EXO only with an ExoPlayer object.");
+        }
         if (this.player != null) {
             unregisterListeners();
         }

@@ -1,7 +1,5 @@
 package com.newrelic.videoagent.core.exception;
 
-import androidx.media3.common.PlaybackException;
-
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -28,7 +26,7 @@ public class ErrorExceptionHandlerTest {
         ErrorExceptionHandler handler = new ErrorExceptionHandler(exception);
 
         assertEquals(-9999, handler.getErrorCode());
-        assertNull(handler.getErrorMessage());
+        assertEquals("<Unknown error>", handler.getErrorMessage());
     }
 
     @Test

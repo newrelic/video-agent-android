@@ -19,10 +19,31 @@ public class ExoErrorHandler implements PlayerErrorHandler {
 
     private static final int DEFAULT_ERROR_CODE = -9999;
 
-    private static final String AD_LOAD_EXCEPTION =
-            "androidx.media3.exoplayer.source.ads.AdsMediaSource$AdLoadException";
-    private static final String AD_ERROR =
-            "com.google.ads.interactivemedia.v3.api.AdError";
+    // Resolved once at class load — zero cost on every call when IMA is absent.
+    private static final Class<?> AD_LOAD_EX_CLASS;
+    private static final Class<?> AD_ERROR_CLASS;
+    private static final Method   GET_ERROR_CODE;
+    private static final boolean  IMA_AVAILABLE;
+
+    static {
+        Class<?> adLoadEx = null;
+        Class<?> adError  = null;
+        Method   method   = null;
+        boolean  ok       = false;
+        try {
+            adLoadEx = Class.forName(
+                    "androidx.media3.exoplayer.source.ads.AdsMediaSource$AdLoadException");
+            adError  = Class.forName("com.google.ads.interactivemedia.v3.api.AdError");
+            method   = adError.getMethod("getErrorCodeNumber");
+            ok       = true;
+        } catch (ClassNotFoundException | NoClassDefFoundError | NoSuchMethodException ignored) {
+            // IMA SDK not on classpath — all calls will fast-path to DEFAULT_ERROR_CODE
+        }
+        AD_LOAD_EX_CLASS = adLoadEx;
+        AD_ERROR_CLASS   = adError;
+        GET_ERROR_CODE   = method;
+        IMA_AVAILABLE    = ok;
+    }
 
     private final int errorCode;
     private final String errorMessage;
@@ -40,10 +61,9 @@ public class ExoErrorHandler implements PlayerErrorHandler {
             code    = e.errorCode;
             message = e.getMessage();
         } else {
-            // IMA error handling via reflection — safe if IMA SDK is not on classpath
-            int[] imaResult = extractIMAErrorCode(error);
-            if (imaResult[0] != DEFAULT_ERROR_CODE) {
-                code    = imaResult[0];
+            int imaCode = extractIMAErrorCode(error);
+            if (imaCode != DEFAULT_ERROR_CODE) {
+                code    = imaCode;
                 message = error.getMessage();
             }
         }
@@ -53,30 +73,25 @@ public class ExoErrorHandler implements PlayerErrorHandler {
     }
 
     /**
-     * Extracts error code from IMA AdError or AdLoadException without importing
-     * IMA classes directly. Returns {DEFAULT_ERROR_CODE} if IMA is not on classpath
-     * or the error is not an IMA error.
+     * Extracts error code from IMA AdError or AdLoadException using pre-resolved
+     * static fields. Returns DEFAULT_ERROR_CODE if IMA is absent or the error is
+     * not an IMA type.
      */
-    private static int[] extractIMAErrorCode(Exception error) {
+    private static int extractIMAErrorCode(Exception error) {
+        if (!IMA_AVAILABLE) return DEFAULT_ERROR_CODE;
         try {
-            Class<?> adLoadExClass = Class.forName(AD_LOAD_EXCEPTION);
-            Class<?> adErrorClass  = Class.forName(AD_ERROR);
-            Method getErrorCode    = adErrorClass.getMethod("getErrorCodeNumber");
-
-            if (adLoadExClass.isInstance(error)) {
+            if (AD_LOAD_EX_CLASS.isInstance(error)) {
                 Throwable cause = error.getCause();
-                if (adErrorClass.isInstance(cause)) {
-                    return new int[]{ (int) getErrorCode.invoke(cause) };
+                if (AD_ERROR_CLASS.isInstance(cause)) {
+                    return (int) GET_ERROR_CODE.invoke(cause);
                 }
-            } else if (adErrorClass.isInstance(error)) {
-                return new int[]{ (int) getErrorCode.invoke(error) };
+            } else if (AD_ERROR_CLASS.isInstance(error)) {
+                return (int) GET_ERROR_CODE.invoke(error);
             }
-        } catch (ClassNotFoundException | NoClassDefFoundError ignored) {
-            // IMA SDK not on classpath — safe to skip
         } catch (Exception ignored) {
             // Reflection failure — fall back to default
         }
-        return new int[]{ DEFAULT_ERROR_CODE };
+        return DEFAULT_ERROR_CODE;
     }
 
     @Override
