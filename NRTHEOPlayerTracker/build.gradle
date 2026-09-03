@@ -2,57 +2,62 @@ plugins {
     id 'com.android.library'
     id 'maven-publish'
 }
+
 android {
     compileSdkVersion 34
-    buildToolsVersion "34.0.0"
 
     defaultConfig {
+        versionCode 1
+        versionName GLOBAL_VERSION_NAME
         minSdkVersion 24
         targetSdkVersion 34
-        versionCode 6
-        versionName GLOBAL_VERSION_NAME
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
     }
+
     buildTypes {
         debug {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            buildConfigField("long", "VERSION_CODE", "${defaultConfig.versionCode}")
-            buildConfigField("String","VERSION_NAME","\"${defaultConfig.versionName}\"")
+            buildConfigField("long", "VERSION_CODE", (defaultConfig.versionCode ?: 0).toString())
+            buildConfigField("String", "VERSION_NAME", "\"${defaultConfig.versionName}\"")
         }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            buildConfigField("long", "VERSION_CODE", "${defaultConfig.versionCode}")
-            buildConfigField("String","VERSION_NAME","\"${defaultConfig.versionName}\"")
+            buildConfigField("long", "VERSION_CODE", (defaultConfig.versionCode ?: 0).toString())
+            buildConfigField("String", "VERSION_NAME", "\"${defaultConfig.versionName}\"")
         }
     }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
     }
-    namespace 'com.newrelic.videoagent.ima'
+
+    namespace 'com.newrelic.videoagent.theoplayer'
     publishing { singleVariant('release') }
 }
+
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.2.0'
-    implementation 'com.google.android.material:material:1.3.0'
+    // THEOplayer is compileOnly: the host app owns the SDK and its license configuration.
+    // This keeps the AAR lean and avoids duplicate class conflicts at runtime.
+    compileOnly "com.theoplayer.theoplayer-sdk-android:core:+"
+
     implementation project(path: ':NewRelicVideoCore')
-    implementation 'androidx.media3:media3-exoplayer-ima:1.2.0'
+
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
-    androidTestImplementation 'androidx.test:runner:1.5.2'
-    androidTestImplementation 'androidx.test:rules:1.5.0'
 }
+
 afterEvaluate {
     publishing {
         publications {
             release(MavenPublication) {
                 from components.release
                 groupId = 'com.github.newrelic'
-                artifactId = 'NRIMATracker'
+                artifactId = 'NRTHEOPlayerTracker'
                 version = "${android.defaultConfig.versionName}"
             }
         }

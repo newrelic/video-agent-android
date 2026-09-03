@@ -6,7 +6,8 @@ buildscript {
         maven { url "https://jitpack.io" }
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:7.4.2'
+        classpath 'com.android.tools.build:gradle:8.7.2'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22"
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
@@ -16,13 +17,35 @@ buildscript {
 // Necessary??
 apply plugin: 'maven-publish'
 
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { stream -> localProperties.load(stream) }
+}
+
 allprojects {
     repositories {
         google()
         mavenCentral()
+        maven {
+            url "https://maven.theoplayer.com/releases"
+            credentials {
+                username = localProperties.getProperty('theoplayer.username', '')
+                password = localProperties.getProperty('theoplayer.secret', '')
+            }
+        }
+    }
+    configurations.all {
+        resolutionStrategy {
+            // Kotlin stdlib jdk7/jdk8 are merged into stdlib since 1.8 — force consistent version
+            force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.0'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.0'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.0'
+        }
     }
 }
 
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+

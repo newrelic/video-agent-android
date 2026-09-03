@@ -18,6 +18,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     Switch adsSwitch;
     Switch qoeSwitch;
     Switch mediaTailorSwitch;
+    Switch theoSwitch;
     int counter = 0;
     NRVideoConfiguration config;
 
@@ -30,6 +31,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         adsSwitch = findViewById(R.id.ads_switch);
         qoeSwitch = findViewById(R.id.qoe_switch);
         mediaTailorSwitch = findViewById(R.id.mediatailor_switch);
+        theoSwitch = findViewById(R.id.theo_switch);
 
         // Initialize QOE switch with current configuration state
         qoeSwitch.setChecked(config.isQoeAggregateEnabled());
@@ -43,6 +45,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     // Show user feedback on UI thread
                         String message = "QOE Aggregate " + (isChecked ? "Enabled" : "Disabled");
                         android.widget.Toast.makeText(MainActivity.this, message, android.widget.Toast.LENGTH_SHORT).show();
+        });
+
+        // Direct URL play button
+        EditText editStreamUrl = findViewById(R.id.edit_stream_url);
+        findViewById(R.id.btn_play_url).setOnClickListener(v -> {
+            String url = editStreamUrl.getText().toString().trim();
+            if (url.isEmpty()) {
+                android.widget.Toast.makeText(this, "Enter a stream URL first", android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            }
+            Intent intent = new Intent(this, getVideoActivity());
+            intent.putExtra("video", "direct");
+            intent.putExtra("direct_url", url);
+            startActivity(intent);
         });
 
         findViewById(R.id.video0).setOnClickListener(this);
@@ -94,6 +110,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     Class getVideoActivity() {
+        if (theoSwitch.isChecked()) {
+            return VideoPlayerTHEO.class;
+        }
         if (mediaTailorSwitch.isChecked()) {
             return VideoPlayerMediaTailor.class;
         }
