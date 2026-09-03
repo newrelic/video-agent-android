@@ -36,19 +36,19 @@ public class VideoPlayer extends AppCompatActivity {
 
         if (video.equals("Tears")) {
             Log.v("VideoPlayer", "Play Tears");
-            playVideo("https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/tears-of-steel.mpd");
+            playVideo("https://storage.googleapis.com/wvmedia/clear/h264/tears/tears.mpd");
         }
         else if (video.equals("Playhouse")) {
             Log.v("VideoPlayer", "Play Playhouse");
-            playVideo("https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/tears-of-steel.mpd");
+            playVideo("https://storage.googleapis.com/wvmedia/clear/h264/tears/tears.mpd");
         }
         else if (video.equals("Kite")) {
             Log.v("VideoPlayer", "Play Kite");
-            playVideo("https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/tears-of-steel.mpd");
+            playVideo("https://storage.googleapis.com/wvmedia/clear/h264/tears/tears.mpd");
         }
         else if (video.equals("Live")) {
             Log.v("VideoPlayer", "Play Live");
-            playVideo("https://demo.unified-streaming.com/k8s/live/stable/live.isml/live.mpd");
+            playVideo("https://livesim2.dashif.org/livesim2/ato_10/testpic3_2s/Manifest.mpd");
         }
         else if (video.equals("direct")) {
             String directUrl = getIntent().getStringExtra("direct_url");

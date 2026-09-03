@@ -21,13 +21,12 @@ public class VideoPlayerTHEO extends AppCompatActivity {
 
     private static final String TAG = "VideoPlayerTHEO";
 
-    // Sintel — Blender animated short film (~14 min, DASH)
-    // Tears of Steel — sci-fi short film with VFX (Blender Foundation), HLS
+    // Apple HLS test stream — served from Apple CDN, trusted by Cronet on emulator
     private static final String STREAM_DASH_VOD =
-            "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8";
-    // Unified Streaming — true 24/7 live HLS (duration=Infinity → contentIsLive=true)
+            "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8";
+    // DASHIF live simulator — reliable live DASH stream
     private static final String STREAM_HLS_LIVE =
-            "https://demo.unified-streaming.com/k8s/live/stable/live.isml/.m3u8";
+            "https://livesim2.dashif.org/livesim2/ato_10/testpic3_2s/Manifest.mpd";
 
     private THEOplayerView theoPlayerView;
     private Integer trackerId;
