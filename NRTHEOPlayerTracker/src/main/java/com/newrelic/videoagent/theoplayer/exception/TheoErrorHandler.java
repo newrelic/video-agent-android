@@ -20,11 +20,18 @@ public class TheoErrorHandler implements PlayerErrorHandler {
         int code      = DEFAULT_ERROR_CODE;
         String message = (error != null) ? error.getMessage() : "<Unknown error>";
 
-        // THEOplayer wraps errors in THEOplayerException — extract code if available
+        // THEOplayer wraps errors in THEOplayerException — extract code if available.
+        // ErrorCode is a plain enum with no numeric values; ordinal() gives declaration
+        // position (0-based). We include the enum name in the message so NR events
+        // remain readable even if THEOplayer reorders the enum in a future SDK release.
         if (error instanceof THEOplayerException) {
             THEOplayerException theoError = (THEOplayerException) error;
-            code    = theoError.getCode() != null ? theoError.getCode().ordinal() : DEFAULT_ERROR_CODE;
-            message = theoError.getMessage();
+            if (theoError.getCode() != null) {
+                code    = theoError.getCode().ordinal();
+                message = theoError.getCode().name() + ": " + theoError.getMessage();
+            } else {
+                message = theoError.getMessage();
+            }
         }
 
         this.errorCode    = code;

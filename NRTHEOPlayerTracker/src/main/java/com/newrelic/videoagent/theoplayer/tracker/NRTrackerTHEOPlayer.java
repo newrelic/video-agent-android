@@ -226,14 +226,13 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
 
         onError = event -> {
             NRLog.d("THEOplayer: ERROR - " + event.getErrorObject().getMessage());
-            TheoErrorHandler handler = new TheoErrorHandler(0, event.getErrorObject().getMessage());
+            TheoErrorHandler handler = new TheoErrorHandler(event.getErrorObject());
             sendError(handler.getErrorCode(), handler.getErrorMessage());
         };
 
         onContentProtectionError = event -> {
             NRLog.d("THEOplayer: CONTENTPROTECTIONERROR");
-            String msg = (event.getErrorObject() != null) ? event.getErrorObject().getMessage() : "DRM / content-protection error";
-            TheoErrorHandler handler = new TheoErrorHandler(0, msg);
+            TheoErrorHandler handler = new TheoErrorHandler(event.getErrorObject());
             sendError(handler.getErrorCode(), handler.getErrorMessage());
         };
 
