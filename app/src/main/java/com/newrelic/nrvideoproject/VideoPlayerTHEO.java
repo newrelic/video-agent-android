@@ -8,9 +8,13 @@ import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.newrelic.videoagent.core.NRAdConfig;
 import com.newrelic.videoagent.core.NRVideo;
 import com.newrelic.videoagent.core.NRVideoPlayerConfiguration;
+import com.newrelic.videoagent.core.NewRelicVideoAgent;
+import java.util.HashMap;
+import java.util.Map;
+import com.newrelic.videoagent.core.tracker.NRTracker;
+import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 
 import com.theoplayer.android.api.THEOplayerView;
 import com.theoplayer.android.api.event.player.PlayerEventTypes;
@@ -21,11 +25,11 @@ public class VideoPlayerTHEO extends AppCompatActivity {
 
     private static final String TAG = "VideoPlayerTHEO";
 
-    // Apple HLS test stream — served from Apple CDN, trusted by Cronet on emulator
-    private static final String STREAM_DASH_VOD =
+    // Apple HLS VOD test stream — reliable on emulator (Cronet trusts Apple CDN certs)
+    private static final String STREAM_HLS_VOD =
             "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8";
     // DASHIF live simulator — reliable live DASH stream
-    private static final String STREAM_HLS_LIVE =
+    private static final String STREAM_DASH_LIVE =
             "https://livesim2.dashif.org/livesim2/ato_10/testpic3_2s/Manifest.mpd";
 
     private THEOplayerView theoPlayerView;
@@ -60,9 +64,14 @@ public class VideoPlayerTHEO extends AppCompatActivity {
         txtLastEvent   = findViewById(R.id.txt_last_event);
 
         // Register NR tracker
+        Map<String, Object> customAttr = new HashMap<>();
+        customAttr.put("something", "This is my test title");
+        customAttr.put("myAttrStr", "Hello");
+        customAttr.put("myAttrInt", 101);
+        customAttr.put("name", "nr-video-agent-android-01-24JUL-john-starc");
         trackerId = NRVideo.addPlayer(
                 new NRVideoPlayerConfiguration("theo-player", theoPlayerView,
-                        NRVideoPlayerConfiguration.PLAYER_TYPE_THEO, null, null));
+                        NRVideoPlayerConfiguration.PLAYER_TYPE_THEO, null, customAttr));
 
         NRVideo.setUserId("test-theo-001");
         NRVideo.setAttribute(trackerId, "playerType", "THEOplayer");
@@ -74,13 +83,13 @@ public class VideoPlayerTHEO extends AppCompatActivity {
 
         String video = getIntent().getStringExtra("video");
         if ("Live".equals(video)) {
-            loadStream(STREAM_HLS_LIVE);
+            loadStream(STREAM_DASH_LIVE);
         } else if ("direct".equals(video)) {
             String directUrl = getIntent().getStringExtra("direct_url");
             Log.d(TAG, "Play direct URL: " + directUrl);
             loadStream(directUrl);
         } else {
-            loadStream(STREAM_DASH_VOD);
+            loadStream(STREAM_HLS_VOD);
         }
     }
 
@@ -102,10 +111,10 @@ public class VideoPlayerTHEO extends AppCompatActivity {
             seekRelative(10));
 
         findViewById(R.id.btn_vod).setOnClickListener(v ->
-            loadStream(STREAM_DASH_VOD));
+            loadStream(STREAM_HLS_VOD));
 
         findViewById(R.id.btn_live).setOnClickListener(v ->
-            loadStream(STREAM_HLS_LIVE));
+            loadStream(STREAM_DASH_LIVE));
 
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
@@ -148,6 +157,11 @@ public class VideoPlayerTHEO extends AppCompatActivity {
 
     private void loadStream(String url) {
         Log.d(TAG, "loadStream: " + url);
+        Map<String, Object> attributes = new HashMap<>();
+        attributes.put("actionName", "VIDEO_STARTED");
+        attributes.put("videoUrl", url);
+        attributes.put("playerType", "THEOplayer");
+        NRVideo.recordCustomEvent(attributes, trackerId);
         TypedSource source = new TypedSource.Builder(url).build();
         theoPlayerView.getPlayer().setSource(
                 new SourceDescription.Builder(source).build());
@@ -256,6 +270,15 @@ public class VideoPlayerTHEO extends AppCompatActivity {
 
     @Override protected void onResume()  { super.onResume();  if (theoPlayerView != null) theoPlayerView.onResume(); }
     @Override protected void onPause()   { super.onPause();   if (theoPlayerView != null) theoPlayerView.onPause(); }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        NRTracker tracker = NewRelicVideoAgent.getInstance().getContentTracker(trackerId);
+        if (tracker instanceof NRVideoTracker) {
+            ((NRVideoTracker) tracker).sendEnd();
+        }
+    }
     @Override protected void onDestroy() {
         super.onDestroy();
         if (theoPlayerView != null) theoPlayerView.onDestroy();

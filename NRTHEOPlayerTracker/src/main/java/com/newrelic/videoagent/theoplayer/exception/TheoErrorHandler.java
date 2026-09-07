@@ -38,12 +38,6 @@ public class TheoErrorHandler implements PlayerErrorHandler {
         this.errorMessage = (message != null) ? message : "<Unknown error>";
     }
 
-    /** Construct directly from a message string (e.g. from ErrorEvent). */
-    public TheoErrorHandler(int code, String message) {
-        this.errorCode    = code;
-        this.errorMessage = (message != null) ? message : "<Unknown error>";
-    }
-
     @Override
     public int getErrorCode() {
         return errorCode;

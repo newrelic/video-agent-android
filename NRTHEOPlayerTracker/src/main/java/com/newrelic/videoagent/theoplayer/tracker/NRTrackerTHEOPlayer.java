@@ -20,6 +20,8 @@ import com.theoplayer.android.api.event.player.SourceChangeEvent;
 import com.theoplayer.android.api.event.player.DurationChangeEvent;
 import com.theoplayer.android.api.event.player.WaitingEvent;
 import com.theoplayer.android.api.event.player.ContentProtectionErrorEvent;
+import com.theoplayer.android.api.event.track.mediatrack.video.ActiveQualityChangedEvent;
+import com.theoplayer.android.api.event.track.mediatrack.video.VideoTrackEventTypes;
 import com.theoplayer.android.api.event.track.mediatrack.video.list.VideoTrackListEventTypes;
 import com.theoplayer.android.api.THEOplayerGlobal;
 import com.theoplayer.android.api.metrics.Metrics;
@@ -62,7 +64,8 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
     private int lastRenditionHeight = 0;
 
     // Tracks cumulative dropped frame count from Metrics API to compute delta per heartbeat
-    private long lastDroppedFrames = 0;
+    private long lastDroppedFrames    = 0;
+    private long lastDroppedFrameTime = 0;
 
     // Individual listener references — stored so they can be removed precisely
     private EventListener<SourceChangeEvent>          onSourceChange;
@@ -77,6 +80,7 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
     private EventListener<ContentProtectionErrorEvent> onContentProtectionError;
     private EventListener<DurationChangeEvent>        onDurationChange;
     private EventListener<com.theoplayer.android.api.event.track.mediatrack.video.list.TrackListChangeEvent> onVideoTrackChange;
+    private EventListener<ActiveQualityChangedEvent> onActiveQualityChanged;
 
     // -------------------------------------------------------------------------
     // Constructors
@@ -108,6 +112,11 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
      */
     @Override
     public void setPlayer(Object player) {
+        if (!(player instanceof THEOplayerView)) {
+            throw new IllegalArgumentException(
+                "[NRTrackerTHEOPlayer] Expected a THEOplayerView but received: " +
+                (player == null ? "null" : player.getClass().getName()));
+        }
         if (this.theoPlayerView != null) {
             unregisterListeners();
         }
@@ -165,14 +174,19 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
             renditionChangeShift = null;
             lastRenditionWidth = 0;
             lastRenditionHeight = 0;
-            lastDroppedFrames = 0;   // reset cumulative counter on new source
+            lastDroppedFrames    = 0;
+            lastDroppedFrameTime = 0;
             sendRequest();
         };
 
         onPlaying = event -> {
             NRLog.d("THEOplayer: PLAYING");
             if (!getState().isStarted) {
-                // First frame after source change
+                // THEOplayer fires PLAYING while isBuffering is still true —
+                // close the initial buffer first so CONTENT_BUFFER_END precedes CONTENT_START.
+                if (getState().isBuffering) {
+                    sendBufferEnd();
+                }
                 sendStart();
             } else if (getState().isBuffering) {
                 // Rebuffer resolved
@@ -198,11 +212,7 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
 
         onWaiting = event -> {
             NRLog.d("THEOplayer: WAITING (isSeeking=" + player.isSeeking() + ")");
-            // THEOplayer fires WAITING during seeks too; guard to avoid a spurious
-            // CONTENT_BUFFER_START event that would have no matching CONTENT_BUFFER_END.
-            if (!player.isSeeking()) {
-                sendBufferStart();
-            }
+            sendBufferStart();
         };
 
         onSeeking = event -> {
@@ -242,8 +252,24 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
             NRLog.d("THEOplayer: DURATIONCHANGE duration=" + player.getDuration());
         };
 
+        // TRACKLISTCHANGE fires when tracks are loaded from a new source — use it to
+        // register per-track ACTIVEQUALITYCHANGEDEVENT listeners for ABR tracking.
+        // Remove before adding to prevent duplicate registration if TRACKLISTCHANGE
+        // fires multiple times (once per track added) during source loading.
         onVideoTrackChange = event -> {
-            NRLog.d("THEOplayer: video track CHANGE");
+            NRLog.d("THEOplayer: video track list CHANGE — registering quality listeners");
+            for (int i = 0; i < player.getVideoTracks().length(); i++) {
+                MediaTrack track = player.getVideoTracks().getItem(i);
+                if (track != null) {
+                    track.removeEventListener(VideoTrackEventTypes.ACTIVEQUALITYCHANGEDEVENT, onActiveQualityChanged);
+                    track.addEventListener(VideoTrackEventTypes.ACTIVEQUALITYCHANGEDEVENT, onActiveQualityChanged);
+                }
+            }
+        };
+
+        // ACTIVEQUALITYCHANGEDEVENT fires on every ABR quality switch.
+        onActiveQualityChanged = event -> {
+            NRLog.d("THEOplayer: ACTIVE QUALITY CHANGED");
             VideoQuality quality = getActiveVideoQuality();
             if (quality == null) return;
 
@@ -293,6 +319,12 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
         player.removeEventListener(PlayerEventTypes.CONTENTPROTECTIONERROR, onContentProtectionError);
         player.removeEventListener(PlayerEventTypes.DURATIONCHANGE,         onDurationChange);
         player.getVideoTracks().removeEventListener(VideoTrackListEventTypes.TRACKLISTCHANGE, onVideoTrackChange);
+        for (int i = 0; i < player.getVideoTracks().length(); i++) {
+            MediaTrack track = player.getVideoTracks().getItem(i);
+            if (track != null) {
+                track.removeEventListener(VideoTrackEventTypes.ACTIVEQUALITYCHANGEDEVENT, onActiveQualityChanged);
+            }
+        }
 
         player               = null;
         theoPlayerView       = null;
@@ -300,6 +332,7 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
         lastRenditionWidth   = 0;
         lastRenditionHeight  = 0;
         lastDroppedFrames    = 0;
+        lastDroppedFrameTime = 0;
     }
 
     // -------------------------------------------------------------------------
@@ -545,16 +578,22 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
         if (player == null || !getState().isStarted) return;
         Metrics metrics = player.getMetrics();
         if (metrics == null) return;
+        long now     = android.os.SystemClock.elapsedRealtime();
         long current = metrics.getDroppedVideoFrames();
         long delta   = current - lastDroppedFrames;
+        // THEOplayer Metrics API exposes only a cumulative counter — no per-event callback or
+        // elapsed duration (unlike ExoPlayer's onDroppedVideoFrames(count, elapsedMs)).
+        // elapsedMs approximates the window; revisit if a future SDK version adds a callback.
+        long elapsedMs = (lastDroppedFrameTime == 0) ? 30_000L : (now - lastDroppedFrameTime);
         if (delta > 0) {
             Map<String, Object> attrs = new HashMap<>();
             attrs.put("lostFrames", (int) delta);
-            attrs.put("lostFramesDuration", 0);  // Metrics API does not provide per-window duration
+            attrs.put("lostFramesDuration", (int) elapsedMs);
             attrs.put("eventCount", 1);
             sendVideoEvent("CONTENT_DROPPED_FRAMES", attrs);
         }
-        lastDroppedFrames = current;
+        lastDroppedFrames    = current;
+        lastDroppedFrameTime = now;
     }
 
     // -------------------------------------------------------------------------
@@ -568,6 +607,13 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
     @Override
     public Map<String, Object> getAttributes(String action, Map<String, Object> attributes) {
         Map<String, Object> attr = super.getAttributes(action, attributes);
+
+        if (getState().isAd) {
+            attr.put("adPlayrate", getPlayrate());
+        } else {
+            attr.put("contentPlayrate", getPlayrate());
+        }
+
         VideoQuality q = getActiveVideoQuality();
         if (q != null && q.getName() != null && !q.getName().isEmpty()) {
             attr.put("contentRenditionName", q.getName());

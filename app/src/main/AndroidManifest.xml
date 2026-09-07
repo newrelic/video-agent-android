@@ -31,7 +31,7 @@
             android:exported="false" />
         <meta-data
             android:name="THEOPLAYER_LICENSE"
-            android:value="sZP7IYe6T6Pg3SbL3QxlTmzr3uhkFSaL0o0-Clb_TOkgTQfLTQX13S1eIuh6FOPlUY3zWokgbgjNIOf9flbzCK0o0LAeFS410Qa-3Q4K3Ok10LeLFSekIlfcTux6IuXK0ZfVfK4_bQgZCYxNWoryIQXzImf90Sbr0uhi0Lfi0u5i0Oi6Io4pIYP1UQgqWgjeCYxgflEc3LRt0uC_0lRo3SecFOPeWok1dDrLYtA1Ioh6TgV6IQjVCGepCoj-f6i6WQjlCDcEWt3zf6i6borgIYNrbtA1bGPqUZrlWoz6FOPzdQ4qFKcNUKh6FOPzdQ4qbQc1sD4ZFK3qWmPUFOPeWok1dDrLYt3qUYPlImf9DZfJf6i6IQjVCGepCoj-f6i6WQjlCDcEWt3zf6i6borgIYNrbtA1bGPqUZrlWoz6FOPzdQ4qFKcNUKh6FOPzdQ4qbQc1sD4ZFK3qWmPUFOPLIQ-LflNWfKXpIwPqdDa6Ymi6bo4pIXjNWYAZIY3LdDjpflNzbG4gFOPKIDXzUYPgbZf9Dkkj" />
+            android:value="${theoplayerLicenseKey}" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

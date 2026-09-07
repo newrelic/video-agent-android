@@ -78,7 +78,7 @@
                 android:id="@+id/btn_play_pause"
                 android:layout_width="100dp"
                 android:layout_height="wrap_content"
-                android:text="⏸ Pause"
+                android:text="▶ Play"
                 android:textColor="#FFFFFF"
                 android:backgroundTint="#FF5722"
                 android:layout_marginEnd="8dp"/>

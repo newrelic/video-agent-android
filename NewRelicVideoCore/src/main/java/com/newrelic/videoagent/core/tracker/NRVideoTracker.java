@@ -512,8 +512,9 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
      * Send buffer start event.
      */
     public void sendBufferStart() {
+        boolean wasPlaying = state.isPlaying;
         if (state.goBufferStart()) {
-            if(state.isPlaying){
+            if(wasPlaying){
                 state.accumulatedVideoWatchTime += state.chrono.getDeltaTime();
             }
             bufferType = calculateBufferType();
