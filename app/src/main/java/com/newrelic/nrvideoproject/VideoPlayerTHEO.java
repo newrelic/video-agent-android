@@ -10,11 +10,8 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.newrelic.videoagent.core.NRVideo;
 import com.newrelic.videoagent.core.NRVideoPlayerConfiguration;
-import com.newrelic.videoagent.core.NewRelicVideoAgent;
 import java.util.HashMap;
 import java.util.Map;
-import com.newrelic.videoagent.core.tracker.NRTracker;
-import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 
 import com.theoplayer.android.api.THEOplayerView;
 import com.theoplayer.android.api.event.player.PlayerEventTypes;
@@ -48,6 +45,7 @@ public class VideoPlayerTHEO extends AppCompatActivity {
 
     private boolean isPlaying = false;
     private boolean isSeeking = false;
+    private String  currentUrl = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -157,11 +155,7 @@ public class VideoPlayerTHEO extends AppCompatActivity {
 
     private void loadStream(String url) {
         Log.d(TAG, "loadStream: " + url);
-        Map<String, Object> attributes = new HashMap<>();
-        attributes.put("actionName", "VIDEO_STARTED");
-        attributes.put("videoUrl", url);
-        attributes.put("playerType", "THEOplayer");
-        NRVideo.recordCustomEvent(attributes, trackerId);
+        currentUrl = url;
         TypedSource source = new TypedSource.Builder(url).build();
         theoPlayerView.getPlayer().setSource(
                 new SourceDescription.Builder(source).build());
@@ -179,6 +173,15 @@ public class VideoPlayerTHEO extends AppCompatActivity {
             seekBar.setProgress(0);
             txtCurrentTime.setText("0:00");
             txtDuration.setText("0:00");
+            // Fire after SOURCECHANGE so the NR tracker's sendRequest() has already
+            // opened the new session — matches ExoPlayer's VIDEO_STARTED pattern.
+            if (currentUrl != null) {
+                Map<String, Object> attrs = new HashMap<>();
+                attrs.put("actionName", "VIDEO_STARTED");
+                attrs.put("videoUrl", currentUrl);
+                attrs.put("playerType", "THEOplayer");
+                NRVideo.recordCustomEvent(attrs, trackerId);
+            }
         });
 
         p.addEventListener(PlayerEventTypes.PLAYING, e -> {
@@ -271,14 +274,6 @@ public class VideoPlayerTHEO extends AppCompatActivity {
     @Override protected void onResume()  { super.onResume();  if (theoPlayerView != null) theoPlayerView.onResume(); }
     @Override protected void onPause()   { super.onPause();   if (theoPlayerView != null) theoPlayerView.onPause(); }
 
-    @Override
-    protected void onStop() {
-        super.onStop();
-        NRTracker tracker = NewRelicVideoAgent.getInstance().getContentTracker(trackerId);
-        if (tracker instanceof NRVideoTracker) {
-            ((NRVideoTracker) tracker).sendEnd();
-        }
-    }
     @Override protected void onDestroy() {
         super.onDestroy();
         if (theoPlayerView != null) theoPlayerView.onDestroy();
