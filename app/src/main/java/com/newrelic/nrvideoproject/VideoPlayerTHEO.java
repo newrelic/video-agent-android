@@ -10,6 +10,9 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.newrelic.videoagent.core.NRVideo;
 import com.newrelic.videoagent.core.NRVideoPlayerConfiguration;
+import com.newrelic.videoagent.core.NewRelicVideoAgent;
+import com.newrelic.videoagent.core.tracker.NRTracker;
+import com.newrelic.videoagent.theoplayer.tracker.NRTrackerTHEOPlayer;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -276,7 +279,10 @@ public class VideoPlayerTHEO extends AppCompatActivity {
 
     @Override protected void onDestroy() {
         super.onDestroy();
-        if (theoPlayerView != null) theoPlayerView.onDestroy();
+        NRTracker tracker = NewRelicVideoAgent.getInstance().getContentTracker(trackerId);
+        if (tracker instanceof NRTrackerTHEOPlayer) {
+            ((NRTrackerTHEOPlayer) tracker).onDestroy();
+        }
         NRVideo.releaseTracker(trackerId);
     }
 }

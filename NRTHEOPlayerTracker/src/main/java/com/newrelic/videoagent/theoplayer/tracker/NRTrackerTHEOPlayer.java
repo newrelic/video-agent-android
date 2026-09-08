@@ -7,6 +7,7 @@ import com.newrelic.videoagent.theoplayer.BuildConfig;
 
 import com.theoplayer.android.api.THEOplayerView;
 import com.newrelic.videoagent.theoplayer.exception.TheoErrorHandler;
+import com.theoplayer.android.api.error.THEOplayerException;
 import com.theoplayer.android.api.event.EventListener;
 import com.theoplayer.android.api.event.player.EndedEvent;
 import com.theoplayer.android.api.event.player.ErrorEvent;
@@ -22,6 +23,7 @@ import com.theoplayer.android.api.event.player.WaitingEvent;
 import com.theoplayer.android.api.event.player.ContentProtectionErrorEvent;
 import com.theoplayer.android.api.event.track.mediatrack.video.ActiveQualityChangedEvent;
 import com.theoplayer.android.api.event.track.mediatrack.video.VideoTrackEventTypes;
+import com.theoplayer.android.api.event.track.mediatrack.video.list.AddTrackEvent;
 import com.theoplayer.android.api.event.track.mediatrack.video.list.VideoTrackListEventTypes;
 import com.theoplayer.android.api.THEOplayerGlobal;
 import com.theoplayer.android.api.metrics.Metrics;
@@ -40,15 +42,20 @@ import static com.newrelic.videoagent.core.NRDef.SRC;
  *
  * <p>Usage:</p>
  * <pre>
- *   NRTrackerTHEOPlayer tracker = new NRTrackerTHEOPlayer(config, theoPlayerView);
+ *   // Pass the THEOplayerView and PLAYER_TYPE_THEO — NRVideo instantiates the tracker internally.
  *   Integer trackerId = NRVideo.addPlayer(
- *       new NRVideoPlayerConfiguration("theo-player", tracker, null, null));
+ *       new NRVideoPlayerConfiguration("theo-player", theoPlayerView,
+ *           NRVideoPlayerConfiguration.PLAYER_TYPE_THEO, null, null));
  *
- *   // Forward Activity lifecycle
- *   {@literal @}Override protected void onResume()  { super.onResume();  tracker.onResume(); }
- *   {@literal @}Override protected void onPause()   { super.onPause();   tracker.onPause(); }
- *   {@literal @}Override protected void onDestroy() { super.onDestroy(); tracker.onDestroy();
- *                                                     NRVideo.releaseTracker(trackerId); }
+ *   // Forward Activity lifecycle via the tracker retrieved from NRVideo
+ *   {@literal @}Override protected void onResume()  { super.onResume();  if (theoPlayerView != null) theoPlayerView.onResume(); }
+ *   {@literal @}Override protected void onPause()   { super.onPause();   if (theoPlayerView != null) theoPlayerView.onPause(); }
+ *   {@literal @}Override protected void onDestroy() {
+ *       super.onDestroy();
+ *       NRTracker t = NewRelicVideoAgent.getInstance().getContentTracker(trackerId);
+ *       if (t instanceof NRTrackerTHEOPlayer) ((NRTrackerTHEOPlayer) t).onDestroy();
+ *       NRVideo.releaseTracker(trackerId);
+ *   }
  * </pre>
  *
  * <p>THEOplayer must be licensed by the host app via AndroidManifest.xml or THEOplayerConfig.</p>
@@ -79,7 +86,7 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
     private EventListener<ErrorEvent>                 onError;
     private EventListener<ContentProtectionErrorEvent> onContentProtectionError;
     private EventListener<DurationChangeEvent>        onDurationChange;
-    private EventListener<com.theoplayer.android.api.event.track.mediatrack.video.list.TrackListChangeEvent> onVideoTrackChange;
+    private EventListener<AddTrackEvent> onVideoTrackChange;
     private EventListener<ActiveQualityChangedEvent> onActiveQualityChanged;
 
     // -------------------------------------------------------------------------
@@ -149,9 +156,10 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
      * Call {@code NRVideo.releaseTracker(trackerId)} after this.
      */
     public void onDestroy() {
-        unregisterListeners();
-        if (theoPlayerView != null) {
-            theoPlayerView.onDestroy();
+        THEOplayerView view = theoPlayerView;
+        unregisterListeners();  // nulls theoPlayerView — capture before calling
+        if (view != null) {
+            view.onDestroy();
         }
     }
 
@@ -172,10 +180,17 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
                 sendEnd();
             }
             renditionChangeShift = null;
-            lastRenditionWidth = 0;
-            lastRenditionHeight = 0;
-            lastDroppedFrames    = 0;
-            lastDroppedFrameTime = 0;
+            lastRenditionWidth   = 0;
+            lastRenditionHeight  = 0;
+            // Metrics.getDroppedVideoFrames() is a cumulative process-lifetime counter —
+            // it does NOT reset on source change. Snapshot the current value so the first
+            // heartbeat delta only counts frames dropped in the new source, not all prior ones.
+            Metrics metrics = (player != null) ? player.getMetrics() : null;
+            lastDroppedFrames    = (metrics != null) ? metrics.getDroppedVideoFrames() : 0;
+            // Snapshot time at source change — not 0 — so the first checkDroppedFrames()
+            // call after isStarted measures the real elapsed window including pre-start
+            // buffering, rather than falling back to the hardcoded 30s sentinel.
+            lastDroppedFrameTime = android.os.SystemClock.elapsedRealtime();
             sendRequest();
         };
 
@@ -235,8 +250,9 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
         };
 
         onError = event -> {
-            NRLog.d("THEOplayer: ERROR - " + event.getErrorObject().getMessage());
-            TheoErrorHandler handler = new TheoErrorHandler(event.getErrorObject());
+            THEOplayerException err = event.getErrorObject();
+            NRLog.d("THEOplayer: ERROR - " + (err != null ? err.getMessage() : "unknown"));
+            TheoErrorHandler handler = new TheoErrorHandler(err);
             sendError(handler.getErrorCode(), handler.getErrorMessage());
         };
 
@@ -252,18 +268,13 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
             NRLog.d("THEOplayer: DURATIONCHANGE duration=" + player.getDuration());
         };
 
-        // TRACKLISTCHANGE fires when tracks are loaded from a new source — use it to
-        // register per-track ACTIVEQUALITYCHANGEDEVENT listeners for ABR tracking.
-        // Remove before adding to prevent duplicate registration if TRACKLISTCHANGE
-        // fires multiple times (once per track added) during source loading.
+        // ADDTRACK fires once per newly added track — wire only that track, not the
+        // full list. This is O(N) total vs. O(N²) if TRACKLISTCHANGE were used.
         onVideoTrackChange = event -> {
-            NRLog.d("THEOplayer: video track list CHANGE — registering quality listeners");
-            for (int i = 0; i < player.getVideoTracks().length(); i++) {
-                MediaTrack track = player.getVideoTracks().getItem(i);
-                if (track != null) {
-                    track.removeEventListener(VideoTrackEventTypes.ACTIVEQUALITYCHANGEDEVENT, onActiveQualityChanged);
-                    track.addEventListener(VideoTrackEventTypes.ACTIVEQUALITYCHANGEDEVENT, onActiveQualityChanged);
-                }
+            MediaTrack track = event.getTrack();
+            if (track != null) {
+                NRLog.d("THEOplayer: video track ADDED — wiring quality listener");
+                track.addEventListener(VideoTrackEventTypes.ACTIVEQUALITYCHANGEDEVENT, onActiveQualityChanged);
             }
         };
 
@@ -298,7 +309,7 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
         player.addEventListener(PlayerEventTypes.ERROR,                  onError);
         player.addEventListener(PlayerEventTypes.CONTENTPROTECTIONERROR, onContentProtectionError);
         player.addEventListener(PlayerEventTypes.DURATIONCHANGE,         onDurationChange);
-        player.getVideoTracks().addEventListener(VideoTrackListEventTypes.TRACKLISTCHANGE, onVideoTrackChange);
+        player.getVideoTracks().addEventListener(VideoTrackListEventTypes.ADDTRACK, onVideoTrackChange);
     }
 
     @Override
@@ -318,7 +329,7 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
         player.removeEventListener(PlayerEventTypes.ERROR,                  onError);
         player.removeEventListener(PlayerEventTypes.CONTENTPROTECTIONERROR, onContentProtectionError);
         player.removeEventListener(PlayerEventTypes.DURATIONCHANGE,         onDurationChange);
-        player.getVideoTracks().removeEventListener(VideoTrackListEventTypes.TRACKLISTCHANGE, onVideoTrackChange);
+        player.getVideoTracks().removeEventListener(VideoTrackListEventTypes.ADDTRACK, onVideoTrackChange);
         for (int i = 0; i < player.getVideoTracks().length(); i++) {
             MediaTrack track = player.getVideoTracks().getItem(i);
             if (track != null) {
@@ -460,17 +471,20 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
     }
 
     /**
-     * Observed bitrate — THEOplayer does not expose a separate measured throughput;
-     * falls back to the manifest-advertised rendition bandwidth.
+     * Observed (actual) bitrate — uses Metrics.getCurrentBandwidthEstimate() which reflects
+     * real measured network throughput, distinct from the manifest-advertised rendition bitrate.
+     * This allows NR dashboards to compare actual vs. manifest bitrate to detect network degradation.
      */
     @Override
     public Long getBitrate() {
-        return getRenditionBitrate();
+        Long measured = getNetworkDownloadBitrate();
+        return (measured != null) ? measured : getRenditionBitrate();
     }
 
     @Override
     public Long getActualBitrate() {
-        return getRenditionBitrate();
+        Long measured = getNetworkDownloadBitrate();
+        return (measured != null) ? measured : getRenditionBitrate();
     }
 
     @Override
@@ -525,15 +539,13 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
                 return (String) title;
             }
         }
-        // Fallback: last path segment of the src URL
+        // Fallback: last path segment of the src URL.
+        // Use Uri.parse() so query strings, fragments, and encoded characters are
+        // handled correctly — matches ExoPlayer's Uri.getLastPathSegment() approach.
         String src = player.getSrc();
         if (src != null && !src.isEmpty()) {
-            int slash = src.lastIndexOf('/');
-            int query = src.indexOf('?');
-            int end   = (query > slash) ? query : src.length();
-            if (slash >= 0 && end > slash + 1) {
-                return src.substring(slash + 1, end);
-            }
+            String segment = android.net.Uri.parse(src).getLastPathSegment();
+            if (segment != null && !segment.isEmpty()) return segment;
         }
         return null;
     }
@@ -584,7 +596,7 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
         // THEOplayer Metrics API exposes only a cumulative counter — no per-event callback or
         // elapsed duration (unlike ExoPlayer's onDroppedVideoFrames(count, elapsedMs)).
         // elapsedMs approximates the window; revisit if a future SDK version adds a callback.
-        long elapsedMs = (lastDroppedFrameTime == 0) ? 30_000L : (now - lastDroppedFrameTime);
+        long elapsedMs = now - lastDroppedFrameTime;
         if (delta > 0) {
             Map<String, Object> attrs = new HashMap<>();
             attrs.put("lostFrames", (int) delta);
@@ -608,11 +620,7 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
     public Map<String, Object> getAttributes(String action, Map<String, Object> attributes) {
         Map<String, Object> attr = super.getAttributes(action, attributes);
 
-        if (getState().isAd) {
-            attr.put("adPlayrate", getPlayrate());
-        } else {
-            attr.put("contentPlayrate", getPlayrate());
-        }
+        attr.put("contentPlayrate", getPlayrate());
 
         VideoQuality q = getActiveVideoQuality();
         if (q != null && q.getName() != null && !q.getName().isEmpty()) {
