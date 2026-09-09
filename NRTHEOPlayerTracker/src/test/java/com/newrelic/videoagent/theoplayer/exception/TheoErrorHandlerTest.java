@@ -39,20 +39,20 @@ public class TheoErrorHandlerTest {
     // ── THEOplayerException — real SDK instances ──────────────────────────────
 
     @Test
-    public void theoException_networkError_usesOrdinalAndPrefixesCodeName() {
+    public void theoException_networkError_usesStableIdAndPrefixesCodeName() {
         TheoErrorHandler h = new TheoErrorHandler(
                 new THEOplayerException(ErrorCode.NETWORK_ERROR, "connection failed"));
 
-        assertEquals(ErrorCode.NETWORK_ERROR.ordinal(), h.getErrorCode());
+        assertEquals(ErrorCode.NETWORK_ERROR.getId(), h.getErrorCode());
         assertEquals("NETWORK_ERROR: connection failed", h.getErrorMessage());
     }
 
     @Test
-    public void theoException_manifestLoadError_returnsCorrectOrdinalAndMessage() {
+    public void theoException_manifestLoadError_returnsStableIdAndMessage() {
         TheoErrorHandler h = new TheoErrorHandler(
                 new THEOplayerException(ErrorCode.MANIFEST_LOAD_ERROR, "404 on manifest"));
 
-        assertEquals(ErrorCode.MANIFEST_LOAD_ERROR.ordinal(), h.getErrorCode());
+        assertEquals(ErrorCode.MANIFEST_LOAD_ERROR.getId(), h.getErrorCode());
         assertEquals("MANIFEST_LOAD_ERROR: 404 on manifest", h.getErrorMessage());
     }
 

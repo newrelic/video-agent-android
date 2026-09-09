@@ -21,13 +21,13 @@ public class TheoErrorHandler implements PlayerErrorHandler {
         String message = (error != null) ? error.getMessage() : "<Unknown error>";
 
         // THEOplayer wraps errors in THEOplayerException — extract code if available.
-        // ErrorCode is a plain enum with no numeric values; ordinal() gives declaration
-        // position (0-based). We include the enum name in the message so NR events
-        // remain readable even if THEOplayer reorders the enum in a future SDK release.
+        // ErrorCode.getId() returns a stable SDK-assigned integer (not ordinal/position-dependent),
+        // safe across upgrades that add or reorder enum constants. THEOplayer's paired
+        // fromId(int) reverse-lookup confirms getId() is the intended serialisable identifier.
         if (error instanceof THEOplayerException) {
             THEOplayerException theoError = (THEOplayerException) error;
             if (theoError.getCode() != null) {
-                code    = theoError.getCode().ordinal();
+                code    = theoError.getCode().getId();
                 message = theoError.getCode().name() + ": " + theoError.getMessage();
             } else {
                 message = theoError.getMessage();

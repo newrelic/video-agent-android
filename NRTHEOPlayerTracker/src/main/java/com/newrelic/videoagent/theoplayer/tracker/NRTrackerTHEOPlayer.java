@@ -181,101 +181,17 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
 
         NRLog.d("NRTrackerTHEOPlayer: registerListeners");
 
-        onSourceChange = event -> {
-            NRLog.d("THEOplayer: SOURCECHANGE");
-            // End any active session before starting a new one (playlist / source swap)
-            if (getState().isRequested) {
-                sendEnd();
-            }
-            renditionChangeShift = null;
-            lastRenditionWidth   = 0;
-            lastRenditionHeight  = 0;
-            // Metrics.getDroppedVideoFrames() is a cumulative process-lifetime counter —
-            // it does NOT reset on source change. Snapshot the current value so the first
-            // heartbeat delta only counts frames dropped in the new source, not all prior ones.
-            Metrics metrics = (player != null) ? player.getMetrics() : null;
-            lastDroppedFrames    = (metrics != null) ? metrics.getDroppedVideoFrames() : 0;
-            // Snapshot time at source change — not 0 — so the first checkDroppedFrames()
-            // call after isStarted measures the real elapsed window including pre-start
-            // buffering, rather than falling back to the hardcoded 30s sentinel.
-            lastDroppedFrameTime = android.os.SystemClock.elapsedRealtime();
-            sendRequest();
-        };
-
-        onPlaying = event -> {
-            NRLog.d("THEOplayer: PLAYING");
-            if (!getState().isStarted) {
-                // THEOplayer fires PLAYING while isBuffering is still true —
-                // close the initial buffer first so CONTENT_BUFFER_END precedes CONTENT_START.
-                if (getState().isBuffering) {
-                    sendBufferEnd();
-                }
-                sendStart();
-            } else if (getState().isBuffering) {
-                // Rebuffer resolved
-                sendBufferEnd();
-            } else if (getState().isSeeking) {
-                // Seek resolved without explicit SEEKED (defensive)
-                sendSeekEnd();
-            }
-        };
-
-        onPlay = event -> {
-            NRLog.d("THEOplayer: PLAY");
-            // Resume from user-initiated pause
-            if (getState().isPaused) {
-                sendResume();
-            }
-        };
-
-        onPause = event -> {
-            NRLog.d("THEOplayer: PAUSE");
-            sendPause();
-        };
-
-        onWaiting = event -> {
-            NRLog.d("THEOplayer: WAITING (isSeeking=" + player.isSeeking() + ")");
-            if (player.isSeeking()) return;  // WAITING during seek is not a real rebuffer
-            sendBufferStart();
-        };
-
-        onSeeking = event -> {
-            NRLog.d("THEOplayer: SEEKING");
-            sendSeekStart();
-        };
-
-        onSeeked = event -> {
-            NRLog.d("THEOplayer: SEEKED");
-            // Close any open buffer that was triggered by the seek
-            if (getState().isBuffering) {
-                sendBufferEnd();
-            }
-            sendSeekEnd();
-        };
-
-        onEnded = event -> {
-            NRLog.d("THEOplayer: ENDED");
-            sendEnd();
-        };
-
-        onError = event -> {
-            THEOplayerException err = event.getErrorObject();
-            NRLog.d("THEOplayer: ERROR - " + (err != null ? err.getMessage() : "unknown"));
-            TheoErrorHandler handler = new TheoErrorHandler(err);
-            sendError(handler.getErrorCode(), handler.getErrorMessage());
-        };
-
-        onContentProtectionError = event -> {
-            NRLog.d("THEOplayer: CONTENTPROTECTIONERROR");
-            TheoErrorHandler handler = new TheoErrorHandler(event.getErrorObject());
-            sendError(handler.getErrorCode(), handler.getErrorMessage());
-        };
-
-        onDurationChange = event -> {
-            // Duration becomes finite after LOADEDMETADATA; no NR event needed — it is
-            // read lazily by getDuration() on the next event that includes it.
-            NRLog.d("THEOplayer: DURATIONCHANGE duration=" + player.getDuration());
-        };
+        onSourceChange           = event -> handleSourceChange();
+        onPlaying                = event -> handlePlaying();
+        onPlay                   = event -> handlePlay();
+        onPause                  = event -> handlePause();
+        onWaiting                = event -> handleWaiting(player.isSeeking());
+        onSeeking                = event -> handleSeeking();
+        onSeeked                 = event -> handleSeeked();
+        onEnded                  = event -> handleEnded();
+        onError                  = event -> handleError(event.getErrorObject());
+        onContentProtectionError = event -> handleError(event.getErrorObject());
+        onDurationChange         = event -> NRLog.d("THEOplayer: DURATIONCHANGE duration=" + player.getDuration());
 
         // ADDTRACK fires once per newly added track — wire only that track, not the
         // full list. This is O(N) total vs. O(N²) if TRACKLISTCHANGE were used.
@@ -287,24 +203,11 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
             }
         };
 
-        // ACTIVEQUALITYCHANGEDEVENT fires on every ABR quality switch.
         onActiveQualityChanged = event -> {
-            NRLog.d("THEOplayer: ACTIVE QUALITY CHANGED");
             VideoQuality quality = getActiveVideoQuality();
-            if (quality == null) return;
-
-            int newWidth  = quality.getWidth();
-            int newHeight = quality.getHeight();
-            long newArea  = (long) newWidth * newHeight;
-            long lastArea = (long) lastRenditionWidth * lastRenditionHeight;
-
-            if (lastArea != 0 && newArea != lastArea) {
-                renditionChangeShift = (newArea > lastArea) ? "up" : "down";
-                sendRenditionChange();
+            if (quality != null) {
+                handleActiveQualityChanged(quality.getWidth(), quality.getHeight());
             }
-
-            lastRenditionWidth  = newWidth;
-            lastRenditionHeight = newHeight;
         };
 
         player.addEventListener(PlayerEventTypes.SOURCECHANGE,           onSourceChange);
@@ -319,6 +222,106 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
         player.addEventListener(PlayerEventTypes.CONTENTPROTECTIONERROR, onContentProtectionError);
         player.addEventListener(PlayerEventTypes.DURATIONCHANGE,         onDurationChange);
         player.getVideoTracks().addEventListener(VideoTrackListEventTypes.ADDTRACK, onVideoTrackChange);
+    }
+
+    // -------------------------------------------------------------------------
+    // Named event handlers — package-private so tests drive them directly
+    // without needing a real THEOplayerView or mocked player events.
+    // Mirrors iOS NRTrackerTHEOplayer.swift's handleXxx() overload pattern.
+    // -------------------------------------------------------------------------
+
+    void handleSourceChange() {
+        NRLog.d("THEOplayer: SOURCECHANGE");
+        if (getState().isRequested) {
+            sendEnd();
+        }
+        renditionChangeShift = null;
+        lastRenditionWidth   = 0;
+        lastRenditionHeight  = 0;
+        // Metrics.getDroppedVideoFrames() is cumulative — snapshot so the first heartbeat
+        // delta only counts frames dropped after this source change, not all prior ones.
+        Metrics metrics = (player != null) ? player.getMetrics() : null;
+        lastDroppedFrames    = (metrics != null) ? metrics.getDroppedVideoFrames() : 0;
+        lastDroppedFrameTime = android.os.SystemClock.elapsedRealtime();
+        sendRequest();
+    }
+
+    void handlePlaying() {
+        NRLog.d("THEOplayer: PLAYING");
+        if (!getState().isStarted) {
+            // THEOplayer fires PLAYING while isBuffering is still true —
+            // close the initial buffer first so CONTENT_BUFFER_END precedes CONTENT_START.
+            if (getState().isBuffering) {
+                sendBufferEnd();
+            }
+            sendStart();
+        } else if (getState().isBuffering) {
+            sendBufferEnd();
+        } else if (getState().isSeeking) {
+            // Seek resolved without explicit SEEKED (defensive)
+            sendSeekEnd();
+        }
+    }
+
+    void handlePlay() {
+        NRLog.d("THEOplayer: PLAY");
+        if (getState().isPaused) {
+            sendResume();
+        }
+    }
+
+    void handlePause() {
+        NRLog.d("THEOplayer: PAUSE");
+        sendPause();
+    }
+
+    /**
+     * Handles WAITING. Extracted as a named overload — mirrors iOS handleWaiting(isSeeking:) —
+     * so tests can exercise the seeking guard without a mocked Player.
+     *
+     * THEOplayer fires WAITING for both rebuffers and seeks. Without the guard every
+     * user seek emits a spurious CONTENT_BUFFER_START to NRDB.
+     */
+    void handleWaiting(boolean isSeeking) {
+        NRLog.d("THEOplayer: WAITING (isSeeking=" + isSeeking + ")");
+        if (isSeeking) return;
+        sendBufferStart();
+    }
+
+    void handleSeeking() {
+        NRLog.d("THEOplayer: SEEKING");
+        sendSeekStart();
+    }
+
+    void handleSeeked() {
+        NRLog.d("THEOplayer: SEEKED");
+        if (getState().isBuffering) {
+            sendBufferEnd();
+        }
+        sendSeekEnd();
+    }
+
+    void handleEnded() {
+        NRLog.d("THEOplayer: ENDED");
+        sendEnd();
+    }
+
+    void handleError(THEOplayerException err) {
+        NRLog.d("THEOplayer: ERROR - " + (err != null ? err.getMessage() : "unknown"));
+        TheoErrorHandler handler = new TheoErrorHandler(err);
+        sendError(handler.getErrorCode(), handler.getErrorMessage());
+    }
+
+    void handleActiveQualityChanged(int newWidth, int newHeight) {
+        NRLog.d("THEOplayer: ACTIVE QUALITY CHANGED");
+        long newArea  = (long) newWidth * newHeight;
+        long lastArea = (long) lastRenditionWidth * lastRenditionHeight;
+        if (lastArea != 0 && newArea != lastArea) {
+            renditionChangeShift = (newArea > lastArea) ? "up" : "down";
+            sendRenditionChange();
+        }
+        lastRenditionWidth  = newWidth;
+        lastRenditionHeight = newHeight;
     }
 
     @Override
