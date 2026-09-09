@@ -35,7 +35,7 @@ import com.theoplayer.android.api.player.track.mediatrack.quality.VideoQuality;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.newrelic.videoagent.core.NRDef.SRC;
+import static com.newrelic.videoagent.core.NRDef.*;
 
 /**
  * New Relic Video tracker for THEOplayer (Dolby OptiView Player).
@@ -621,6 +621,10 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
         Map<String, Object> attr = super.getAttributes(action, attributes);
 
         attr.put("contentPlayrate", getPlayrate());
+
+        if (action.equals(CONTENT_RENDITION_CHANGE)) {
+            attr.put("shift", renditionChangeShift);
+        }
 
         VideoQuality q = getActiveVideoQuality();
         if (q != null && q.getName() != null && !q.getName().isEmpty()) {

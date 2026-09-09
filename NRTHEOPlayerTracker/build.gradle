@@ -42,7 +42,7 @@ android {
 dependencies {
     // THEOplayer is compileOnly: the host app owns the SDK and its license configuration.
     // This keeps the AAR lean and avoids duplicate class conflicts at runtime.
-    compileOnly "com.theoplayer.theoplayer-sdk-android:core:11.+"
+    compileOnly "com.theoplayer.theoplayer-sdk-android:core:11.9.0"
 
     implementation project(path: ':NewRelicVideoCore')
 
