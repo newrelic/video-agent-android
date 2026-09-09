@@ -94,6 +94,14 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
     // -------------------------------------------------------------------------
 
     /**
+     * No-arg constructor — use when the player will be attached via {@link #setPlayer(Object)}.
+     * Matches the pattern of NRTrackerExoPlayer for consistency and testability.
+     */
+    public NRTrackerTHEOPlayer() {
+        super();
+    }
+
+    /**
      * Create a tracker with configuration only; call {@link #setPlayer(Object)} later.
      */
     public NRTrackerTHEOPlayer(NRVideoConfiguration configuration) {
@@ -227,6 +235,7 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
 
         onWaiting = event -> {
             NRLog.d("THEOplayer: WAITING (isSeeking=" + player.isSeeking() + ")");
+            if (player.isSeeking()) return;  // WAITING during seek is not a real rebuffer
             sendBufferStart();
         };
 
