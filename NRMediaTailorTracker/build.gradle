@@ -33,6 +33,7 @@ android {
         targetCompatibility JavaVersion.VERSION_11
     }
     namespace 'com.newrelic.videoagent.mediatailor'
+    publishing { singleVariant('release') }
 }
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.2.0'

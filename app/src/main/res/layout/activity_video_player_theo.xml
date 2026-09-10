@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#000000"
+    tools:context=".VideoPlayerTHEO">
+
+    <!-- Video surface -->
+    <com.theoplayer.android.api.THEOplayerView
+        android:id="@+id/theo_player_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"/>
+
+    <!-- Custom controls overlay -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#CC000000"
+        android:padding="8dp">
+
+        <!-- SeekBar -->
+        <SeekBar
+            android:id="@+id/seek_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="1000"
+            android:progressTint="#FF5722"
+            android:thumbTint="#FF5722"/>
+
+        <!-- Time display -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:id="@+id/txt_current_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0:00"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"/>
+
+            <View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1"/>
+
+            <TextView
+                android:id="@+id/txt_duration"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0:00"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"/>
+        </LinearLayout>
+
+        <!-- Playback buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <Button
+                android:id="@+id/btn_seek_back"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="-10s"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#444444"
+                android:layout_marginEnd="8dp"/>
+
+            <Button
+                android:id="@+id/btn_play_pause"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:text="▶ Play"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#FF5722"
+                android:layout_marginEnd="8dp"/>
+
+            <Button
+                android:id="@+id/btn_seek_fwd"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+10s"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#444444"
+                android:layout_marginEnd="8dp"/>
+
+            <Button
+                android:id="@+id/btn_mute"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔇 Mute"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#444444"/>
+        </LinearLayout>
+
+        <!-- Playback speed -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="4dp">
+
+            <Button
+                android:id="@+id/btn_speed_half"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0.5x"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#37474F"
+                android:layout_marginEnd="6dp"/>
+
+            <Button
+                android:id="@+id/btn_speed_normal"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="1x"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#37474F"
+                android:layout_marginEnd="6dp"/>
+
+            <Button
+                android:id="@+id/btn_speed_1_5"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="1.5x"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#37474F"
+                android:layout_marginEnd="6dp"/>
+
+            <Button
+                android:id="@+id/btn_speed_2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="2x"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#37474F"/>
+        </LinearLayout>
+
+        <!-- Source switch row 1: normal streams -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="4dp">
+
+            <Button
+                android:id="@+id/btn_vod"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="▶ VOD"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#1565C0"
+                android:layout_marginEnd="8dp"/>
+
+            <Button
+                android:id="@+id/btn_live"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔴 Live"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#B71C1C"
+                android:layout_marginEnd="8dp"/>
+
+            <Button
+                android:id="@+id/btn_token_url"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔑 Token"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#00695C"/>
+        </LinearLayout>
+
+        <!-- Source switch row 2: error/test streams -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="4dp">
+
+            <Button
+                android:id="@+id/btn_drm_fail"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔒 DRM Fail"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#6A1B9A"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- NR event panel -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="10dp"
+        android:background="#F5F5F5">
+
+        <TextView
+            android:id="@+id/txt_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Status: idle"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:fontFamily="monospace"/>
+
+        <TextView
+            android:id="@+id/txt_playhead"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Playhead: --"
+            android:textSize="12sp"
+            android:layout_marginTop="2dp"
+            android:fontFamily="monospace"/>
+
+        <TextView
+            android:id="@+id/txt_last_event"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Last NR event: --"
+            android:textSize="12sp"
+            android:layout_marginTop="2dp"
+            android:textColor="#1565C0"
+            android:fontFamily="monospace"/>
+    </LinearLayout>
+
+</LinearLayout>

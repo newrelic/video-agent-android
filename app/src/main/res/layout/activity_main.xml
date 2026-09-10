@@ -98,12 +98,58 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/direct_manifest_url" />
 
+    <!-- Direct stream URL input — plays in ExoPlayer or THEOplayer based on switch -->
+    <LinearLayout
+        android:id="@+id/url_input_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
+        android:layout_marginTop="12dp"
+        app:layout_constraintTop_toBottomOf="@+id/play_direct_url"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <EditText
+            android:id="@+id/edit_stream_url"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Paste stream URL (HLS / DASH)"
+            android:inputType="textUri"
+            android:textSize="12sp"
+            android:singleLine="true"
+            android:saveEnabled="false"
+            android:importantForAutofill="no"
+            android:layout_marginEnd="8dp"/>
+
+        <Button
+            android:id="@+id/btn_play_url"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="▶ Play"
+            app:backgroundTint="#1565C0"/>
+    </LinearLayout>
+
     <Switch
         android:id="@+id/qoe_switch"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginBottom="16dp"
         android:text="Enable QOE Aggregate"
+        app:layout_constraintBottom_toTopOf="@+id/theo_switch"
+        android:layout_marginRight="8dp"
+        app:layout_constraintRight_toRightOf="parent"
+        android:layout_marginLeft="8dp"
+        app:layout_constraintLeft_toLeftOf="parent"/>
+
+    <Switch
+        android:id="@+id/theo_switch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:text="THEOplayer"
         app:layout_constraintBottom_toTopOf="@+id/mediatailor_switch"
         android:layout_marginRight="8dp"
         app:layout_constraintRight_toRightOf="parent"
