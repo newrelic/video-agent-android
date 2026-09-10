@@ -4,11 +4,12 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-The New Relic Video Agent for Android provides comprehensive video analytics for Android applications using ExoPlayer (Media3). Track video events, monitor playback quality, identify errors, and gain deep insights into user engagement and performance — for both mobile and Android TV.
+The New Relic Video Agent for Android provides comprehensive video analytics for Android applications using ExoPlayer (Media3) or THEOplayer (Dolby OptiView). Track video events, monitor playback quality, identify errors, and gain deep insights into user engagement and performance — for both mobile and Android TV.
 
 ## Features
 
-- **Automatic Event Detection** — Captures ExoPlayer lifecycle events automatically without manual instrumentation
+- **Automatic Event Detection** — Captures ExoPlayer and THEOplayer lifecycle events automatically without manual instrumentation
+- **Multi-Player SDK Support** — Plug-in tracker modules for ExoPlayer (Media3) and THEOplayer (Dolby OptiView); swap or run both in the same app
 - **QoE Metrics** — Quality of Experience aggregation for startup time, buffering ratio, bitrate, download throughput, rendition switches, pause time, and playback errors
 - **Event Segregation** — Organized event types: `VideoAction`, `VideoAdAction`, `VideoErrorAction`, `VideoCustomAction`
 - **IMA Ads Support** — Built-in Google IMA SDK ad tracking via dedicated ad tracker
@@ -53,20 +54,24 @@ Add the dependencies inside your app's `build.gradle`:
 ```groovy
 dependencies {
     // Required: Core library
-    implementation 'com.github.newrelic.video-agent-android:NewRelicVideoCore:v4.1.0'
+    implementation 'com.github.newrelic.video-agent-android:NewRelicVideoCore:v5.0.0'
 
-    // ExoPlayer (Media3) tracker
-    implementation 'com.github.newrelic.video-agent-android:NRExoPlayerTracker:v4.1.0'
+    // ExoPlayer (Media3) tracker — choose one player tracker
+    implementation 'com.github.newrelic.video-agent-android:NRExoPlayerTracker:v5.0.0'
 
-    // Google IMA ad tracker (optional — for client-side ad insertion)
-    implementation 'com.github.newrelic.video-agent-android:NRIMATracker:v4.1.0'
+    // THEOplayer (Dolby OptiView) tracker — alternative to NRExoPlayerTracker
+    implementation 'com.github.newrelic.video-agent-android:NRTHEOPlayerTracker:v5.0.0'
+
+    // Google IMA ad tracker (optional — for client-side ad insertion, ExoPlayer only)
+    implementation 'com.github.newrelic.video-agent-android:NRIMATracker:v5.0.0'
 
     // AWS MediaTailor ad tracker (optional — for server-side ad insertion / SSAI)
-    implementation 'com.github.newrelic.video-agent-android:NRMediaTailorTracker:v4.1.0'
+    implementation 'com.github.newrelic.video-agent-android:NRMediaTailorTracker:v5.0.0'
 }
 ```
 
-> **Note:** Replace `v4.1.0` with the desired [release version](https://github.com/newrelic/video-agent-android/releases).
+> **Note:** All modules are versioned together — always use the same version number for every module you include. See [releases](https://github.com/newrelic/video-agent-android/releases) for the latest version.
+> Use either `NRExoPlayerTracker` or `NRTHEOPlayerTracker` — both can coexist in the same app for multi-player scenarios.
 > `NRIMATracker` and `NRMediaTailorTracker` are mutually exclusive per player — pick one based on whether your stream uses CSAI (IMA) or SSAI (MediaTailor).
 
 ### Option 2: Install Manually Using AAR Files
@@ -110,9 +115,10 @@ Before using the Video Agent, ensure you have:
 
 - **New Relic Account** — Active account with a valid application token
 - **New Relic Android Agent** — [Installed and configured](https://docs.newrelic.com/docs/mobile-monitoring/new-relic-mobile-android/install-configure/install-android-apps-gradle-android-studio) in your project
-- **ExoPlayer / Media3** — `androidx.media3:media3-exoplayer:1.2.0` or later
-- **Google IMA SDK** (optional) — `androidx.media3:media3-exoplayer-ima:1.2.0` if tracking ads
-- **Android minSdk** — API 16 (Android 4.1) or higher
+- **ExoPlayer / Media3** (if using `NRExoPlayerTracker`) — `androidx.media3:media3-exoplayer:1.2.0` or later
+- **THEOplayer SDK** (if using `NRTHEOPlayerTracker`) — `com.theoplayer.theoplayer-sdk-android:core:11.x` 
+- **Google IMA SDK** (optional) — `androidx.media3:media3-exoplayer-ima:1.2.0` if tracking ads with ExoPlayer
+- **Android minSdk** — API 24 (Android 7.0) or higher
 
 ## Modules
 
@@ -122,6 +128,7 @@ The Video Agent is composed of three modules:
 |--------|-------------|----------|
 | **NewRelicVideoCore** | Base classes for tracker management, event generation, and data harvesting. Depends on the New Relic Android Agent. | Yes |
 | **NRExoPlayerTracker** | Video tracker for ExoPlayer (Media3). Automatically hooks into player lifecycle events. | Yes (for ExoPlayer) |
+| **NRTHEOPlayerTracker** | Video tracker for THEOplayer (Dolby OptiView). Hooks into THEOplayer event listeners for lifecycle, QoE, rendition changes, and DRM errors. 
 | **NRIMATracker** | Ad tracker for the Google IMA SDK (client-side ad insertion / CSAI). Captures ad lifecycle events including quartiles, breaks, and errors. | Optional |
 | **NRMediaTailorTracker** | Ad tracker for AWS Elemental MediaTailor (server-side ad insertion / SSAI). Supports DASH and HLS, explicit and implicit session init, live + VOD, with rich VAST metadata. | Optional |
 
@@ -155,7 +162,8 @@ Map<String, Object> customAttrs = new HashMap<>();
 customAttrs.put("contentTitle", "My Video Title");
 
 NRVideoPlayerConfiguration playerConfig =
-        new NRVideoPlayerConfiguration("my-player", player, null, customAttrs);
+        new NRVideoPlayerConfiguration("my-player", player,
+                NRVideoPlayerConfiguration.PLAYER_TYPE_EXO, null, customAttrs);
 
 Integer trackerId = NRVideo.addPlayer(playerConfig);
 
@@ -167,6 +175,46 @@ protected void onDestroy() {
     super.onDestroy();
 }
 ```
+
+### Basic Setup — THEOplayer
+
+> **Prerequisite:** Your `AndroidManifest.xml` must include a valid THEOplayer license key:
+> ```xml
+> <meta-data android:name="THEOPLAYER_LICENSE" android:value="${theoplayerLicenseKey}" />
+> ```
+
+```java
+// Step 1: Initialize NRVideo in your Application class or main activity
+NRVideoConfiguration config = new NRVideoConfiguration.Builder("YOUR_APPLICATION_TOKEN")
+        .autoDetectPlatform(getApplicationContext())
+        .withHarvestCycle(5 * 60) // 300 seconds (5 minutes) — recommended for on-demand video
+        .build();
+
+NRVideo.newBuilder(getApplicationContext())
+        .withConfiguration(config)
+        .build();
+
+// Step 2: Register the THEOplayerView
+THEOplayerView theoPlayerView = findViewById(R.id.theo_player_view);
+
+Integer trackerId = NRVideo.addPlayer(
+        new NRVideoPlayerConfiguration("theo-player", theoPlayerView,
+                NRVideoPlayerConfiguration.PLAYER_TYPE_THEO, null, null));
+
+// Step 3: Forward Activity lifecycle events
+@Override protected void onResume()  { super.onResume();  theoPlayerView.onResume(); }
+@Override protected void onPause()   { super.onPause();   theoPlayerView.onPause(); }
+@Override protected void onDestroy() {
+    super.onDestroy();
+    NRTracker tracker = NewRelicVideoAgent.getInstance().getContentTracker(trackerId);
+    if (tracker instanceof NRTrackerTHEOPlayer) {
+        ((NRTrackerTHEOPlayer) tracker).onDestroy();
+    }
+    NRVideo.releaseTracker(trackerId);
+}
+```
+
+> **Note:** `NRTrackerTHEOPlayer.onDestroy()` must be called before `NRVideo.releaseTracker()` to ensure `THEOplayerView.onDestroy()` is forwarded and listeners are cleanly unregistered.
 
 ### Setup with ExoPlayer and AWS MediaTailor (SSAI)
 
@@ -192,6 +240,7 @@ ExoPlayer player = new ExoPlayer.Builder(this).build();
 NRVideoPlayerConfiguration playerConfig = new NRVideoPlayerConfiguration(
         "mediatailor-player",
         player,
+        NRVideoPlayerConfiguration.PLAYER_TYPE_EXO,
         NRAdConfig.mediaTailor(null, trackingUrl),
         /* custom attrs */ null);
 Integer trackerId = NRVideo.addPlayer(playerConfig);
@@ -246,7 +295,8 @@ ExoPlayer player = new ExoPlayer.Builder(this)
         .build();
 
 NRVideoPlayerConfiguration playerConfig =
-        new NRVideoPlayerConfiguration("my-player", player, NRAdConfig.csai(), null);
+        new NRVideoPlayerConfiguration("my-player", player,
+                NRVideoPlayerConfiguration.PLAYER_TYPE_EXO, NRAdConfig.csai(), null);
 
 Integer trackerId = NRVideo.addPlayer(playerConfig);
 
@@ -378,7 +428,8 @@ if (shouldEnable) {
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `playerName` | `String` | Unique identifier for the video player. Used to distinguish between multiple players. |
-| `player` | `ExoPlayer` | The ExoPlayer instance to track. |
+| `player` | `ExoPlayer` / `THEOplayerView` | The player instance to track. |
+| `playerType` | `String` | `NRVideoPlayerConfiguration.PLAYER_TYPE_EXO` (`"exo"`) or `PLAYER_TYPE_THEO` (`"theo"`). Always set this explicitly — omitting it triggers a warning log and falls back to ExoPlayer for backward compatibility only. |
 | `adConfig` | `NRAdConfig` | Ad framework configuration. Pass `NRAdConfig.csai()` for IMA, `NRAdConfig.mediaTailor()` for MediaTailor, or `null` for no ad tracking. |
 | `customAttributes` | `Map<String, Object>` | Custom attributes to attach to all events from this player. |
 
@@ -509,7 +560,8 @@ customAttrs.put("contentTitle", "Big Buck Bunny");
 customAttrs.put("contentProvider", "studio-abc");
 
 NRVideoPlayerConfiguration playerConfig =
-        new NRVideoPlayerConfiguration("main-player", player, false, customAttrs);
+        new NRVideoPlayerConfiguration("main-player", player,
+                NRVideoPlayerConfiguration.PLAYER_TYPE_EXO, null, customAttrs);
 
 Integer trackerId = NRVideo.addPlayer(playerConfig);
 
