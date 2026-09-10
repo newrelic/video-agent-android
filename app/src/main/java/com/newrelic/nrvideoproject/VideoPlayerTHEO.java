@@ -20,6 +20,8 @@ import com.theoplayer.android.api.THEOplayerView;
 import com.theoplayer.android.api.event.player.PlayerEventTypes;
 import com.theoplayer.android.api.source.SourceDescription;
 import com.theoplayer.android.api.source.TypedSource;
+import com.theoplayer.android.api.source.drm.DRMConfiguration;
+import com.theoplayer.android.api.source.drm.KeySystemConfiguration;
 
 public class VideoPlayerTHEO extends AppCompatActivity {
 
@@ -31,6 +33,15 @@ public class VideoPlayerTHEO extends AppCompatActivity {
     // DASHIF live simulator — reliable live DASH stream
     private static final String STREAM_DASH_LIVE =
             "https://livesim2.dashif.org/livesim2/ato_10/testpic3_2s/Manifest.mpd";
+    // Same HLS VOD with a fake token query param — used to verify obfuscation masks token=REDACTED
+    private static final String STREAM_HLS_TOKEN =
+            "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8?token=secret12345&quality=high";
+    // Bitmovin public Widevine-protected DASH stream — used to trigger CONTENTPROTECTIONERROR.
+    // A deliberately wrong license URL causes DRM acquisition to fail without needing a real license.
+    private static final String STREAM_DASH_DRM =
+            "https://bitmovin-a.akamaihd.net/content/art-of-motion_drm/mpds/11331.mpd";
+    private static final String FAKE_LICENSE_URL =
+            "https://httpbin.org/status/403"; // reachable but returns 403 → CONTENT_PROTECTION_LICENSE_ERROR
 
     private THEOplayerView theoPlayerView;
     private Integer trackerId;
@@ -111,11 +122,30 @@ public class VideoPlayerTHEO extends AppCompatActivity {
         findViewById(R.id.btn_seek_fwd).setOnClickListener(v ->
             seekRelative(10));
 
+        Button btnMute = findViewById(R.id.btn_mute);
+        btnMute.setOnClickListener(v -> {
+            boolean muted = theoPlayerView.getPlayer().isMuted();
+            theoPlayerView.getPlayer().setMuted(!muted);
+            btnMute.setText(muted ? "🔇 Mute" : "🔊 Unmute");
+            txtStatus.setText("Muted: " + !muted);
+        });
+
+        findViewById(R.id.btn_speed_half).setOnClickListener(v ->  setSpeed(0.5));
+        findViewById(R.id.btn_speed_normal).setOnClickListener(v -> setSpeed(1.0));
+        findViewById(R.id.btn_speed_1_5).setOnClickListener(v ->  setSpeed(1.5));
+        findViewById(R.id.btn_speed_2).setOnClickListener(v ->     setSpeed(2.0));
+
         findViewById(R.id.btn_vod).setOnClickListener(v ->
             loadStream(STREAM_HLS_VOD));
 
         findViewById(R.id.btn_live).setOnClickListener(v ->
             loadStream(STREAM_DASH_LIVE));
+
+        findViewById(R.id.btn_drm_fail).setOnClickListener(v ->
+            loadDrmFailureStream());
+
+        findViewById(R.id.btn_token_url).setOnClickListener(v ->
+            loadStream(STREAM_HLS_TOKEN));
 
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
@@ -154,6 +184,25 @@ public class VideoPlayerTHEO extends AppCompatActivity {
             target = Math.min(target, duration);
         }
         theoPlayerView.getPlayer().setCurrentTime(target);
+    }
+
+    private void setSpeed(double rate) {
+        theoPlayerView.getPlayer().setPlaybackRate(rate);
+        txtStatus.setText("Speed: " + rate + "x");
+        Log.d(TAG, "setSpeed: " + rate);
+    }
+
+    private void loadDrmFailureStream() {
+        Log.d(TAG, "loadDrmFailureStream: deliberate DRM failure to verify CONTENT_ERROR");
+        currentUrl = STREAM_DASH_DRM;
+        TypedSource source = new TypedSource.Builder(STREAM_DASH_DRM)
+                .drm(new DRMConfiguration.Builder()
+                        .widevine(new KeySystemConfiguration.Builder(FAKE_LICENSE_URL).build())
+                        .build())
+                .build();
+        theoPlayerView.getPlayer().setSource(
+                new SourceDescription.Builder(source).build());
+        theoPlayerView.getPlayer().setAutoplay(true);
     }
 
     private void loadStream(String url) {

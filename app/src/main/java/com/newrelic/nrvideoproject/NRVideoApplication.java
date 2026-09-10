@@ -4,6 +4,9 @@ import android.app.Application;
 
 import com.newrelic.videoagent.core.NRVideo;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
+import com.newrelic.videoagent.core.ObfuscationRule;
+
+import java.util.Arrays;
 
 /**
  * Initializes the NRVideo SDK at process startup rather than in MainActivity,
@@ -24,6 +27,9 @@ public class NRVideoApplication extends Application {
                 .enableLogging()
                 .enableQoeAggregate(BuildConfig.QOE_AGGREGATE_DEFAULT)
                 .withCollectorAddress("staging-mobile-collector.newrelic.com")
+                .withObfuscationRules(Arrays.asList(
+                    new ObfuscationRule("token=[^&\" ]+", "token=REDACTED")
+                ))
                 .build();
         NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
     }

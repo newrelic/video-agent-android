@@ -162,8 +162,16 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
     /**
      * Forward Activity#onDestroy to THEOplayerView and clean up listeners.
      * Call {@code NRVideo.releaseTracker(trackerId)} after this.
+     *
+     * Fires CONTENT_END before unregistering listeners so the final event carries
+     * accurate playhead and attribute values (player is still set at this point).
      */
     public void onDestroy() {
+        // Close the NR session while player is still set — attributes are accurate here.
+        // goEnd() is idempotent: no-op if no session is active.
+        if (getState().isRequested) {
+            sendEnd();
+        }
         THEOplayerView view = theoPlayerView;
         unregisterListeners();  // nulls theoPlayerView — capture before calling
         if (view != null) {

@@ -151,6 +151,14 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
      * Stop heartbeats and call `super.dispose()`.
      */
     public void dispose() {
+        // Close an active session so CONTENT_END is emitted before the tracker is torn down.
+        // goEnd() is idempotent — no-op if no session is active or it was already closed.
+        // This is a safety net for direct releaseTracker() calls that bypass the
+        // player-specific onDestroy() (e.g. NRTrackerTHEOPlayer.onDestroy() fires sendEnd()
+        // earlier while the player is still set; this path covers every other case).
+        if (state.isRequested) {
+            sendEnd();
+        }
         super.dispose();
         stopHeartbeat();
         // Unregister the QOE provider so a disposed tracker is no longer polled at harvest.
