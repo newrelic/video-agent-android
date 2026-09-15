@@ -353,8 +353,8 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
     public void sendRequest() {
         if (state.goRequest()) {
             // Reset the timeSince table at every new session boundary so timestamps
-            // from the previous session (e.g. timeSinceSeekEnd) do not bleed into
-            // the first events of the new session (NR-617147).
+            // from the previous session do not bleed into
+            // the first events of the new session.
             generateTimeSinceTable();
             playtimeSinceLastEventTimestamp = 0L;
 
@@ -823,18 +823,24 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
     }
 
     /**
-     * Send request event.
-     *
-     * @param errorMessage Error message.
+     * Send error event.
+     * errorCode is nullable — pass null when no meaningful code is available so the
+     * errorCode attribute is omitted from the NRDB event.
+     * errorMessage is the primary signal when no code exists.
      */
-    public void sendError(int errorCode, String errorMessage) {
-        if (errorMessage == null) {
+    public void sendError(Integer errorCode, String errorMessage) {
+        if (errorMessage == null || errorMessage.trim().isEmpty()) {
             errorMessage = "<Unknown error>";
         }
         numberOfErrors++;
         Map<String, Object> errAttr = new HashMap<>();
         errAttr.put("errorMessage", errorMessage);
-        errAttr.put("errorCode", errorCode);
+        // Only include errorCode when a real value is available.
+        // Null means the error has no SDK-provided code — omitting it avoids
+        // polluting NRDB with meaningless sentinel values.
+        if (errorCode != null) {
+            errAttr.put("errorCode", errorCode);
+        }
 //        generatePlayElapsedTime();
         String actionName = CONTENT_ERROR;
         if (state.isAd) {
