@@ -8,9 +8,9 @@
     android:background="#000000"
     tools:context=".VideoPlayerTHEO">
 
-    <!-- Video surface -->
-    <com.theoplayer.android.api.THEOplayerView
-        android:id="@+id/theo_player_view"
+    <!-- Video surface — THEOplayerView, config injected programmatically -->
+    <FrameLayout
+        android:id="@+id/theo_player_container"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"/>

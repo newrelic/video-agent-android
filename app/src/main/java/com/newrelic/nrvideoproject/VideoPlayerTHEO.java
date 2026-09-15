@@ -30,12 +30,12 @@ public class VideoPlayerTHEO extends AppCompatActivity {
     // Apple HLS VOD test stream — reliable on emulator (Cronet trusts Apple CDN certs)
     private static final String STREAM_HLS_VOD =
             "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8";
-    // DASHIF live simulator — reliable live DASH stream
-    private static final String STREAM_DASH_LIVE =
-            "https://livesim2.dashif.org/livesim2/ato_10/testpic3_2s/Manifest.mpd";
     // Same HLS VOD with a fake token query param — used to verify obfuscation masks token=REDACTED
     private static final String STREAM_HLS_TOKEN =
             "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8?token=secret12345&quality=high";
+    // Unified Streaming live DASH — 720p25, confirmed live (MPD publishTime updates in real time)
+    private static final String STREAM_DASH_LIVE =
+            "https://demo.unified-streaming.com/k8s/live/scte35.isml/.mpd";
     // Bitmovin public Widevine-protected DASH stream — used to trigger CONTENTPROTECTIONERROR.
     // A deliberately wrong license URL causes DRM acquisition to fail without needing a real license.
     private static final String STREAM_DASH_DRM =
@@ -66,7 +66,20 @@ public class VideoPlayerTHEO extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_video_player_theo);
 
-        theoPlayerView = findViewById(R.id.theo_player_view);
+        // Create THEOplayerView programmatically so we can pass a custom THEOplayerConfig.
+        // tunnelingEnabled(false) disables Android's tunneled playback mode, forcing video
+        // through the normal GPU render pipeline — required to produce getDroppedVideoFrames() > 0
+        // under stress (tunneling bypasses the render pipeline entirely).
+        android.widget.FrameLayout container = findViewById(R.id.theo_player_container);
+        com.theoplayer.android.api.THEOplayerConfig theoConfig =
+                new com.theoplayer.android.api.THEOplayerConfig.Builder()
+                        .tunnelingEnabled(false)
+                        .build();
+        theoPlayerView = new THEOplayerView(this, theoConfig);
+        theoPlayerView.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+        container.addView(theoPlayerView);
         seekBar        = findViewById(R.id.seek_bar);
         btnPlayPause   = findViewById(R.id.btn_play_pause);
         txtCurrentTime = findViewById(R.id.txt_current_time);
@@ -122,7 +135,7 @@ public class VideoPlayerTHEO extends AppCompatActivity {
         findViewById(R.id.btn_seek_fwd).setOnClickListener(v ->
             seekRelative(10));
 
-        Button btnMute = findViewById(R.id.btn_mute);
+Button btnMute = findViewById(R.id.btn_mute);
         btnMute.setOnClickListener(v -> {
             boolean muted = theoPlayerView.getPlayer().isMuted();
             theoPlayerView.getPlayer().setMuted(!muted);
@@ -141,13 +154,13 @@ public class VideoPlayerTHEO extends AppCompatActivity {
         findViewById(R.id.btn_live).setOnClickListener(v ->
             loadStream(STREAM_DASH_LIVE));
 
-        findViewById(R.id.btn_drm_fail).setOnClickListener(v ->
-            loadDrmFailureStream());
-
         findViewById(R.id.btn_token_url).setOnClickListener(v ->
             loadStream(STREAM_HLS_TOKEN));
 
-        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+        findViewById(R.id.btn_drm_fail).setOnClickListener(v ->
+            loadDrmFailureStream());
+
+seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
                 if (fromUser) {

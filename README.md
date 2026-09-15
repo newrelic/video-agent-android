@@ -88,8 +88,9 @@ dependencies {
 ```groovy
 dependencies {
     implementation project(":NewRelicVideoCore")
-    implementation project(":NRExoPlayerTracker")
-    implementation project(":NRIMATracker")
+    implementation project(":NRExoPlayerTracker")    // or NRTHEOPlayerTracker
+    implementation project(":NRIMATracker")           // optional — CSAI ads
+    implementation project(":NRMediaTailorTracker")   // optional — SSAI ads
 }
 ```
 
@@ -104,8 +105,9 @@ dependencies {
 ```groovy
 dependencies {
     implementation project(":NewRelicVideoCore")
-    implementation project(":NRExoPlayerTracker")
-    implementation project(":NRIMATracker")
+    implementation project(":NRExoPlayerTracker")    // or NRTHEOPlayerTracker
+    implementation project(":NRIMATracker")           // optional — CSAI ads
+    implementation project(":NRMediaTailorTracker")   // optional — SSAI ads
 }
 ```
 
@@ -117,18 +119,19 @@ Before using the Video Agent, ensure you have:
 - **New Relic Android Agent** — [Installed and configured](https://docs.newrelic.com/docs/mobile-monitoring/new-relic-mobile-android/install-configure/install-android-apps-gradle-android-studio) in your project
 - **ExoPlayer / Media3** (if using `NRExoPlayerTracker`) — `androidx.media3:media3-exoplayer:1.2.0` or later
 - **THEOplayer SDK** (if using `NRTHEOPlayerTracker`) — `com.theoplayer.theoplayer-sdk-android:core:11.x` 
-- **Google IMA SDK** (optional) — `androidx.media3:media3-exoplayer-ima:1.2.0` if tracking ads with ExoPlayer
+- **Google IMA SDK** (optional) — `androidx.media3:media3-exoplayer-ima:1.2.0` if tracking CSAI ads with ExoPlayer
+- **AWS MediaTailor** (optional) — No extra SDK needed; requires a valid MediaTailor session tracking URL
 - **Android minSdk** — API 24 (Android 7.0) or higher
 
 ## Modules
 
-The Video Agent is composed of three modules:
+The Video Agent is composed of five modules:
 
 | Module | Description | Required |
 |--------|-------------|----------|
 | **NewRelicVideoCore** | Base classes for tracker management, event generation, and data harvesting. Depends on the New Relic Android Agent. | Yes |
 | **NRExoPlayerTracker** | Video tracker for ExoPlayer (Media3). Automatically hooks into player lifecycle events. | Yes (for ExoPlayer) |
-| **NRTHEOPlayerTracker** | Video tracker for THEOplayer (Dolby OptiView). Hooks into THEOplayer event listeners for lifecycle, QoE, rendition changes, and DRM errors. 
+| **NRTHEOPlayerTracker** | Video tracker for THEOplayer (Dolby OptiView). Hooks into THEOplayer event listeners for lifecycle, QoE, rendition changes, and DRM errors. | Yes (for THEOplayer) |
 | **NRIMATracker** | Ad tracker for the Google IMA SDK (client-side ad insertion / CSAI). Captures ad lifecycle events including quartiles, breaks, and errors. | Optional |
 | **NRMediaTailorTracker** | Ad tracker for AWS Elemental MediaTailor (server-side ad insertion / SSAI). Supports DASH and HLS, explicit and implicit session init, live + VOD, with rich VAST metadata. | Optional |
 

@@ -14,8 +14,6 @@ buildscript {
     }
 }
 
-// Necessary??
-apply plugin: 'maven-publish'
 
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file('local.properties')
