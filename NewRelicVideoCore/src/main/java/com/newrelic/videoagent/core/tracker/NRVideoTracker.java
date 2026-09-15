@@ -352,6 +352,10 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
      */
     public void sendRequest() {
         if (state.goRequest()) {
+            // Reset the timeSince table at every new session boundary so timestamps
+            // from the previous session (e.g. timeSinceSeekEnd) do not bleed into
+            // the first events of the new session (NR-617147).
+            generateTimeSinceTable();
             playtimeSinceLastEventTimestamp = 0L;
 
             if (state.isAd) {
