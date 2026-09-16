@@ -15,7 +15,7 @@ public class ErrorExceptionHandlerTest {
 
         ErrorExceptionHandler handler = new ErrorExceptionHandler(genericException);
 
-        assertEquals(-9999, handler.getErrorCode());
+        assertNull(handler.getErrorCode());
         assertEquals("Generic error message", handler.getErrorMessage());
     }
 
@@ -25,7 +25,7 @@ public class ErrorExceptionHandlerTest {
 
         ErrorExceptionHandler handler = new ErrorExceptionHandler(exception);
 
-        assertEquals(-9999, handler.getErrorCode());
+        assertNull(handler.getErrorCode());
         assertEquals("<Unknown error>", handler.getErrorMessage());
     }
 
@@ -35,7 +35,7 @@ public class ErrorExceptionHandlerTest {
 
         ErrorExceptionHandler handler = new ErrorExceptionHandler(runtimeException);
 
-        assertEquals(-9999, handler.getErrorCode());
+        assertNull(handler.getErrorCode());
         assertEquals("Runtime error", handler.getErrorMessage());
     }
 
@@ -45,7 +45,7 @@ public class ErrorExceptionHandlerTest {
 
         ErrorExceptionHandler handler = new ErrorExceptionHandler(ioException);
 
-        assertEquals(-9999, handler.getErrorCode());
+        assertNull(handler.getErrorCode());
         assertEquals("IO error occurred", handler.getErrorMessage());
     }
 
@@ -55,7 +55,7 @@ public class ErrorExceptionHandlerTest {
 
         ErrorExceptionHandler handler = new ErrorExceptionHandler(exception);
 
-        assertEquals(-9999, handler.getErrorCode());
+        assertNull(handler.getErrorCode());
         assertEquals("", handler.getErrorMessage());
     }
 
@@ -68,7 +68,7 @@ public class ErrorExceptionHandlerTest {
 
         ErrorExceptionHandler handler = new ErrorExceptionHandler(exception);
 
-        assertEquals(-9999, handler.getErrorCode());
+        assertNull(handler.getErrorCode());
         assertEquals(longMessage, handler.getErrorMessage());
     }
 
@@ -79,7 +79,7 @@ public class ErrorExceptionHandlerTest {
 
         ErrorExceptionHandler handler = new ErrorExceptionHandler(exception);
 
-        assertEquals(-9999, handler.getErrorCode());
+        assertNull(handler.getErrorCode());
         assertEquals(messageWithSpecialChars, handler.getErrorMessage());
     }
 
@@ -89,11 +89,11 @@ public class ErrorExceptionHandlerTest {
 
         ErrorExceptionHandler handler = new ErrorExceptionHandler(exception);
 
-        int errorCode1 = handler.getErrorCode();
-        int errorCode2 = handler.getErrorCode();
+        Integer errorCode1 = handler.getErrorCode();
+        Integer errorCode2 = handler.getErrorCode();
 
         assertEquals(errorCode1, errorCode2);
-        assertEquals(-9999, errorCode1);
+        assertNull(errorCode1);
     }
 
     @Test
@@ -119,8 +119,8 @@ public class ErrorExceptionHandlerTest {
 
         assertEquals("Error 1", handler1.getErrorMessage());
         assertEquals("Error 2", handler2.getErrorMessage());
-        assertEquals(-9999, handler1.getErrorCode());
-        assertEquals(-9999, handler2.getErrorCode());
+        assertNull(handler1.getErrorCode());
+        assertNull(handler2.getErrorCode());
     }
 
     @Test
@@ -129,7 +129,7 @@ public class ErrorExceptionHandlerTest {
 
         ErrorExceptionHandler handler = new ErrorExceptionHandler(illegalArgException);
 
-        assertEquals(-9999, handler.getErrorCode());
+        assertNull(handler.getErrorCode());
         assertEquals("Invalid argument provided", handler.getErrorMessage());
     }
 
@@ -139,7 +139,7 @@ public class ErrorExceptionHandlerTest {
 
         ErrorExceptionHandler handler = new ErrorExceptionHandler(npe);
 
-        assertEquals(-9999, handler.getErrorCode());
+        assertNull(handler.getErrorCode());
         assertEquals("Null pointer encountered", handler.getErrorMessage());
     }
 
@@ -149,7 +149,7 @@ public class ErrorExceptionHandlerTest {
 
         ErrorExceptionHandler handler = new ErrorExceptionHandler(secException);
 
-        assertEquals(-9999, handler.getErrorCode());
+        assertNull(handler.getErrorCode());
         assertEquals("Security violation detected", handler.getErrorMessage());
     }
 
@@ -159,7 +159,7 @@ public class ErrorExceptionHandlerTest {
 
         ErrorExceptionHandler handler = new ErrorExceptionHandler(unsupportedException);
 
-        assertEquals(-9999, handler.getErrorCode());
+        assertNull(handler.getErrorCode());
         assertEquals("Operation not supported", handler.getErrorMessage());
     }
 
@@ -169,7 +169,7 @@ public class ErrorExceptionHandlerTest {
 
         ErrorExceptionHandler handler = new ErrorExceptionHandler(exception);
 
-        assertEquals(-9999, handler.getErrorCode());
+        assertNull(handler.getErrorCode());
     }
 
     @Test
@@ -178,7 +178,7 @@ public class ErrorExceptionHandlerTest {
 
         ErrorExceptionHandler handler = new ErrorExceptionHandler(exception);
 
-        assertEquals(-9999, handler.getErrorCode());
+        assertNull(handler.getErrorCode());
         assertEquals("12345", handler.getErrorMessage());
     }
 
@@ -189,7 +189,7 @@ public class ErrorExceptionHandlerTest {
 
         ErrorExceptionHandler handler = new ErrorExceptionHandler(exception);
 
-        assertEquals(-9999, handler.getErrorCode());
+        assertNull(handler.getErrorCode());
         assertEquals(unicodeMessage, handler.getErrorMessage());
     }
 
@@ -200,7 +200,7 @@ public class ErrorExceptionHandlerTest {
 
         ErrorExceptionHandler handler = new ErrorExceptionHandler(exception);
 
-        assertEquals(-9999, handler.getErrorCode());
+        assertNull(handler.getErrorCode());
         assertTrue(handler.getErrorMessage().contains("Wrapper error"));
         assertTrue(handler.getErrorMessage().contains("Root cause error"));
     }

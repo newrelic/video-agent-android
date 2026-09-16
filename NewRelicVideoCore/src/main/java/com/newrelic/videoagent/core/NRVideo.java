@@ -68,10 +68,19 @@ public final class NRVideo {
             throw new IllegalStateException("NRVideo is not initialized. Call NRVideo.newBuilder(context).withConfiguration(config).build() first.");
         }
 
-        // Config-driven path uses the supplied playerType; legacy path defaults to ExoPlayer.
-        String playerType = config.getPlayerType() != null
-                ? config.getPlayerType()
-                : NRVideoPlayerConfiguration.PLAYER_TYPE_EXO;
+        // Config-driven path uses the supplied playerType.
+        // Legacy path (playerType == null) defaults to ExoPlayer for backward compatibility with
+        // integrations built before PLAYER_TYPE_* constants were introduced.
+        // An explicit warning is logged so developers know to set playerType — without it, passing
+        // a non-ExoPlayer object produces a misleading "Expected an ExoPlayer" error rather than
+        // pointing at the missing playerType as the root cause.
+        String playerType = config.getPlayerType();
+        if (playerType == null) {
+            NRLog.w("[NRVideo] playerType not set — defaulting to PLAYER_TYPE_EXO for backward "
+                  + "compatibility. Set playerType explicitly via "
+                  + "NRVideoPlayerConfiguration.PLAYER_TYPE_EXO or PLAYER_TYPE_THEO.");
+            playerType = NRVideoPlayerConfiguration.PLAYER_TYPE_EXO;
+        }
         NRTracker contentTracker = createTrackerForType(
                 playerType, instance.configuration, config.getPlayer());
         NRLog.d("[NRVideo] tracker resolved for playerType='" + playerType + "'");

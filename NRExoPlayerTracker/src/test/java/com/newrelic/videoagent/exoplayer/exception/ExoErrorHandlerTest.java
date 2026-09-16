@@ -17,21 +17,21 @@ public class ExoErrorHandlerTest {
     @Test
     public void genericException_returnsDefaultCode() {
         ExoErrorHandler h = new ExoErrorHandler(new Exception("boom"));
-        assertEquals(-9999, h.getErrorCode());
+        assertNull(h.getErrorCode());
         assertEquals("boom", h.getErrorMessage());
     }
 
     @Test
     public void nullException_returnsDefaultCodeAndUnknownMessage() {
         ExoErrorHandler h = new ExoErrorHandler(null);
-        assertEquals(-9999, h.getErrorCode());
+        assertNull(h.getErrorCode());
         assertEquals("<Unknown error>", h.getErrorMessage());
     }
 
     @Test
     public void exceptionWithNullMessage_returnsUnknownMessage() {
         ExoErrorHandler h = new ExoErrorHandler(new IOException((String) null));
-        assertEquals(-9999, h.getErrorCode());
+        assertNull(h.getErrorCode());
         assertEquals("<Unknown error>", h.getErrorMessage());
     }
 
@@ -42,7 +42,7 @@ public class ExoErrorHandlerTest {
         InvalidResponseCodeException e = new InvalidResponseCodeException(
                 404, "Not Found", null, Collections.emptyMap(), null, new byte[0]);
         ExoErrorHandler h = new ExoErrorHandler(e);
-        assertEquals(404, h.getErrorCode());
+        assertEquals((Integer) 404, h.getErrorCode());
         assertEquals("Not Found", h.getErrorMessage());
     }
 
@@ -51,7 +51,7 @@ public class ExoErrorHandlerTest {
         InvalidResponseCodeException e = new InvalidResponseCodeException(
                 500, "Internal Server Error", null, Collections.emptyMap(), null, new byte[0]);
         ExoErrorHandler h = new ExoErrorHandler(e);
-        assertEquals(500, h.getErrorCode());
+        assertEquals((Integer) 500, h.getErrorCode());
     }
 
     // ── PlaybackException ─────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ public class ExoErrorHandlerTest {
         PlaybackException e = new TestPlaybackException(
                 "playback failed", PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED);
         ExoErrorHandler h = new ExoErrorHandler(e);
-        assertEquals(PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED, h.getErrorCode());
+        assertEquals((Integer) PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED, h.getErrorCode());
         assertEquals("playback failed", h.getErrorMessage());
     }
 
@@ -77,17 +77,17 @@ public class ExoErrorHandlerTest {
     public void playbackException_nullMessage_returnsUnknownMessage() {
         PlaybackException e = new TestPlaybackException(null, PlaybackException.ERROR_CODE_UNSPECIFIED);
         ExoErrorHandler h = new ExoErrorHandler(e);
-        assertEquals(PlaybackException.ERROR_CODE_UNSPECIFIED, h.getErrorCode());
+        assertEquals((Integer) PlaybackException.ERROR_CODE_UNSPECIFIED, h.getErrorCode());
         assertEquals("<Unknown error>", h.getErrorMessage());
     }
 
     // ── IMA absent (default classpath in unit tests) ──────────────────────────
 
     @Test
-    public void imaAbsent_nonImaException_returnsDefaultCode() {
+    public void imaAbsent_nonImaException_returnsNullCode() {
         // IMA SDK is not on the test classpath — IMA_AVAILABLE should be false,
-        // so any non-IMA exception falls through to DEFAULT_ERROR_CODE.
+        // so any non-IMA exception falls through to null (no SDK-provided error code).
         ExoErrorHandler h = new ExoErrorHandler(new RuntimeException("network stall"));
-        assertEquals(-9999, h.getErrorCode());
+        assertNull(h.getErrorCode());
     }
 }

@@ -17,8 +17,6 @@ import java.lang.reflect.Method;
  */
 public class ExoErrorHandler implements PlayerErrorHandler {
 
-    private static final int DEFAULT_ERROR_CODE = -9999;
-
     // Resolved once at class load — zero cost on every call when IMA is absent.
     private static final Class<?> AD_LOAD_EX_CLASS;
     private static final Class<?> AD_ERROR_CLASS;
@@ -37,7 +35,7 @@ public class ExoErrorHandler implements PlayerErrorHandler {
             method   = adError.getMethod("getErrorCodeNumber");
             ok       = true;
         } catch (ClassNotFoundException | NoClassDefFoundError | NoSuchMethodException ignored) {
-            // IMA SDK not on classpath — all calls will fast-path to DEFAULT_ERROR_CODE
+            // IMA SDK not on classpath — IMA errors will have no error code
         }
         AD_LOAD_EX_CLASS = adLoadEx;
         AD_ERROR_CLASS   = adError;
@@ -45,11 +43,11 @@ public class ExoErrorHandler implements PlayerErrorHandler {
         IMA_AVAILABLE    = ok;
     }
 
-    private final int errorCode;
+    private final Integer errorCode;   // null when no SDK-provided code is available
     private final String errorMessage;
 
     public ExoErrorHandler(Exception error) {
-        int code = DEFAULT_ERROR_CODE;
+        Integer code = null;
         String message = (error != null) ? error.getMessage() : "<Unknown error>";
 
         if (error instanceof InvalidResponseCodeException) {
@@ -61,8 +59,8 @@ public class ExoErrorHandler implements PlayerErrorHandler {
             code    = e.errorCode;
             message = e.getMessage();
         } else {
-            int imaCode = extractIMAErrorCode(error);
-            if (imaCode != DEFAULT_ERROR_CODE) {
+            Integer imaCode = extractIMAErrorCode(error);
+            if (imaCode != null) {
                 code    = imaCode;
                 message = error.getMessage();
             }
@@ -74,11 +72,10 @@ public class ExoErrorHandler implements PlayerErrorHandler {
 
     /**
      * Extracts error code from IMA AdError or AdLoadException using pre-resolved
-     * static fields. Returns DEFAULT_ERROR_CODE if IMA is absent or the error is
-     * not an IMA type.
+     * static fields. Returns null if IMA is absent or the error is not an IMA type.
      */
-    private static int extractIMAErrorCode(Exception error) {
-        if (!IMA_AVAILABLE) return DEFAULT_ERROR_CODE;
+    private static Integer extractIMAErrorCode(Exception error) {
+        if (!IMA_AVAILABLE) return null;
         try {
             if (AD_LOAD_EX_CLASS.isInstance(error)) {
                 Throwable cause = error.getCause();
@@ -89,13 +86,13 @@ public class ExoErrorHandler implements PlayerErrorHandler {
                 return (int) GET_ERROR_CODE.invoke(error);
             }
         } catch (Exception ignored) {
-            // Reflection failure — fall back to default
+            // Reflection failure — no code available
         }
-        return DEFAULT_ERROR_CODE;
+        return null;
     }
 
     @Override
-    public int getErrorCode() {
+    public Integer getErrorCode() {
         return errorCode;
     }
 
