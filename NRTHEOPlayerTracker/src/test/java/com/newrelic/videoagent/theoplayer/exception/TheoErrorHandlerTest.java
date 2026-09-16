@@ -10,8 +10,6 @@ import static org.mockito.Mockito.*;
 
 public class TheoErrorHandlerTest {
 
-    
-
     // ── null / plain Exception ────────────────────────────────────────────────
 
     @Test
