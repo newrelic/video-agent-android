@@ -12,6 +12,7 @@ package com.newrelic.videoagent.core.exception;
  * on NRVideoTracker — Core never needs to know which player SDK produced the error.
  */
 public interface PlayerErrorHandler {
-    int getErrorCode();
+    /** Returns null when no SDK-provided error code is available — callers omit errorCode from events. */
+    Integer getErrorCode();
     String getErrorMessage();
 }
