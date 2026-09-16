@@ -49,7 +49,7 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
         if (adError != null) {
             sendError(adError.getErrorCodeNumber(), adError.getMessage());
         } else {
-            sendError(-9999, "Unknown IMA error");
+            sendError(null, "Unknown IMA error");
         }
     }
 

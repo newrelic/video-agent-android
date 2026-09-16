@@ -11,13 +11,11 @@ import com.theoplayer.android.api.error.THEOplayerException;
  */
 public class TheoErrorHandler implements PlayerErrorHandler {
 
-    private static final int DEFAULT_ERROR_CODE = -9999;
-
-    private final int errorCode;
+    private final Integer errorCode;   // null when no SDK-provided code is available
     private final String errorMessage;
 
     public TheoErrorHandler(Exception error) {
-        int code      = DEFAULT_ERROR_CODE;
+        Integer code   = null;
         String message = (error != null) ? error.getMessage() : "<Unknown error>";
 
         // THEOplayer wraps errors in THEOplayerException — extract code if available.
@@ -39,7 +37,7 @@ public class TheoErrorHandler implements PlayerErrorHandler {
     }
 
     @Override
-    public int getErrorCode() {
+    public Integer getErrorCode() {
         return errorCode;
     }
 
