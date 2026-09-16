@@ -84,9 +84,9 @@ public class ExoErrorHandlerTest {
     // ── IMA absent (default classpath in unit tests) ──────────────────────────
 
     @Test
-    public void imaAbsent_nonImaException_returnsDefaultCode() {
+    public void imaAbsent_nonImaException_returnsNullCode() {
         // IMA SDK is not on the test classpath — IMA_AVAILABLE should be false,
-        // so any non-IMA exception falls through to DEFAULT_ERROR_CODE.
+        // so any non-IMA exception falls through to null (no SDK-provided error code).
         ExoErrorHandler h = new ExoErrorHandler(new RuntimeException("network stall"));
         assertNull(h.getErrorCode());
     }
