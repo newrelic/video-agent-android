@@ -1,3 +1,8 @@
+## [4.5.2](https://github.com/newrelic/video-agent-android/compare/v4.5.1...v4.5.2) (2026-09-17)
+
+### Bug Fixes
+
+* **ci:** remove --no-ci from semantic-release to fix major version detection ([10037b3](https://github.com/newrelic/video-agent-android/commit/10037b39f9bac8ffbd9e0e808525e2267a72977f))
 ## [4.5.0](https://github.com/newrelic/video-agent-android/compare/v4.4.0...v4.5.0) (2026-08-31)
 
 ### Features
