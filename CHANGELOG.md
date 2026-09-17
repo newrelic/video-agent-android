@@ -1,4 +1,4 @@
-## [4.5.1](https://github.com/newrelic/video-agent-android/compare/v4.5.0...v4.5.1) (2026-09-17)
+## [5.0.0](https://github.com/newrelic/video-agent-android/compare/v4.5.0...v5.0.0) (2026-09-17)
 
 ### ⚠ BREAKING CHANGES
 
