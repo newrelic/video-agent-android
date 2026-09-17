@@ -51,11 +51,14 @@ jobs:
         id: get_version
         run: |
           CURRENT_VERSION="${{ steps.current_version.outputs.current_version }}"
-          
-          # Run dry-run
-          npx semantic-release --dry-run --no-ci > semantic-output.txt 2>&1 || true
-          cat semantic-output.txt 
-          
+
+          # Run semantic-release in CI mode (no --no-ci, no --dry-run) so it
+          # traverses the full merge-commit graph and detects feat! / BREAKING CHANGE
+          # from feature branches merged via merge commits.
+          npx semantic-release \
+            --repository-url "https://github.com/${{ github.repository }}.git" \
+            2>&1 | tee semantic-output.txt || true
+
           # Parse output
           NEXT_VERSION=$(grep "The next release version is" semantic-output.txt | sed -E 's/.*The next release version is ([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -1)
           
