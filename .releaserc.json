@@ -11,7 +11,7 @@
     [
       "@semantic-release/commit-analyzer",
       {
-        "preset": "angular",
+        "preset": "conventionalcommits",
         "releaseRules": [
           {"breaking": true, "release": "major"},
           {"type": "feat", "release": "minor"},
