@@ -1,7 +1,6 @@
 package com.newrelic.videoagent.core;
 
 import androidx.annotation.Nullable;
-import androidx.media3.exoplayer.ExoPlayer;
 
 import java.util.Map;
 
@@ -32,7 +31,7 @@ public class NRVideoPlayerConfiguration {
      * built against v4.2.0 and earlier.
      *
      * @deprecated Construct an {@link NRAdConfig} via its factory methods and
-     * pass it to {@link #NRVideoPlayerConfiguration(String, ExoPlayer, NRAdConfig, Map)}.
+     * pass it to {@link #NRVideoPlayerConfiguration(String, Object, NRAdConfig, Map)}.
      * <pre>
      *   AdTrackerType.NONE          →  null
      *   AdTrackerType.IMA           →  NRAdConfig.csai()
@@ -48,8 +47,14 @@ public class NRVideoPlayerConfiguration {
         MEDIA_TAILOR
     }
 
+    /** Pass to config-driven constructor to use NRTrackerExoPlayer. */
+    public static final String PLAYER_TYPE_EXO  = "exo";
+    /** Pass to config-driven constructor to use NRTrackerTHEOPlayer. */
+    public static final String PLAYER_TYPE_THEO = "theo";
+
     private final String playerName;
-    private final ExoPlayer player;
+    private final String playerType;
+    private final Object player;
     private final NRAdConfig adConfig;
     private final Map<String, Object> customAttributes;
 
@@ -65,36 +70,52 @@ public class NRVideoPlayerConfiguration {
      *                         emitted by this player's tracker. Pass {@code null}
      *                         if not needed.
      */
+    /**
+     * Config-driven constructor — Core resolves the tracker class from the playerType string.
+     * Customer still adds only the relevant module (NRExoPlayerTracker or NRTHEOPlayerTracker).
+     *
+     * @param playerType Use {@link #PLAYER_TYPE_EXO} or {@link #PLAYER_TYPE_THEO}.
+     */
     public NRVideoPlayerConfiguration(String playerName,
-                                       ExoPlayer player,
+                                       Object player,
+                                       String playerType,
                                        @Nullable NRAdConfig adConfig,
                                        @Nullable Map<String, Object> customAttributes) {
         this.playerName       = playerName;
+        this.playerType       = playerType;
         this.player           = player;
         this.adConfig         = adConfig;
         this.customAttributes = customAttributes;
     }
 
+    /** Legacy: pass player instance directly — NRVideo creates NRTrackerExoPlayer internally. */
+    public NRVideoPlayerConfiguration(String playerName,
+                                       Object player,
+                                       @Nullable NRAdConfig adConfig,
+                                       @Nullable Map<String, Object> customAttributes) {
+        this(playerName, player, null, adConfig, customAttributes);
+    }
+
     /**
-     * @deprecated Use {@link #NRVideoPlayerConfiguration(String, ExoPlayer, NRAdConfig, Map)}
+     * @deprecated Use {@link #NRVideoPlayerConfiguration(String, Object, NRAdConfig, Map)}
      * with {@link NRAdConfig#csai()} for ads or {@code null} for no ads.
      */
     @Deprecated
     public NRVideoPlayerConfiguration(String playerName,
-                                       ExoPlayer player,
+                                       Object player,
                                        boolean isAdEnabled,
                                        @Nullable Map<String, Object> customAttributes) {
         this(playerName, player, isAdEnabled ? NRAdConfig.csai() : null, customAttributes);
     }
 
     /**
-     * @deprecated Use {@link #NRVideoPlayerConfiguration(String, ExoPlayer, NRAdConfig, Map)}.
+     * @deprecated Use {@link #NRVideoPlayerConfiguration(String, Object, NRAdConfig, Map)}.
      * Map values: {@code NONE} → {@code null}, {@code IMA} → {@link NRAdConfig#csai()},
      * {@code MEDIA_TAILOR} → {@link NRAdConfig#mediaTailor()}.
      */
     @Deprecated
     public NRVideoPlayerConfiguration(String playerName,
-                                       ExoPlayer player,
+                                       Object player,
                                        AdTrackerType adTrackerType,
                                        @Nullable Map<String, Object> customAttributes) {
         this(playerName, player, toAdConfig(adTrackerType), customAttributes);
@@ -110,7 +131,11 @@ public class NRVideoPlayerConfiguration {
         return playerName;
     }
 
-    public ExoPlayer getPlayer() {
+    public String getPlayerType() {
+        return playerType;
+    }
+
+    public Object getPlayer() {
         return player;
     }
 

@@ -47,19 +47,19 @@ public class VideoPlayerAds extends AppCompatActivity implements AdErrorEvent.Ad
 
         if (video.equals("Tears")) {
             Log.v("VideoPlayer", "Play Tears");
-            playVideo("https://turtle-tube.appspot.com/t/t2/dash.mpd");
+            playVideo("https://storage.googleapis.com/wvmedia/clear/h264/tears/tears.mpd");
         }
         else if (video.equals("Playhouse")) {
             Log.v("VideoPlayer", "Play Playhouse");
-            playVideo("https://turtle-tube.appspot.com/t/t2/dash.mpd");
+            playVideo("https://storage.googleapis.com/wvmedia/clear/h264/tears/tears.mpd");
         }
         else if (video.equals("Kite")) {
             Log.v("VideoPlayer", "Play Kite");
-            playVideo("https://turtle-tube.appspot.com/t/t2/dash.mpd");
+            playVideo("https://storage.googleapis.com/wvmedia/clear/h264/tears/tears.mpd");
         }
         else if (video.equals("Live")) {
             Log.v("VideoPlayer", "Play Live");
-            playVideo("https://turtle-tube.appspot.com/t/t2/dash.mpd");
+            playVideo("https://storage.googleapis.com/wvmedia/clear/h264/tears/tears.mpd");
         }
         else {
             Log.v("VideoPlayer","Unknown video");

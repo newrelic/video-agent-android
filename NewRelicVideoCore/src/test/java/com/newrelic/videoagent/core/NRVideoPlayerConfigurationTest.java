@@ -1,7 +1,5 @@
 package com.newrelic.videoagent.core;
 
-import androidx.media3.exoplayer.ExoPlayer;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
@@ -18,7 +16,7 @@ import static org.junit.Assert.*;
 public class NRVideoPlayerConfigurationTest {
 
     @Mock
-    private ExoPlayer mockPlayer;
+    private Object mockPlayer;
 
     @Before
     public void setUp() {

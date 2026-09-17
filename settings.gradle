@@ -1,6 +1,7 @@
 include ':NRIMATracker'
 include ':NRMediaTailorTracker'
 include ':NRExoPlayerTracker'
+include ':NRTHEOPlayerTracker'
 include ':NewRelicVideoCore'
 include ':app'
 rootProject.name = "NRVideoProject"

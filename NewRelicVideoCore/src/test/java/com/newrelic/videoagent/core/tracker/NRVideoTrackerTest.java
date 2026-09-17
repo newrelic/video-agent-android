@@ -13,6 +13,7 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.Shadows;
 import org.robolectric.shadows.ShadowLooper;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import static com.newrelic.videoagent.core.NRDef.*;
@@ -460,7 +461,7 @@ public class NRVideoTrackerTest {
 
     @Test
     public void testGetAttributesWithCustomAttributes() {
-        Map<String, Object> customAttrs = new java.util.HashMap<>();
+        Map<String, Object> customAttrs = new HashMap<>();
         customAttrs.put("customKey", "customValue");
 
         Map<String, Object> attrs = tracker.getAttributes(CONTENT_START, customAttrs);
@@ -697,7 +698,7 @@ public class NRVideoTrackerTest {
 
     @Test
     public void testAttributesPersistCustomValues() {
-        Map<String, Object> customAttrs = new java.util.HashMap<>();
+        Map<String, Object> customAttrs = new HashMap<>();
         customAttrs.put("customKey1", "value1");
         customAttrs.put("customKey2", 42);
         customAttrs.put("customKey3", true);
@@ -763,5 +764,156 @@ public class NRVideoTrackerTest {
         }
 
         // Should handle concurrent attribute access
+    }
+
+    // ========== sendError() empty/null message normalisation ==========
+
+    /**
+     * Capturing subclass — intercepts sendVideoEvent so tests can assert on the
+     * exact attributes that flow into the event pipeline (i.e. what NRDB would receive).
+     */
+    private static class CapturingTracker extends NRVideoTracker {
+        Map<String, Object> lastEventAttributes;
+
+        @Override
+        public void sendVideoEvent(String eventType, Map<String, Object> attributes) {
+            lastEventAttributes = attributes != null ? new HashMap<>(attributes) : null;
+            // Do NOT call super — avoids network I/O in tests.
+        }
+
+        @Override
+        public void sendVideoErrorEvent(String eventType, Map<String, Object> attributes) {
+            // sendError() routes through sendVideoErrorEvent, not sendVideoEvent
+            lastEventAttributes = attributes != null ? new HashMap<>(attributes) : null;
+        }
+    }
+
+    @Test
+    public void sendError_emptyMessage_isReplacedWithUnknownError() {
+        CapturingTracker t = new CapturingTracker();
+        t.setPlayer(new Object());
+        t.sendRequest();
+        t.sendStart();
+
+        t.sendError(null, "");
+
+        assertNotNull("sendError must fire an event", t.lastEventAttributes);
+        assertEquals(
+            "empty errorMessage must be replaced with <Unknown error> before reaching NRDB",
+            "<Unknown error>", t.lastEventAttributes.get("errorMessage"));
+    }
+
+    @Test
+    public void sendError_blankMessage_isReplacedWithUnknownError() {
+        CapturingTracker t = new CapturingTracker();
+        t.setPlayer(new Object());
+        t.sendRequest();
+        t.sendStart();
+
+        t.sendError(null, "   ");
+
+        assertNotNull("sendError must fire an event", t.lastEventAttributes);
+        assertEquals(
+            "whitespace-only errorMessage must be replaced with <Unknown error> before reaching NRDB",
+            "<Unknown error>", t.lastEventAttributes.get("errorMessage"));
+    }
+
+    @Test
+    public void sendError_nullMessage_isReplacedWithUnknownError() {
+        CapturingTracker t = new CapturingTracker();
+        t.setPlayer(new Object());
+        t.sendRequest();
+        t.sendStart();
+
+        t.sendError(null, null);
+
+        assertNotNull("sendError must fire an event", t.lastEventAttributes);
+        assertEquals(
+            "null errorMessage must be replaced with <Unknown error> before reaching NRDB",
+            "<Unknown error>", t.lastEventAttributes.get("errorMessage"));
+    }
+
+    @Test
+    public void sendError_realMessage_isPreserved() {
+        CapturingTracker t = new CapturingTracker();
+        t.setPlayer(new Object());
+        t.sendRequest();
+        t.sendStart();
+
+        t.sendError(2004, "Connection timed out");
+
+        assertNotNull("sendError must fire an event", t.lastEventAttributes);
+        assertEquals("real errorMessage must reach NRDB unchanged",
+            "Connection timed out", t.lastEventAttributes.get("errorMessage"));
+        assertEquals("real errorCode must reach NRDB unchanged",
+            2004, t.lastEventAttributes.get("errorCode"));
+    }
+
+    @Test
+    public void sendError_nullCode_isAbsentFromEvent() {
+        CapturingTracker t = new CapturingTracker();
+        t.setPlayer(new Object());
+        t.sendRequest();
+        t.sendStart();
+
+        t.sendError(null, "some error");
+
+        assertNotNull("sendError must fire an event", t.lastEventAttributes);
+        assertFalse("null errorCode must NOT appear in the event",
+            t.lastEventAttributes.containsKey("errorCode"));
+    }
+
+    /**
+     * timeSince attributes from a previous session must NOT bleed into the first
+     * events of the next session after viewId increments.
+     *
+     * Note: timeSinceTable.applyAttributes() runs inside NRTracker.sendEvent() AFTER
+     * getAttributes() returns, so tests must call applyAttributes() directly on the
+     * protected timeSinceTable field to observe what the fully-assembled event carries.
+     *
+     * After the fix, sendRequest() calls generateTimeSinceTable(), resetting all timestamps.
+     */
+    @Test
+    public void timeSinceSeekEnd_doesNotBleedIntoNextSession_afterViewIdIncrement() {
+        // Session 1: record a seek-end timestamp in the timeSinceTable
+        tracker.setPlayer(new Object());
+        tracker.sendRequest();
+        tracker.sendStart();
+        // Drive timeSinceTable directly — simulates CONTENT_SEEK_END firing and recording the timestamp
+        Map<String, Object> seekAttrs = new HashMap<>();
+        tracker.timeSinceTable.applyAttributes(CONTENT_SEEK_END, seekAttrs);  // records ts.now()
+        tracker.sendEnd();
+
+        // Session 2: new session — sendRequest() calls generateTimeSinceTable(), resetting all entries
+        tracker.sendRequest();
+
+        // Apply timeSinceTable for CONTENT_BUFFER_START — its filter matches this event type.
+        // If the timestamp bled over, timeSinceSeekEnd would appear here.
+        Map<String, Object> bufferAttrs = new HashMap<>();
+        tracker.timeSinceTable.applyAttributes(CONTENT_BUFFER_START, bufferAttrs);
+
+        assertNull(
+            "timeSinceSeekEnd must be absent on CONTENT_BUFFER_START in a new session — " +
+            "sendRequest() must reset the timeSince table",
+            bufferAttrs.get("timeSinceSeekEnd"));
+    }
+
+    @Test
+    public void timeSinceSeekEnd_isPopulated_afterSeekInSameSession() {
+        // Positive case: timeSinceSeekEnd IS present when a seek occurred in the SAME session
+        tracker.setPlayer(new Object());
+        tracker.sendRequest();
+        tracker.sendStart();
+        // Record the seek-end timestamp in the current session's timeSinceTable
+        Map<String, Object> seekAttrs = new HashMap<>();
+        tracker.timeSinceTable.applyAttributes(CONTENT_SEEK_END, seekAttrs);  // records ts.now()
+
+        // CONTENT_BUFFER_START matches the filter — timeSinceSeekEnd should be present
+        Map<String, Object> bufferAttrs = new HashMap<>();
+        tracker.timeSinceTable.applyAttributes(CONTENT_BUFFER_START, bufferAttrs);
+
+        assertNotNull(
+            "timeSinceSeekEnd must be present on CONTENT_BUFFER_START when a seek occurred in this session",
+            bufferAttrs.get("timeSinceSeekEnd"));
     }
 }

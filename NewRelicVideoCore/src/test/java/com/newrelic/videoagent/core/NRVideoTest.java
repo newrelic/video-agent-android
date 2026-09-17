@@ -3,8 +3,6 @@ package com.newrelic.videoagent.core;
 import android.app.Application;
 import android.content.Context;
 
-import androidx.media3.exoplayer.ExoPlayer;
-
 import com.newrelic.videoagent.core.NRAdConfig;
 import com.newrelic.videoagent.core.tracker.NRTracker;
 
@@ -34,7 +32,7 @@ import static org.mockito.Mockito.*;
 public class NRVideoTest {
 
     @Mock
-    private ExoPlayer mockPlayer;
+    private Object mockPlayer;
 
     @Mock
     private NRVideoConfiguration mockConfig;

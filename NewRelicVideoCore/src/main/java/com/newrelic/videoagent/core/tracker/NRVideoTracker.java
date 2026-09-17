@@ -151,6 +151,14 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
      * Stop heartbeats and call `super.dispose()`.
      */
     public void dispose() {
+        // Close an active session so CONTENT_END is emitted before the tracker is torn down.
+        // goEnd() is idempotent — no-op if no session is active or it was already closed.
+        // This is a safety net for direct releaseTracker() calls that bypass the
+        // player-specific onDestroy() (e.g. NRTrackerTHEOPlayer.onDestroy() fires sendEnd()
+        // earlier while the player is still set; this path covers every other case).
+        if (state.isRequested) {
+            sendEnd();
+        }
         super.dispose();
         stopHeartbeat();
         // Unregister the QOE provider so a disposed tracker is no longer polled at harvest.
@@ -344,6 +352,10 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
      */
     public void sendRequest() {
         if (state.goRequest()) {
+            // Reset the timeSince table at every new session boundary so timestamps
+            // from the previous session do not bleed into
+            // the first events of the new session.
+            generateTimeSinceTable();
             playtimeSinceLastEventTimestamp = 0L;
 
             if (state.isAd) {
@@ -512,8 +524,9 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
      * Send buffer start event.
      */
     public void sendBufferStart() {
+        boolean wasPlaying = state.isPlaying;
         if (state.goBufferStart()) {
-            if(state.isPlaying){
+            if(wasPlaying){
                 state.accumulatedVideoWatchTime += state.chrono.getDeltaTime();
             }
             bufferType = calculateBufferType();
@@ -810,18 +823,24 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
     }
 
     /**
-     * Send request event.
-     *
-     * @param errorMessage Error message.
+     * Send error event.
+     * errorCode is nullable — pass null when no meaningful code is available so the
+     * errorCode attribute is omitted from the NRDB event.
+     * errorMessage is the primary signal when no code exists.
      */
-    public void sendError(int errorCode, String errorMessage) {
-        if (errorMessage == null) {
+    public void sendError(Integer errorCode, String errorMessage) {
+        if (errorMessage == null || errorMessage.trim().isEmpty()) {
             errorMessage = "<Unknown error>";
         }
         numberOfErrors++;
         Map<String, Object> errAttr = new HashMap<>();
         errAttr.put("errorMessage", errorMessage);
-        errAttr.put("errorCode", errorCode);
+        // Only include errorCode when a real value is available.
+        // Null means the error has no SDK-provided code — omitting it avoids
+        // polluting NRDB with meaningless sentinel values.
+        if (errorCode != null) {
+            errAttr.put("errorCode", errorCode);
+        }
 //        generatePlayElapsedTime();
         String actionName = CONTENT_ERROR;
         if (state.isAd) {
