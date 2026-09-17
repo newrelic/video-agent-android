@@ -298,6 +298,12 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
 
     void handleSeeking() {
         NRLog.d("THEOplayer: SEEKING");
+        // After a natural video end, THEOplayer fires SEEKING when the user seeks back
+        // instead of SOURCECHANGE, so no new session would be opened. Restart the session
+        // here to mirror ExoPlayer's automatic restart on STATE_BUFFERING when !isRequested.
+        if (!getState().isRequested) {
+            sendRequest();
+        }
         sendSeekStart();
     }
 

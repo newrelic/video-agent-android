@@ -233,4 +233,37 @@ public class NRTrackerTHEOPlayerEventTest {
         assertFalse("Same area must not emit CONTENT_RENDITION_CHANGE",
                 tracker.wasEventSent(CONTENT_RENDITION_CHANGE));
     }
+
+    // ── Replay after natural video end ────────────────────────────────────────
+
+    @Test
+    public void handleSeeking_afterVideoEnded_automaticallyRestartsSession() {
+        // Full playback session: source → play → end
+        tracker.handleSourceChange();
+        tracker.handlePlaying();
+        tracker.handleEnded();          // session closed: isRequested=false
+        tracker.clearEvents();
+
+        // User seeks back — THEOplayer fires SEEKING, not SOURCECHANGE.
+        // Without the fix this would be silently dropped.
+        tracker.handleSeeking();
+
+        assertTrue("SEEKING after video end must restart the session with CONTENT_REQUEST",
+                tracker.wasEventSent(CONTENT_REQUEST));
+    }
+
+    @Test
+    public void handleSeeking_duringActiveSession_doesNotRestartSession() {
+        // Normal mid-playback seek must NOT emit an extra CONTENT_REQUEST
+        tracker.handleSourceChange();
+        tracker.handlePlaying();
+        tracker.clearEvents();
+
+        tracker.handleSeeking();
+
+        assertFalse("SEEKING during active session must NOT emit CONTENT_REQUEST",
+                tracker.wasEventSent(CONTENT_REQUEST));
+        assertTrue("SEEKING during active session must emit CONTENT_SEEK_START",
+                tracker.wasEventSent(CONTENT_SEEK_START));
+    }
 }
