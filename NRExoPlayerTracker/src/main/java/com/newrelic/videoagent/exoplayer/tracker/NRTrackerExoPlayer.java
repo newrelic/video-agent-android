@@ -210,7 +210,10 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
     }
 
     public Long getActualBitrate() {
-        return actualBitrate;
+        if (actualBitrate > 0) {
+            return actualBitrate;
+        }
+        return null;
     }
 
     /**
@@ -767,8 +770,19 @@ public class NRTrackerExoPlayer extends NRVideoTracker implements Player.Listene
 
     @Override
     public void onLoadCompleted(@NonNull EventTime eventTime, @NonNull LoadEventInfo loadEventInfo, @NonNull MediaLoadData mediaLoadData) {
+        // HLS's main sample-stream wrapper tags muxed audio+video segment loads as
+        // TRACK_TYPE_DEFAULT rather than TRACK_TYPE_VIDEO (unlike DASH/progressive, whose
+        // chunk sources report TRACK_TYPE_VIDEO directly), so it also needs to be treated as
+        // a video load whenever the loaded format is actually video.
+        boolean isDefaultTrackCarryingVideo = mediaLoadData.trackType == C.TRACK_TYPE_DEFAULT
+                && mediaLoadData.trackFormat != null
+                && (mediaLoadData.trackFormat.height > 0
+                    || (mediaLoadData.trackFormat.sampleMimeType != null
+                        && mediaLoadData.trackFormat.sampleMimeType.startsWith("video/")));
+        boolean isVideoLoad = mediaLoadData.trackType == C.TRACK_TYPE_VIDEO || isDefaultTrackCarryingVideo;
+
         if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA
-                && mediaLoadData.trackType == C.TRACK_TYPE_VIDEO
+                && isVideoLoad
                 && loadEventInfo.loadDurationMs > 0) {
             // Set renditionBitrate from manifest/track format
             if (mediaLoadData.trackFormat != null && mediaLoadData.trackFormat.bitrate != C.INDEX_UNSET && mediaLoadData.trackFormat.bitrate > 0) {
