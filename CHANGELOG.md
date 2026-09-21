@@ -1,7 +1,5 @@
 ## [5.0.0](https://github.com/newrelic/video-agent-android/compare/v4.5.0...v5.0.0) (2026-09-17)
 
-### Notes
-
 - **Breaking change:** `NewRelicVideoCore` no longer bundles ExoPlayer as a
   compile-time dependency. Host apps must add `androidx.media3:media3-exoplayer`
   to their own `build.gradle`. `NRExoPlayerTracker` also declares it `compileOnly`
