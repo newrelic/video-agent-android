@@ -31,7 +31,7 @@
 ### Bug fixes
 
 - `timeSince` values from a closed session (e.g. `timeSinceSeekEnd`) leaked into
-  the first events of the next session (NR-617147). The timeSince table is now reset
+  the first events of the next session. The timeSince table is now reset
   at every session boundary (`sendRequest()`).
 - THEOplayer: `onDestroy()` now emits `CONTENT_END` before unregistering listeners,
   so the final event carries accurate playhead and attribute values regardless of when
