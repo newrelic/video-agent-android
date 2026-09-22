@@ -1,45 +1,43 @@
 ## [5.0.0](https://github.com/newrelic/video-agent-android/compare/v4.5.0...v5.0.0) (2026-09-17)
 
-### ⚠ BREAKING CHANGES
+- **Breaking change:** `NewRelicVideoCore` no longer bundles ExoPlayer as a
+  compile-time dependency. Host apps must add `androidx.media3:media3-exoplayer`
+  to their own `build.gradle`. `NRExoPlayerTracker` also declares it `compileOnly`
+  for the same reason.
+- **Breaking change:** `NRVideoPlayerConfiguration` constructors that previously
+  accepted `ExoPlayer` now accept `Object`. Existing ExoPlayer integrations compile
+  without source changes, but any `ExoPlayer` import previously pulled through the
+  transitive dependency must now be declared explicitly.
 
-* THEOplayer integration - add NRTHEOPlayerTracker module and sample app support
+### New features
 
-### Features
+- **THEOplayer support:** A new `NRTHEOPlayerTracker` module
+  (`com.github.newrelic:NRTHEOPlayerTracker`) instruments THEOplayer for content
+  playback, ad tracking, and error events. The THEOplayer SDK is declared
+  `compileOnly` — the host app provides it. Integrate via
+  `NRVideoPlayerConfiguration.PLAYER_TYPE_THEO`.
+- **Player-agnostic initialization:** `NRVideoPlayerConfiguration` now supports
+  three initialization patterns: a pre-built tracker passed directly, a config-driven
+  `playerType` string (`"exo"` or `"theo"`) that resolves the tracker at runtime via
+  reflection, and the existing legacy path for backward compatibility. This removes
+  the hard ExoPlayer compile dependency from Core.
+- **Structured error handling:** A new `PlayerErrorHandler` interface and per-player
+  implementations (`ExoErrorHandler`, `TheoErrorHandler`) extract typed error codes
+  and messages from player-specific exceptions, providing consistent error attributes
+  across player types.
 
-* THEOplayer integration - add NRTHEOPlayerTracker module and sample app support ([2dd4c74](https://github.com/newrelic/video-agent-android/commit/2dd4c7404f58435fd06464115911ff27211f19bd))
+### Bug fixes
 
-### Bug Fixes
+- `timeSince` values from a closed session (e.g. `timeSinceSeekEnd`) leaked into
+  the first events of the next session. The timeSince table is now reset
+  at every session boundary (`sendRequest()`).
+- THEOplayer: `onDestroy()` now emits `CONTENT_END` before unregistering listeners,
+  so the final event carries accurate playhead and attribute values regardless of when
+  the activity is destroyed.
+- All trackers: `dispose()` now emits `CONTENT_END` before teardown as a safety net
+  for integrations that call `NRVideo.releaseTracker()` directly without going through
+  the player-specific `onDestroy()`.
 
-* Add error handler ([aa15588](https://github.com/newrelic/video-agent-android/commit/aa15588d746e9dcdd06366add3e603d9236712b4))
-* Add Read Me file ([4211fa4](https://github.com/newrelic/video-agent-android/commit/4211fa4e6e14332e7831d72281886a9dc6221851))
-* Add Rendition shift ([986d754](https://github.com/newrelic/video-agent-android/commit/986d75431f92fecead5447fecbb260569ee2e048))
-* Add unit test ([d3bd446](https://github.com/newrelic/video-agent-android/commit/d3bd4468fda827d40fa7c9321e281005c625e542))
-* Added test cases ([8ce3e16](https://github.com/newrelic/video-agent-android/commit/8ce3e162a1527efa05bfca8d83ae6df83f87706e))
-* **ci:** remove --no-ci from semantic-release to fix major version detection ([10037b3](https://github.com/newrelic/video-agent-android/commit/10037b39f9bac8ffbd9e0e808525e2267a72977f))
-* **ci:** remove --no-ci from semantic-release to fix major version detection ([5ba9248](https://github.com/newrelic/video-agent-android/commit/5ba9248a91bd34a93a5f166e37d7932b9aacdc01))
-* Error code to null ([81c4cf5](https://github.com/newrelic/video-agent-android/commit/81c4cf5a7be54466f1cda64f3d5a7b3447c023ba))
-* Fix CI failure ([477a0f8](https://github.com/newrelic/video-agent-android/commit/477a0f86486a327949e55bdf973f16bb332edea9))
-* Fix CI failure ([e148b40](https://github.com/newrelic/video-agent-android/commit/e148b400b033f9116f5ac7bd0e816ca1cf933bc2))
-* Fix CI failure ([702b951](https://github.com/newrelic/video-agent-android/commit/702b951b0899f506064ec075ac01da090613aff6))
-* Release tracker issue ([150ba91](https://github.com/newrelic/video-agent-android/commit/150ba91ae345cf7651247a40a3fc3dd7e84ac6a2))
-* Remove config driven code ([943250c](https://github.com/newrelic/video-agent-android/commit/943250c1a224dac620c8ddf4ec7fd9a1c9759f63))
-* Remove default code reference ([7786407](https://github.com/newrelic/video-agent-android/commit/7786407b2aa33b3d3433ebd2fd49b053f061d1cd))
-* Remove unused code ([cfe3822](https://github.com/newrelic/video-agent-android/commit/cfe3822b1b434286ba23a09b91c110425030803b))
-* Remove unused code ([d24ad47](https://github.com/newrelic/video-agent-android/commit/d24ad47cee480bd0cb19394f573e99b1c829c0d6))
-* Rephrased the statement ([94c89a6](https://github.com/newrelic/video-agent-android/commit/94c89a6c3790a4b5f3b32f196c23bd7522b05595))
-* Resize the video ([66497c5](https://github.com/newrelic/video-agent-android/commit/66497c5bfefc5c677de31cf062bafd9e2e8671c8))
-* Review comments ([1114cc5](https://github.com/newrelic/video-agent-android/commit/1114cc5550835f0c5c3c09be9bfbaa343c8fcf08))
-* Review comments ([b8a7283](https://github.com/newrelic/video-agent-android/commit/b8a7283bd29cad0618d8072f2f45d4fffa2f2c60))
-* Sample app ([90b5078](https://github.com/newrelic/video-agent-android/commit/90b507867143d0dac217698ad2d58a4aad12a200))
-* Test cases ([e4802cb](https://github.com/newrelic/video-agent-android/commit/e4802cbaa5d5d845e1ded471d663b97182cdd342))
-* **theo:** restart session on seek-back after video end ([89f618d](https://github.com/newrelic/video-agent-android/commit/89f618dfaa8f4b39cb70558390ec98e5546be9d9))
-* timeSince-session-boundary ([2fd6442](https://github.com/newrelic/video-agent-android/commit/2fd6442f19fbc563296218e8d91bcc98c4fc15d5))
-* Update comment ([a97425b](https://github.com/newrelic/video-agent-android/commit/a97425bf27a6d35edb41047925312295806d3ad0))
-* Update ReadMe file ([5f38e1c](https://github.com/newrelic/video-agent-android/commit/5f38e1cbc181b737e9688fe02e23aeeed1e43b81))
-* Update the video url ([75a2be1](https://github.com/newrelic/video-agent-android/commit/75a2be15ab4650ee8dbf048cf64834dedf990884))
-* Updated error handler ([e8640c8](https://github.com/newrelic/video-agent-android/commit/e8640c822fab4f6e4adc65af08aa2f3d0f32d444))
-* Updated error handler part ([c271102](https://github.com/newrelic/video-agent-android/commit/c271102d9d22976e0bb5d99ff89abe27653ce795))
-* Updated with config driven ([cb6536a](https://github.com/newrelic/video-agent-android/commit/cb6536a15fb84d1a5a347e7630efa5727f3bd18c))
 ## [4.5.0](https://github.com/newrelic/video-agent-android/compare/v4.4.0...v4.5.0) (2026-08-31)
 
 ### Features
