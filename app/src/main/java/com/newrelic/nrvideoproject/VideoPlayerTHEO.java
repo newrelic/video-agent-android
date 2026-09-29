@@ -10,13 +10,11 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.newrelic.videoagent.core.NRVideo;
 import com.newrelic.videoagent.core.NRVideoPlayerConfiguration;
-import com.newrelic.videoagent.core.NewRelicVideoAgent;
-import com.newrelic.videoagent.core.tracker.NRTracker;
-import com.newrelic.videoagent.theoplayer.tracker.NRTrackerTHEOPlayer;
 import java.util.HashMap;
 import java.util.Map;
 
 import com.theoplayer.android.api.THEOplayerView;
+import com.theoplayer.android.api.player.Player;
 import com.theoplayer.android.api.event.player.PlayerEventTypes;
 import com.theoplayer.android.api.source.SourceDescription;
 import com.theoplayer.android.api.source.TypedSource;
@@ -88,14 +86,15 @@ public class VideoPlayerTHEO extends AppCompatActivity {
         txtPlayhead    = findViewById(R.id.txt_playhead);
         txtLastEvent   = findViewById(R.id.txt_last_event);
 
-        // Register NR tracker
+        // Register NR tracker 
+        Player theoplayer = theoPlayerView.getPlayer();
         Map<String, Object> customAttr = new HashMap<>();
         customAttr.put("something", "This is my test title");
         customAttr.put("myAttrStr", "Hello");
         customAttr.put("myAttrInt", 101);
         customAttr.put("name", "nr-video-agent-android-01-24JUL-john-starc");
         trackerId = NRVideo.addPlayer(
-                new NRVideoPlayerConfiguration("theo-player", theoPlayerView,
+                new NRVideoPlayerConfiguration("theo-player", theoplayer,
                         NRVideoPlayerConfiguration.PLAYER_TYPE_THEO, null, customAttr));
 
         NRVideo.setUserId("test-theo-001");
@@ -341,10 +340,7 @@ seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
 
     @Override protected void onDestroy() {
         super.onDestroy();
-        NRTracker tracker = NewRelicVideoAgent.getInstance().getContentTracker(trackerId);
-        if (tracker instanceof NRTrackerTHEOPlayer) {
-            ((NRTrackerTHEOPlayer) tracker).onDestroy();
-        }
         NRVideo.releaseTracker(trackerId);
+        if (theoPlayerView != null) theoPlayerView.onDestroy();
     }
 }

@@ -5,7 +5,6 @@ import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.theoplayer.BuildConfig;
 
-import com.theoplayer.android.api.THEOplayerView;
 import com.newrelic.videoagent.theoplayer.exception.TheoErrorHandler;
 import com.theoplayer.android.api.error.THEOplayerException;
 import com.theoplayer.android.api.event.EventListener;
@@ -43,18 +42,18 @@ import static com.newrelic.videoagent.core.NRDef.*;
  * <p>Usage:</p>
  * <pre>
  *   // Pass the THEOplayerView and PLAYER_TYPE_THEO — NRVideo instantiates the tracker internally.
+ *
  *   Integer trackerId = NRVideo.addPlayer(
- *       new NRVideoPlayerConfiguration("theo-player", theoPlayerView,
+ *       new NRVideoPlayerConfiguration("theo-player", theoplayer,
  *           NRVideoPlayerConfiguration.PLAYER_TYPE_THEO, null, null));
  *
- *   // Forward Activity lifecycle via the tracker retrieved from NRVideo
- *   {@literal @}Override protected void onResume()  { super.onResume();  if (theoPlayerView != null) theoPlayerView.onResume(); }
- *   {@literal @}Override protected void onPause()   { super.onPause();   if (theoPlayerView != null) theoPlayerView.onPause(); }
+ *   // Activity lifecycle must still be forwarded directly to THEOplayerView (THEOplayer SDK requirement)
+ *   {@literal @}Override protected void onResume()  { super.onResume();  theoPlayerView.onResume(); }
+ *   {@literal @}Override protected void onPause()   { super.onPause();   theoPlayerView.onPause(); }
  *   {@literal @}Override protected void onDestroy() {
  *       super.onDestroy();
- *       NRTracker t = NewRelicVideoAgent.getInstance().getContentTracker(trackerId);
- *       if (t instanceof NRTrackerTHEOPlayer) ((NRTrackerTHEOPlayer) t).onDestroy();
  *       NRVideo.releaseTracker(trackerId);
+ *       theoPlayerView.onDestroy();
  *   }
  * </pre>
  *
@@ -62,7 +61,6 @@ import static com.newrelic.videoagent.core.NRDef.*;
  */
 public class NRTrackerTHEOPlayer extends NRVideoTracker {
 
-    protected THEOplayerView theoPlayerView;
     protected Player player;
 
     // Per-rendition change direction ("up" | "down" | null)
@@ -109,11 +107,11 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
     }
 
     /**
-     * Create a tracker and attach it to a {@link THEOplayerView} immediately.
+     * Create a tracker and attach it to a {@link Player} immediately.
      */
-    public NRTrackerTHEOPlayer(NRVideoConfiguration configuration, THEOplayerView theoPlayerView) {
+    public NRTrackerTHEOPlayer(NRVideoConfiguration configuration, Player theoplayer) {
         super(configuration);
-        setPlayer(theoPlayerView);
+        setPlayer(theoplayer);
     }
 
     // -------------------------------------------------------------------------
@@ -121,62 +119,25 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
     // -------------------------------------------------------------------------
 
     /**
-     * Attach the tracker to a {@link THEOplayerView}.
+     * Attach the tracker to a THEOplayer {@link Player} instance.
+     * Obtain it from your THEOplayerView: {@code theoPlayerView.getPlayer()}.
      *
-     * @param player A {@link THEOplayerView} instance.
+     * @param player A THEOplayer {@link Player} instance.
      */
     @Override
     public void setPlayer(Object player) {
-        if (!(player instanceof THEOplayerView)) {
+        if (!(player instanceof Player)) {
             throw new IllegalArgumentException(
-                "[NRTrackerTHEOPlayer] Expected a THEOplayerView but received: " +
-                (player == null ? "null" : player.getClass().getName()));
+                "[NRTrackerTHEOPlayer] Expected a THEOplayer Player instance but received: " +
+                (player == null ? "null" : player.getClass().getName()) +
+                ". Pass theoPlayerView.getPlayer(), not the THEOplayerView itself.");
         }
-        if (this.theoPlayerView != null) {
+        if (this.player != null) {
             unregisterListeners();
         }
-        this.theoPlayerView = (THEOplayerView) player;
-        this.player = this.theoPlayerView.getPlayer();
+        this.player = (Player) player;
         registerListeners();
         super.setPlayer(player);
-    }
-
-    // -------------------------------------------------------------------------
-    // Lifecycle pass-throughs
-    // -------------------------------------------------------------------------
-
-    /** Forward Activity#onResume to THEOplayerView. */
-    public void onResume() {
-        if (theoPlayerView != null) {
-            theoPlayerView.onResume();
-        }
-    }
-
-    /** Forward Activity#onPause to THEOplayerView. */
-    public void onPause() {
-        if (theoPlayerView != null) {
-            theoPlayerView.onPause();
-        }
-    }
-
-    /**
-     * Forward Activity#onDestroy to THEOplayerView and clean up listeners.
-     * Call {@code NRVideo.releaseTracker(trackerId)} after this.
-     *
-     * Fires CONTENT_END before unregistering listeners so the final event carries
-     * accurate playhead and attribute values (player is still set at this point).
-     */
-    public void onDestroy() {
-        // Close the NR session while player is still set — attributes are accurate here.
-        // goEnd() is idempotent: no-op if no session is active.
-        if (getState().isRequested) {
-            sendEnd();
-        }
-        THEOplayerView view = theoPlayerView;
-        unregisterListeners();  // nulls theoPlayerView — capture before calling
-        if (view != null) {
-            view.onDestroy();
-        }
     }
 
     // -------------------------------------------------------------------------
@@ -364,7 +325,6 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
         }
 
         player               = null;
-        theoPlayerView       = null;
         renditionChangeShift = null;
         lastRenditionWidth   = 0;
         lastRenditionHeight  = 0;
@@ -689,14 +649,7 @@ public class NRTrackerTHEOPlayer extends NRVideoTracker {
     // -------------------------------------------------------------------------
 
     /**
-     * Obtain the THEOplayerView held by this tracker.
-     */
-    public THEOplayerView getTHEOPlayerView() {
-        return theoPlayerView;
-    }
-
-    /**
-     * Obtain the underlying THEOplayer Player interface.
+     * Obtain the THEOplayer Player interface held by this tracker.
      */
     public Player getPlayer() {
         return player;
