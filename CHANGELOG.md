@@ -1,8 +1,13 @@
 ## [5.0.1](https://github.com/newrelic/video-agent-android/compare/v5.0.0...v5.0.1) (2026-09-29)
 
-### Bug Fixes
+### Breaking changes
 
-* Update Theo Tracker to accept player ([c19c781](https://github.com/newrelic/video-agent-android/commit/c19c781eb60bc93972531abf11158d680f9f53bd))
+- **THEOplayer tracker API corrected:** `NRTrackerTHEOPlayer` now accepts a
+  THEOplayer `Player` instance instead of a `THEOplayerView`. Update your
+  integration to pass `theoplayer` instance rather than the view itself.
+  The tracker no longer proxies Activity lifecycle — forward `onResume()`,
+  `onPause()`, and `onDestroy()` directly to `THEOplayerView`.
+
 ## [5.0.0](https://github.com/newrelic/video-agent-android/compare/v4.5.0...v5.0.0) (2026-09-17)
 
 - **Breaking change:** `NewRelicVideoCore` no longer bundles ExoPlayer as a
