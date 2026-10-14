@@ -1,3 +1,8 @@
+## [5.0.2](https://github.com/newrelic/video-agent-android/compare/v5.0.1...v5.0.2) (2026-10-14)
+
+### Bug Fixes
+
+* **android:** report contentBitrate for HLS streams instead of 0 ([5880f2c](https://github.com/newrelic/video-agent-android/commit/5880f2c3f613f3ce3e4619b4c79f585a393104ba))
 ## [5.0.1](https://github.com/newrelic/video-agent-android/compare/v5.0.0...v5.0.1) (2026-09-29)
 
 ### Breaking changes
