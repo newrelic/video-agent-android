@@ -1,3 +1,14 @@
+## [5.0.2](https://github.com/newrelic/video-agent-android/compare/v5.0.1...v5.0.2) (2026-10-14)
+
+### Bug fixes
+
+- **ExoPlayer / HLS:** `contentBitrate` always reported `0` for HLS streams. media3
+  internally classifies muxed audio+video HLS segment loads as `TRACK_TYPE_DEFAULT`
+  rather than `TRACK_TYPE_VIDEO` (unlike DASH and progressive streams, which were
+  unaffected). The tracker's bitrate-capture logic only fired for `TRACK_TYPE_VIDEO`,
+  so HLS loads never populated the field. `contentBitrate` now correctly reflects the
+  actual stream bitrate for HLS content.
+  
 ## [5.0.1](https://github.com/newrelic/video-agent-android/compare/v5.0.0...v5.0.1) (2026-09-29)
 
 ### Breaking changes
