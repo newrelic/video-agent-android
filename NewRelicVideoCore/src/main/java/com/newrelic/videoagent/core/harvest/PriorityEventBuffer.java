@@ -6,10 +6,9 @@ import java.util.ArrayList;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import com.newrelic.videoagent.core.NRVideoConstants;
-import com.newrelic.videoagent.core.utils.NRLog;
+import com.newrelic.videoagent.core.utils.BufferDropLogger;
 
 /**
  * Video-optimized priority event buffer for mobile/TV environments
@@ -39,10 +38,9 @@ public class PriorityEventBuffer implements EventBufferInterface {
     private final boolean isAndroidTVDevice;
     private final boolean isRunningInLowMemory;
 
-    // Buffer drop logging: WARNING latched once per 90% crossing (reset on drain), cumulative drop count for the session
-    private final AtomicBoolean liveNearFullLogged = new AtomicBoolean(false);
-    private final AtomicBoolean ondemandNearFullLogged = new AtomicBoolean(false);
-    private final AtomicLong droppedEventCount = new AtomicLong(0);
+    // Buffer fill/drop logging per queue; one cumulative drop count for the whole buffer
+    private final BufferDropLogger liveDropLogger;
+    private final BufferDropLogger ondemandDropLogger;
 
     // Enhanced callback support
     private OverflowCallback overflowCallback;
@@ -61,6 +59,10 @@ public class PriorityEventBuffer implements EventBufferInterface {
             this.MAX_LIVE_EVENTS = 150;      // 150 × 2KB = 300KB (conservative for mobile)
             this.MAX_ONDEMAND_EVENTS = 350;  // 350 × 2KB = 700KB (balanced for mobile)
         }
+
+        AtomicLong droppedEventCount = new AtomicLong(0);
+        this.liveDropLogger = new BufferDropLogger("Live", MAX_LIVE_EVENTS, droppedEventCount);
+        this.ondemandDropLogger = new BufferDropLogger("On-demand", MAX_ONDEMAND_EVENTS, droppedEventCount);
     }
 
     /**
@@ -100,22 +102,20 @@ public class PriorityEventBuffer implements EventBufferInterface {
         // Check capacity thresholds AFTER the event is added
         double currentCapacity = (double) targetQueue.size() / maxCapacity;
 
+        (isLiveContent ? liveDropLogger : ondemandDropLogger).checkFill(targetQueue.size());
+
         // Check for 90% threshold (overflow prevention)
         if (currentCapacity >= 0.9) {
             shouldTriggerHarvest = true;
             harvestType = isLiveContent ? NRVideoConstants.EVENT_TYPE_LIVE : NRVideoConstants.EVENT_TYPE_ONDEMAND;
-            if ((isLiveContent ? liveNearFullLogged : ondemandNearFullLogged).compareAndSet(false, true)) {
-                NRLog.w("Event buffer (" + harvestType + ") near capacity: " + targetQueue.size() + "/" + maxCapacity
-                        + " events (>=90%), triggering emergency harvest");
-            }
         }
 
         // Fallback: if we somehow still reach max capacity, remove oldest events
         while (liveEvents.size() > MAX_LIVE_EVENTS) {
-            recordDrop(liveEvents.poll(), NRVideoConstants.EVENT_TYPE_LIVE, MAX_LIVE_EVENTS);
+            if (liveEvents.poll() != null) liveDropLogger.recordDrop();
         }
         while (ondemandEvents.size() > MAX_ONDEMAND_EVENTS) {
-            recordDrop(ondemandEvents.poll(), NRVideoConstants.EVENT_TYPE_ONDEMAND, MAX_ONDEMAND_EVENTS);
+            if (ondemandEvents.poll() != null) ondemandDropLogger.recordDrop();
         }
 
         if (shouldStartScheduler) {
@@ -140,7 +140,7 @@ public class PriorityEventBuffer implements EventBufferInterface {
             // Fast path: Check if queue is empty before acquiring lock (optimization)
             ConcurrentLinkedQueue<Map<String, Object>> targetQueue = isLivePriority ? liveEvents : ondemandEvents;
             if (targetQueue.isEmpty()) {
-                (isLivePriority ? liveNearFullLogged : ondemandNearFullLogged).set(false);
+                (isLivePriority ? liveDropLogger : ondemandDropLogger).checkFill(0);
                 return new ArrayList<>(); // No lock needed for empty queue
             }
 
@@ -206,10 +206,7 @@ public class PriorityEventBuffer implements EventBufferInterface {
                 // Mobile optimization: Prefer smaller, frequent batches for responsiveness
             }
 
-            int maxCapacity = isLivePriority ? MAX_LIVE_EVENTS : MAX_ONDEMAND_EVENTS;
-            if ((double) targetQueue.size() / maxCapacity < 0.9) {
-                (isLivePriority ? liveNearFullLogged : ondemandNearFullLogged).set(false);
-            }
+            (isLivePriority ? liveDropLogger : ondemandDropLogger).checkFill(targetQueue.size());
 
             return batch;
         } catch (InterruptedException e) {
@@ -244,19 +241,8 @@ public class PriorityEventBuffer implements EventBufferInterface {
     public void clear() {
         liveEvents.clear();
         ondemandEvents.clear();
-        liveNearFullLogged.set(false);
-        ondemandNearFullLogged.set(false);
-    }
-
-    /**
-     * Logs an evicted event at ERROR level with the cumulative session drop count.
-     * Called on every drop (no rate limiting); a null event means nothing was evicted.
-     */
-    private void recordDrop(Map<String, Object> evicted, String type, int maxCapacity) {
-        if (evicted == null) return;
-        long total = droppedEventCount.incrementAndGet();
-        NRLog.e("Event buffer (" + type + ") full at " + maxCapacity + " events, dropped oldest event. "
-                + "Total events dropped this session: " + total);
+        liveDropLogger.checkFill(0);
+        ondemandDropLogger.checkFill(0);
     }
 
     /**

@@ -30,6 +30,7 @@ public class PriorityEventBufferDropLoggingTest {
     // Mobile on-demand capacity is 350 events; 90% is 315
     private static final int MAX_ONDEMAND = 350;
     private static final int NEAR_FULL = 315;
+    private static final int INFO_FILL = 298; // 85% of 350 is 297.5
 
     private PriorityEventBuffer buffer;
 
@@ -66,11 +67,43 @@ public class PriorityEventBufferDropLoggingTest {
     }
 
     @Test
-    public void noLogsBelowNinetyPercent() {
+    public void noLogsBelowEightyFivePercent() {
+        addEvents(INFO_FILL - 1);
+
+        assertEquals(0, ShadowLog.getLogs().size());
+    }
+
+    @Test
+    public void infoOnceAtEightyFivePercent() {
         addEvents(NEAR_FULL - 1);
 
+        assertEquals(1, countLogs(Log.INFO));
         assertEquals(0, countLogs(Log.WARN));
-        assertEquals(0, countLogs(Log.ERROR));
+        assertTrue(ShadowLog.getLogs().get(0).msg.contains("On-demand buffer 85% full (298 of 350 events)"));
+    }
+
+    @Test
+    public void infoLatchResetsAfterDrain() {
+        addEvents(INFO_FILL);
+        assertEquals(1, countLogs(Log.INFO));
+
+        while (!buffer.pollBatchByPriority(Integer.MAX_VALUE, null, NRVideoConstants.EVENT_TYPE_ONDEMAND).isEmpty()) {
+            // drain
+        }
+        addEvents(INFO_FILL);
+        assertEquals(2, countLogs(Log.INFO));
+    }
+
+    @Test
+    public void liveAndOnDemandLatchIndependently() {
+        addEvents(INFO_FILL);
+        for (int i = 0; i < 128; i++) { // 85% of 150 is 127.5
+            Map<String, Object> event = new HashMap<>();
+            event.put("contentIsLive", true);
+            buffer.addEvent(event);
+        }
+
+        assertEquals(2, countLogs(Log.INFO));
     }
 
     @Test
@@ -101,7 +134,7 @@ public class PriorityEventBufferDropLoggingTest {
 
         assertEquals(3, countLogs(Log.ERROR));
         int last = ShadowLog.getLogs().size() - 1;
-        assertTrue(ShadowLog.getLogs().get(last).msg.contains("Total events dropped this session: 3"));
+        assertTrue(ShadowLog.getLogs().get(last).msg.contains("Total dropped this session: 3"));
     }
 
     @Test
@@ -113,7 +146,7 @@ public class PriorityEventBufferDropLoggingTest {
         addEvents(MAX_ONDEMAND + 1);
 
         int last = ShadowLog.getLogs().size() - 1;
-        assertTrue(ShadowLog.getLogs().get(last).msg.contains("Total events dropped this session: 2"));
+        assertTrue(ShadowLog.getLogs().get(last).msg.contains("Total dropped this session: 2"));
     }
 
     @Test
@@ -128,6 +161,7 @@ public class PriorityEventBufferDropLoggingTest {
         NRLog.setLevel(NRLogLevel.ERROR);
         addEvents(MAX_ONDEMAND + 1);
 
+        assertEquals(0, countLogs(Log.INFO));
         assertEquals(0, countLogs(Log.WARN));
         assertEquals(1, countLogs(Log.ERROR));
     }

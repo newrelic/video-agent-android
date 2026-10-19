@@ -28,7 +28,7 @@ public class NRVideoConfigurationLoggingTest {
     @Test
     public void enableLoggingWithLevel() {
         NRVideoConfiguration config = new NRVideoConfiguration.Builder(TOKEN)
-                .enableLogging(NRLogLevel.WARNING)
+                .enableLogging(true, NRLogLevel.WARNING)
                 .build();
 
         assertTrue(config.isDebugLoggingEnabled());
@@ -38,11 +38,17 @@ public class NRVideoConfigurationLoggingTest {
     @Test
     public void plainEnableLoggingClearsEarlierLevel() {
         NRVideoConfiguration config = new NRVideoConfiguration.Builder(TOKEN)
-                .enableLogging(NRLogLevel.ERROR)
+                .enableLogging(true, NRLogLevel.ERROR)
                 .enableLogging()
                 .build();
 
         assertTrue(config.isDebugLoggingEnabled());
         assertNull(config.getLoggingLevel());
+    }
+
+    @Test
+    public void enableLoggingBooleanTogglesFlag() {
+        assertTrue(new NRVideoConfiguration.Builder(TOKEN).enableLogging(true).build().isDebugLoggingEnabled());
+        assertFalse(new NRVideoConfiguration.Builder(TOKEN).enableLogging(true).enableLogging(false).build().isDebugLoggingEnabled());
     }
 }
