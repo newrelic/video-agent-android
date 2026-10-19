@@ -331,24 +331,17 @@ public final class NRVideoConfiguration {
 
         public Builder enableLogging() {
             this.debugLoggingEnabled = true;
+            this.loggingLevel = null;
             return this;
         }
 
         /**
-         * Enable or disable agent logging to Logcat (default: disabled)
-         * @param enabled true to enable logging
+         * Enable agent logging to Logcat with a minimum level (INFO, WARNING or ERROR).
+         * When a level is set, debug messages are suppressed. Buffer capacity warnings are
+         * WARNING level; dropped events are ERROR level. Use enableLogging() to log everything.
          */
-        public Builder enableLogging(boolean enabled) {
-            this.debugLoggingEnabled = enabled;
-            return this;
-        }
-
-        /**
-         * Set the minimum level logged when logging is enabled (INFO, WARNING or ERROR).
-         * When set, debug messages are suppressed. Default: null (log everything).
-         * Buffer capacity warnings are WARNING level; dropped events are ERROR level.
-         */
-        public Builder withLoggingLevel(NRLogLevel level) {
+        public Builder enableLogging(NRLogLevel level) {
+            this.debugLoggingEnabled = true;
             this.loggingLevel = level;
             return this;
         }
