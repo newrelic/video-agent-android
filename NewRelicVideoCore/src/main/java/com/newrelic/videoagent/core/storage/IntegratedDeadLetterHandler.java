@@ -37,6 +37,7 @@ public class IntegratedDeadLetterHandler {
     private final AtomicLong totalEventsBackedUp = new AtomicLong(0);
 
     // Thread safety
+    // Evictions only: fill thresholds for the in-memory queue are logged by DeadLetterEventBuffer itself
     private final BufferDropLogger dropLogger;
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
 
@@ -139,7 +140,6 @@ public class IntegratedDeadLetterHandler {
             List<Map<String, Object>> pendingEvents = inMemoryQueue.pollBatchByPriority(
                 emergencyBatchSize, null, NRVideoConstants.EVENT_TYPE_ONDEMAND);
 
-            dropLogger.checkFill(inMemoryQueue.getEventCount());
             if (!pendingEvents.isEmpty()) {
                 List<Map<String, Object>> cleanEvents = new ArrayList<>();
                 for (Map<String, Object> event : pendingEvents) {
@@ -176,7 +176,6 @@ public class IntegratedDeadLetterHandler {
                 }
             }
             inMemoryQueue.addEvent(event);
-            dropLogger.checkFill(inMemoryQueue.getEventCount());
         }
     }
 

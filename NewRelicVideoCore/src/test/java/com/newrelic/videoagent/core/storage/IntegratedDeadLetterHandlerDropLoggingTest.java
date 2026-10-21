@@ -97,14 +97,6 @@ public class IntegratedDeadLetterHandlerDropLoggingTest {
     }
 
     @Test
-    public void infoAndWarningOncePerCrossing() {
-        handler.handleFailedEvents(events(25), NRVideoConstants.EVENT_TYPE_ONDEMAND);
-
-        assertEquals(1, countLogs(Log.INFO));
-        assertEquals(1, countLogs(Log.WARN));
-    }
-
-    @Test
     public void exhaustedRetriesAreBackedUpNotDropped() {
         Map<String, Object> exhausted = new HashMap<>();
         Map<String, Object> meta = new HashMap<>();
@@ -117,5 +109,17 @@ public class IntegratedDeadLetterHandlerDropLoggingTest {
 
         verify(mockMainBuffer).backupFailedEvents(anyList());
         assertEquals(0, countLogs(Log.ERROR));
+    }
+
+    @Test
+    public void fillLinesComeFromOneLoggerAtDefaultCapacity() {
+        when(mockConfiguration.getMaxDeadLetterSize()).thenReturn(100);
+        handler = new IntegratedDeadLetterHandler(mockMainBuffer, mockHttpClient, mockConfiguration);
+        ShadowLog.clear();
+
+        handler.handleFailedEvents(events(130), NRVideoConstants.EVENT_TYPE_ONDEMAND);
+
+        assertEquals(1, countLogs(Log.INFO));
+        assertEquals(1, countLogs(Log.WARN));
     }
 }
