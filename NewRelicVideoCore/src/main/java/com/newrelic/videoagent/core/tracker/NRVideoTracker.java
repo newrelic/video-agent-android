@@ -472,7 +472,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                         NRVideo.getInstance().getHarvestManager().unregisterQoeProvider(this);
                     }
                     qoeProviderRegistered = false;
-                    NRLog.d("Final QOE_AGGREGATE recorded to crash-safe buffer at CONTENT_END");
+                    NRLog.d("Final QOE_AGGREGATE recorded to crash-safe buffer at CONTENT_END " + formatQoeKpis(finalQoe));
                 }
             }
 
@@ -601,6 +601,26 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
      * Note: QoE metrics are currently limited to content-related events only, not ad events.
      * This design choice focuses QoE measurement on the primary content viewing experience.
      */
+    private static final String[] QOE_LOG_KEYS = {
+            "startupTime", "peakBitrate", "averageBitrate", "totalPlaytime", "totalRebufferingTime",
+            "rebufferingRatio", "hadStartupError", "hadPlaybackError", "avgDownloadRate",
+            "minDownloadRate", "maxDownloadRate", "totalSwitchUps", "totalSwitchDowns",
+            "totalPauseTime", "totalRenditions", "qoeAggregateVersion"
+    };
+
+    /** Debug-log shape matching iOS: "[QOE_AGGREGATE] => {startupTime=..., peakBitrate=..., ...}". */
+    static String formatQoeKpis(Map<String, Object> qoeEvent) {
+        StringBuilder sb = new StringBuilder("[QOE_AGGREGATE] => {");
+        boolean first = true;
+        for (String key : QOE_LOG_KEYS) {
+            if (qoeEvent == null || !qoeEvent.containsKey(key)) continue;
+            if (!first) sb.append(", ");
+            sb.append(key).append('=').append(qoeEvent.get(key));
+            first = false;
+        }
+        return sb.append('}').toString();
+    }
+
     /**
      * Implementation of QoeProvider interface.
      * Called by HarvestManager during harvest to generate QOE_AGGREGATE events.
@@ -638,7 +658,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                     // Update snapshot for next dirty check
                     lastSentQoeKpis = new HashMap<>(currentKpis);
 
-                    NRLog.d("QOE_AGGREGATE generated for harvest cycle " + harvestCycleNumber + " (KPIs changed)");
+                    NRLog.d("QOE_AGGREGATE generated for harvest cycle " + harvestCycleNumber + " (KPIs changed) " + formatQoeKpis(qoeEvent));
                     return qoeEvent;
                 } else {
                     NRLog.d("QOE_AGGREGATE skipped for harvest cycle " + harvestCycleNumber + " (no KPI changes)");
