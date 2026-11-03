@@ -56,6 +56,11 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.robolectric:robolectric:4.10.3'
     testImplementation 'org.mockito:mockito-core:4.11.0'
+    // Test-only: lets NRVideoConfigurationTest exercise the real
+    // AgentConfiguration class reflection reads against, instead of a
+    // hand-rolled stub. Never ships to consumers — NewRelicVideoCore itself
+    // has no production dependency on the base agent, by design.
+    testImplementation 'com.newrelic.agent.android:android-agent:7.6.7'
     // Updated AndroidX Test dependencies that are compatible with Android 12+
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
