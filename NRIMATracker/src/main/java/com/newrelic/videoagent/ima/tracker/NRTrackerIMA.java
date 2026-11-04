@@ -103,7 +103,12 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
                 // DAI has no CONTENT_PAUSE/RESUME_REQUESTED; the break boundaries are these
                 // events. CSAI behaviour is unchanged. sendAdBreakStart/End are idempotent
                 // (state guarded), so an app that also calls them manually cannot double up.
-                if (dai) sendAdBreakStart();
+                if (dai) {
+                    // AD_BREAK_STARTED carries no Ad, so without this the break start would
+                    // report the previous break's position, creative and title.
+                    clearAdAttributes();
+                    sendAdBreakStart();
+                }
                 break;
             case AD_BREAK_ENDED:
                 if (dai) sendAdBreakEnd();
@@ -120,14 +125,14 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
                     // SKIPPED (e.g. seek over a midroll): close it so the new ad gets
                     // its own AD_REQUEST/AD_START.
                     if (getState().isRequested) sendEnd();
-                    skipped = false;
                 }
+                skipped = false;
                 quartile = 0L;
                 sendRequest();
                 sendStart();
                 break;
             case SKIPPED:
-                if (dai) skipped = true;
+                skipped = true;
                 sendEnd();
                 quartile = null;
                 break;
@@ -158,6 +163,17 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
                 sendResume();
                 break;
         }
+    }
+
+    private void clearAdAttributes() {
+        adPosition = null;
+        creativeId = null;
+        title = null;
+        bitrate = null;
+        renditionHeight = null;
+        renditionWidth = null;
+        duration = null;
+        quartile = null;
     }
 
     private void fillAdAttributes(Ad ad) {
@@ -217,12 +233,13 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
      */
     @Override
     public boolean preSend(String action, Map<String, Object> attributes) {
+        if (attributes != null && action != null && action.startsWith("AD_") && !AD_ERROR.equals(action)) {
+            // CSAI and DAI both report adSkipped (iOS parity); reset on every STARTED.
+            attributes.put("adSkipped", skipped ? 1L : 0L);
+        }
         if (dai && attributes != null) {
             if (action != null && action.startsWith("AD_")) {
                 attributes.put("adStreamType", AD_STREAM_TYPE_DAI);
-                if (!AD_ERROR.equals(action)) {
-                    attributes.put("adSkipped", skipped ? 1L : 0L);
-                }
             }
             if (AD_ERROR.equals(action) && lastErrorType != null) {
                 attributes.put("adErrorType", lastErrorType);

@@ -21,16 +21,19 @@ public class NRVideoApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        config = new NRVideoConfiguration.Builder(BuildConfig.NR_APPLICATION_TOKEN)
+        NRVideoConfiguration.Builder builder = new NRVideoConfiguration.Builder(BuildConfig.NR_APPLICATION_TOKEN)
                 .autoDetectPlatform(getApplicationContext())
                 .withHarvestCycle(30)
                 .enableLogging()
                 .enableQoeAggregate(BuildConfig.QOE_AGGREGATE_DEFAULT)
-                .withCollectorAddress("staging-mobile-collector.newrelic.com")
                 .withObfuscationRules(Arrays.asList(
                     new ObfuscationRule("token=[^&\" ]+", "token=REDACTED")
-                ))
-                .build();
+                ));
+        // Optional override (e.g. staging-mobile-collector.newrelic.com) from local.properties: nr.collectorAddress
+        if (!BuildConfig.NR_COLLECTOR_ADDRESS.isEmpty()) {
+            builder.withCollectorAddress(BuildConfig.NR_COLLECTOR_ADDRESS);
+        }
+        config = builder.build();
         NRVideo.newBuilder(getApplicationContext()).withConfiguration(config).build();
     }
 

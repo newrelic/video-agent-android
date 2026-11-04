@@ -141,8 +141,8 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | adPosition               | The position of the ad.                                                                                                                            |
 | adCreativeId             | The creative ID of the ad.                                                                                                                         |
 | adStreamType             | `DAI` on events from an IMA DAI (server-side inserted) ad session. Absent for CSAI and MediaTailor. Set on all `AD_*` events and `AD_ERROR`.                |
-| adSkipped                | `1` if the ad was skipped (`AD_END` after a skip), else `0`. Reset on every `AD_START`. IMA DAI only.                                              |
-| adErrorType              | IMA `AdError.AdErrorType` name (`LOAD` or `PLAY`) on `AD_ERROR`. IMA DAI only.                                                                     |
+| adSkipped                | `1` if the ad was skipped (`AD_END` after a skip), else `0`. Reset on every `AD_START`. IMA CSAI and DAI.                                              |
+| adErrorType              | IMA `AdError.AdErrorType` name (`LOAD` or `PLAY`) on `AD_ERROR`. IMA CSAI and DAI.                                                                     |
 | adPartner                | The ad partner, e.g., ima, freewheel, aws-mediatailor.                                                                                             |
 | adSystem                 | *(MediaTailor)* The ad-server name returned in the VAST response — e.g., `GDFP`, `FreeWheel`, `SpringServe`, `Publica`.                            |
 | vastAdId                 | *(MediaTailor)* Hierarchical VAST ad identifier, useful for tracing back to ad-server logs.                                                       |

@@ -135,6 +135,22 @@ public class NRTrackerIMADaiTest {
     // ---- lifecycle ----
 
     @Test
+    public void breakStartDoesNotCarryPreviousBreaksAdAttributes() {
+        Ad pre = ad(0);
+        daiTracker.handleStreamAdEvent(event(AdEventType.AD_BREAK_STARTED, null));
+        daiTracker.handleStreamAdEvent(event(AdEventType.STARTED, pre));
+        daiTracker.handleStreamAdEvent(event(AdEventType.COMPLETED, pre));
+        daiTracker.handleStreamAdEvent(event(AdEventType.AD_BREAK_ENDED, null));
+        daiTracker.handleStreamAdEvent(event(AdEventType.AD_BREAK_STARTED, null));
+
+        Map<String, Object> breakStart = daiTracker.last("AD_BREAK_START");
+        assertNull(daiTracker.getAdPosition());
+        assertNull(daiTracker.getAdCreativeId());
+        assertNull(daiTracker.getTitle());
+        assertEquals("DAI", breakStart.get("adStreamType"));
+    }
+
+    @Test
     public void fullLifecycleEmitsSameVocabularyAsCsai() {
         Ad a = ad(0);
         daiTracker.handleStreamAdEvent(event(AdEventType.AD_BREAK_STARTED, null));
@@ -313,9 +329,20 @@ public class NRTrackerIMADaiTest {
         assertEquals(1, csaiTracker.count("AD_BREAK_END"));
         for (Map<String, Object> m : csaiTracker.attrs) {
             assertFalse(m.containsKey("adStreamType"));
-            assertFalse(m.containsKey("adSkipped"));
             assertFalse(m.containsKey("adErrorType"));
         }
         assertEquals(1009, csaiTracker.last("AD_ERROR").get("errorCode"));
+    }
+
+    @Test
+    public void csaiSkippedSetsFlagOnEndAndIsResetOnNextAd() {
+        csaiTracker.onAdEvent(event(AdEventType.STARTED, ad(0)));
+        csaiTracker.onAdEvent(event(AdEventType.SKIPPED, ad(0)));
+        assertEquals(1L, csaiTracker.last("AD_END").get("adSkipped"));
+
+        csaiTracker.onAdEvent(event(AdEventType.STARTED, ad(0)));
+        assertEquals(0L, csaiTracker.last("AD_START").get("adSkipped"));
+        csaiTracker.onAdEvent(event(AdEventType.COMPLETED, ad(0)));
+        assertEquals(0L, csaiTracker.last("AD_END").get("adSkipped"));
     }
 }

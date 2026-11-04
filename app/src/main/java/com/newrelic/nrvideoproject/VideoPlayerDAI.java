@@ -88,7 +88,8 @@ public class VideoPlayerDAI extends AppCompatActivity
 
         // Same lifecycle as every other agent integration; only the ad config differs.
         Map<String, Object> custom = new HashMap<>();
-        custom.put("testRun", "dai-sample");
+        String testRun = getIntent().getStringExtra("testRun");
+        custom.put("testRun", testRun != null ? testRun : "dai-sample");
         trackerId = NRVideo.addPlayer(new NRVideoPlayerConfiguration(
                 "dai-player", player, NRVideoPlayerConfiguration.PLAYER_TYPE_EXO,
                 NRAdConfig.dai(), custom));
