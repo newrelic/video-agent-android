@@ -72,7 +72,7 @@ dependencies {
 
 > **Note:** All modules are versioned together — always use the same version number for every module you include. See [releases](https://github.com/newrelic/video-agent-android/releases) for the latest version.
 > Use either `NRExoPlayerTracker` or `NRTHEOPlayerTracker` — both can coexist in the same app for multi-player scenarios.
-> `NRIMATracker` and `NRMediaTailorTracker` are mutually exclusive per player — pick one based on whether your stream uses CSAI (IMA) or SSAI (MediaTailor).
+> `NRIMATracker` and `NRMediaTailorTracker` are mutually exclusive per player — pick one based on whether your stream uses IMA (CSAI or DAI) or MediaTailor SSAI.
 
 ### Option 2: Install Manually Using AAR Files
 
@@ -133,6 +133,7 @@ The Video Agent is composed of five modules:
 | **NRExoPlayerTracker** | Video tracker for ExoPlayer (Media3). Automatically hooks into player lifecycle events. | Yes (for ExoPlayer) |
 | **NRTHEOPlayerTracker** | Video tracker for THEOplayer (Dolby OptiView). Hooks into THEOplayer event listeners for lifecycle, QoE, rendition changes, and DRM errors. | Yes (for THEOplayer) |
 | **NRIMATracker** | Ad tracker for the Google IMA SDK (client-side ad insertion / CSAI). Captures ad lifecycle events including quartiles, breaks, and errors. | Optional |
+| **NRIMATracker (DAI mode)** | Same module, used with `NRAdConfig.dai()` for Google IMA dynamic ad insertion (server-side stitched ads). See [IMA DAI](#setup-with-exoplayer-and-ima-dai-ssai). | Optional |
 | **NRMediaTailorTracker** | Ad tracker for AWS Elemental MediaTailor (server-side ad insertion / SSAI). Supports DASH and HLS, explicit and implicit session init, live + VOD, with rich VAST metadata. | Optional |
 
 ## Usage
@@ -287,6 +288,32 @@ What the tracker emits on `VideoAdAction`:
 All events carry `trackerName="NRMTracker"`, `adPartner="aws-mediatailor"`,
 plus rich VAST metadata (see [DATAMODEL.md](./DATAMODEL.md)).
 
+### Setup with ExoPlayer and IMA DAI (SSAI)
+
+Use `NRAdConfig.dai()` for Google IMA dynamic ad insertion, where ads are stitched into the
+stream. It uses the same `NRIMATracker` module and ad vocabulary as CSAI; ad breaks come from
+`AD_BREAK_STARTED` / `AD_BREAK_ENDED`, and DAI events carry `adStreamType=DAI`.
+
+```java
+Integer trackerId = NRVideo.addPlayer(new NRVideoPlayerConfiguration(
+        "my-dai-player", player, NRVideoPlayerConfiguration.PLAYER_TYPE_EXO,
+        NRAdConfig.dai(), null));
+NRTrackerIMA adTracker =
+        (NRTrackerIMA) NewRelicVideoAgent.getInstance().getAdTracker(trackerId);
+
+// Media3 ImaServerSideAdInsertionMediaSource: forward the builder listeners.
+ImaServerSideAdInsertionMediaSource.AdsLoader adsLoader =
+        new ImaServerSideAdInsertionMediaSource.AdsLoader.Builder(context, playerView)
+                .setAdEventListener(adTracker::handleStreamAdEvent)
+                .setAdErrorListener(adTracker::handleStreamAdError)
+                .build();
+
+// Driving the IMA DAI SDK directly? Bind the StreamManager instead:
+// adTracker.registerStreamManager(streamManager);   // and unregisterStreamManager() on teardown
+```
+
+A complete example is `VideoPlayerDAI` in the sample `app` (enable the "IMA DAI (SSAI)" switch).
+
 ### Setup with ExoPlayer and IMA Ads
 
 ```java
@@ -433,7 +460,7 @@ if (shouldEnable) {
 | `playerName` | `String` | Unique identifier for the video player. Used to distinguish between multiple players. |
 | `player` | `ExoPlayer` / `THEOplayerView` | The player instance to track. |
 | `playerType` | `String` | `NRVideoPlayerConfiguration.PLAYER_TYPE_EXO` (`"exo"`) or `PLAYER_TYPE_THEO` (`"theo"`). Always set this explicitly — omitting it triggers a warning log and falls back to ExoPlayer for backward compatibility only. |
-| `adConfig` | `NRAdConfig` | Ad framework configuration. Pass `NRAdConfig.csai()` for IMA, `NRAdConfig.mediaTailor()` for MediaTailor, or `null` for no ad tracking. |
+| `adConfig` | `NRAdConfig` | Ad framework configuration. Pass `NRAdConfig.csai()` for IMA, `NRAdConfig.dai()` for IMA DAI, `NRAdConfig.mediaTailor()` for MediaTailor, or `null` for no ad tracking. |
 | `customAttributes` | `Map<String, Object>` | Custom attributes to attach to all events from this player. |
 
 > **Upgrading from v4.2.0?** The old `boolean isAdEnabled` and `AdTrackerType` constructors are still supported but deprecated. They compile without changes — `true` maps to `NRAdConfig.csai()`, `AdTrackerType.IMA` maps to `NRAdConfig.csai()`, `AdTrackerType.MEDIA_TAILOR` maps to `NRAdConfig.mediaTailor()`. Migrate at your own pace.

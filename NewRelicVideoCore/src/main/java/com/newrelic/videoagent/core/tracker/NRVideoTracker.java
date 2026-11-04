@@ -276,7 +276,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
             if (action.startsWith("AD_BREAK_")) {
                 if (linkedTracker instanceof NRVideoTracker) {
                     Long playhead = ((NRVideoTracker) linkedTracker).getPlayhead();
-                    if (playhead < 100) {
+                    if (playhead != null && playhead < 100) {
                         attr.put("adPosition", "pre");
                     }
                 }

@@ -12,6 +12,9 @@ import androidx.annotation.Nullable;
  *   // Google IMA / any CSAI framework
  *   NRAdConfig.csai()
  *
+ *   // Google IMA DAI (dynamic ad insertion, ads stitched into the stream)
+ *   NRAdConfig.dai()
+ *
  *   // AWS MediaTailor — standard AWS hostnames
  *   NRAdConfig.mediaTailor()
  *
@@ -49,7 +52,9 @@ public final class NRAdConfig {
         /** Client-side ad insertion — Google IMA, Freewheel, generic CSAI. */
         CSAI,
         /** Server-side ad insertion — AWS Elemental MediaTailor. */
-        SSAI_MT
+        SSAI_MT,
+        /** Server-side ad insertion — Google IMA DAI (StreamManager events). */
+        DAI
     }
 
     /** Internal tracker type — set by the factory method, not by the customer. */
@@ -102,6 +107,19 @@ public final class NRAdConfig {
      */
     public static NRAdConfig csai() {
         return new NRAdConfig(Type.CSAI, null, null);
+    }
+
+    /**
+     * Google IMA DAI (dynamic ad insertion / SSAI).
+     *
+     * <p>Uses the same IMA ad tracker as {@link #csai()} but in DAI mode: ad
+     * break boundaries come from {@code AD_BREAK_STARTED}/{@code AD_BREAK_ENDED},
+     * skipped ads are reported, and ad events and errors carry
+     * {@code adStreamType=DAI}. Feed it with {@code NRTrackerIMA.registerStreamManager}
+     * or {@code handleStreamAdEvent}/{@code handleStreamAdError}.</p>
+     */
+    public static NRAdConfig dai() {
+        return new NRAdConfig(Type.DAI, null, null);
     }
 
     /**
@@ -175,6 +193,9 @@ public final class NRAdConfig {
     public String toString() {
         if (type == Type.CSAI) {
             return "NRAdConfig{csai}";
+        }
+        if (type == Type.DAI) {
+            return "NRAdConfig{dai}";
         }
         StringBuilder sb = new StringBuilder("NRAdConfig{mediaTailor");
         if (adSegmentPrefix != null) sb.append(", adSegmentPrefix='").append(adSegmentPrefix).append("'");

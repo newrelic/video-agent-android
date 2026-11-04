@@ -124,6 +124,19 @@ public class NRVideoPlayerConfigurationTest {
     // ── Backward compatibility (deprecated API) ───────────────────────────────
 
     @Test
+    public void testDaiAdConfig() {
+        NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
+            "TestPlayer", mockPlayer, NRAdConfig.dai(), null);
+
+        assertEquals(NRAdConfig.Type.DAI, config.getAdConfig().type);
+        assertNull(config.getAdConfig().adSegmentPrefix);
+        assertNull(config.getAdConfig().trackingUrl);
+        assertNotEquals(NRAdConfig.csai(), config.getAdConfig());
+        assertEquals(NRAdConfig.dai(), config.getAdConfig());
+        assertTrue(config.isAdEnabled());
+    }
+
+    @Test
     @SuppressWarnings("deprecation")
     public void testDeprecatedBooleanConstructorTrue() {
         NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
