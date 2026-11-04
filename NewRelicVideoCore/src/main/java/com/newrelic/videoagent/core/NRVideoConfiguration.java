@@ -4,6 +4,7 @@ import android.app.ActivityManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import com.newrelic.videoagent.core.utils.NRLog;
+import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import java.util.ArrayList;
@@ -80,11 +81,31 @@ public final class NRVideoConfiguration {
     private static final int MEMORY_OPTIMIZED_MAX_DEAD_LETTER_SIZE = 50;
 
     private NRVideoConfiguration(Builder builder) {
-        if (builder.applicationToken == null || builder.applicationToken.trim().isEmpty()) {
+        String resolvedToken = builder.applicationToken;
+        String resolvedCollectorAddress = builder.collectorAddress;
+
+        // Fall back to the base New Relic Android agent's own applicationToken/
+        // collectorHost (via AgentConfiguration.getInstance(), read through
+        // reflection so this module keeps its zero-dependency footprint — no
+        // compileOnly/implementation dependency on com.newrelic.agent.android
+        // is added just to support this opportunistic read) when the caller
+        // omits an explicit token. Explicit fields always win: collectorAddress
+        // is only taken from the fallback if the caller didn't set it either.
+        if (resolvedToken == null || resolvedToken.trim().isEmpty()) {
+            BaseAgentConfig baseAgentConfig = tryReadBaseAgentConfig();
+            if (baseAgentConfig != null) {
+                resolvedToken = baseAgentConfig.applicationToken;
+                if (resolvedCollectorAddress == null) {
+                    resolvedCollectorAddress = baseAgentConfig.collectorHost;
+                }
+            }
+        }
+
+        if (resolvedToken == null || resolvedToken.trim().isEmpty()) {
             throw new IllegalArgumentException("Application token cannot be null or empty");
         }
 
-        this.applicationToken = builder.applicationToken.trim();
+        this.applicationToken = resolvedToken.trim();
         this.region = identifyRegion(this.applicationToken);
         this.harvestCycleSeconds = builder.harvestCycleSeconds;
         this.liveHarvestCycleSeconds = builder.liveHarvestCycleSeconds;
@@ -94,7 +115,7 @@ public final class NRVideoConfiguration {
         this.memoryOptimized = builder.memoryOptimized;
         this.debugLoggingEnabled = builder.debugLoggingEnabled;
         this.isTV = builder.isTV;
-        this.collectorAddress = builder.collectorAddress;
+        this.collectorAddress = resolvedCollectorAddress;
         this.qoeAggregateIntervalMultiplier = builder.qoeAggregateIntervalMultiplier;
         // Make a defensive copy and wrap it as unmodifiable.
         // React analogy: like Object.freeze([...builder.obfuscationRules]) — same idea.
@@ -234,6 +255,59 @@ public final class NRVideoConfiguration {
         return "US";
     }
 
+    /** Holds the two fields read off the base agent's AgentConfiguration singleton. */
+    private static final class BaseAgentConfig {
+        final String applicationToken;
+        final String collectorHost;
+
+        BaseAgentConfig(String applicationToken, String collectorHost) {
+            this.applicationToken = applicationToken;
+            this.collectorHost = collectorHost;
+        }
+    }
+
+    /**
+     * Reads applicationToken/collectorHost off the base New Relic Android
+     * agent's AgentConfiguration.getInstance() singleton, if that class is
+     * present on the classpath (reflection, not a compile-time dependency —
+     * this module stays usable with or without the base agent present).
+     * Returns null if the base agent class isn't on the classpath, or if it
+     * is but hasn't been started yet (getApplicationToken() returns null/empty
+     * before NewRelic.withApplicationToken(...).start(context) runs).
+     *
+     * @return Base agent's token/collectorHost, or null if unavailable.
+     */
+    private static BaseAgentConfig tryReadBaseAgentConfig() {
+        try {
+            Class<?> configClass = Class.forName("com.newrelic.agent.android.AgentConfiguration");
+            Method getInstance = configClass.getMethod("getInstance");
+            Object instance = getInstance.invoke(null);
+
+            Method getApplicationToken = configClass.getMethod("getApplicationToken");
+            String token = (String) getApplicationToken.invoke(instance);
+            if (token == null || token.trim().isEmpty()) {
+                return null;
+            }
+
+            String collectorHost = null;
+            try {
+                Method getCollectorHost = configClass.getMethod("getCollectorHost");
+                collectorHost = (String) getCollectorHost.invoke(instance);
+            } catch (ReflectiveOperationException e) {
+                NRLog.w("Base agent AgentConfiguration has no getCollectorHost(): " + e.getMessage());
+            }
+
+            return new BaseAgentConfig(token, collectorHost);
+        } catch (ClassNotFoundException e) {
+            // Base Android agent isn't on the classpath at all — expected and fine,
+            // this fallback is opportunistic, not a hard dependency.
+            return null;
+        } catch (ReflectiveOperationException e) {
+            NRLog.w("Failed to read base agent config via reflection: " + e.getMessage());
+            return null;
+        }
+    }
+
     /**
      * Builder pattern for thread-safe configuration creation
      */
@@ -255,6 +329,17 @@ public final class NRVideoConfiguration {
 
         public Builder(String applicationToken) {
             this.applicationToken = applicationToken;
+        }
+
+        /**
+         * No-arg constructor for when the base New Relic Android agent is
+         * already started on this app — build() will fall back to its
+         * applicationToken/collectorHost via AgentConfiguration.getInstance().
+         * build() still throws IllegalArgumentException if no token is
+         * available from either source.
+         */
+        public Builder() {
+            this.applicationToken = null;
         }
 
         /**
