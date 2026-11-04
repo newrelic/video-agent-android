@@ -64,6 +64,10 @@ public class NRTrackerIMADaiTest {
             return null;
         }
 
+        String getVideoIdFromCore() {
+            return super.getVideoId();
+        }
+
         int count(String action) {
             int n = 0;
             for (String a : actions) if (a.equals(action)) n++;
@@ -130,6 +134,67 @@ public class NRTrackerIMADaiTest {
         assertFalse(csaiTracker.isDai());
         assertEquals("NRAdConfig{dai}", NRAdConfig.dai().toString());
         assertFalse(NRAdConfig.dai().equals(NRAdConfig.csai()));
+    }
+
+
+    // ---- privacy / ids / custom attributes ----
+
+    @Test
+    public void daiErrorMessageDropsUrlQuery() {
+        String raw = "Stream initialization failed. HTTP status code: 404 with URL: "
+                + "https://pubads.g.doubleclick.net/ssai/event/bad/streams?rdid=abc-123&correlator=42&sid=X";
+        daiTracker.handleStreamAdError(errorEvent(AdError.AdErrorType.LOAD, 900, raw));
+        assertEquals("Stream initialization failed. HTTP status code: 404 with URL: "
+                + "https://pubads.g.doubleclick.net/ssai/event/bad/streams?<redacted>",
+                daiTracker.last("AD_ERROR").get("errorMessage"));
+    }
+
+    @Test
+    public void daiErrorMessageWithoutUrlIsUnchanged() {
+        daiTracker.handleStreamAdError(errorEvent(AdError.AdErrorType.LOAD, 1005, "Stream request failed"));
+        assertEquals("Stream request failed", daiTracker.last("AD_ERROR").get("errorMessage"));
+        assertEquals("https://host/path", NRTrackerIMA.redactUrlQueries("https://host/path"));
+        assertNull(NRTrackerIMA.redactUrlQueries(null));
+    }
+
+    @Test
+    public void csaiErrorMessageKeepsUrlQuery() {
+        String raw = "failed https://host/p?a=1&b=2";
+        csaiTracker.onAdError(errorEvent(AdError.AdErrorType.LOAD, 1009, raw));
+        assertEquals(raw, csaiTracker.last("AD_ERROR").get("errorMessage"));
+    }
+
+    @Test
+    public void daiAdIdIsImaAdIdAndDiffersPerAd() {
+        Ad first = ad(0);
+        when(first.getAdId()).thenReturn("ad-1");
+        Ad second = ad(0);
+        when(second.getAdId()).thenReturn("ad-2");
+        daiTracker.handleStreamAdEvent(event(AdEventType.STARTED, first));
+        assertEquals("ad-1", daiTracker.last("AD_START").get("adId"));
+        daiTracker.handleStreamAdEvent(event(AdEventType.COMPLETED, first));
+        daiTracker.handleStreamAdEvent(event(AdEventType.STARTED, second));
+        assertEquals("ad-2", daiTracker.last("AD_START").get("adId"));
+    }
+
+    @Test
+    public void daiAdIdFallsBackToCoreValueWhenImaIdMissingAndCsaiUnchanged() {
+        Ad noId = ad(0);
+        when(noId.getAdId()).thenReturn("");
+        daiTracker.handleStreamAdEvent(event(AdEventType.STARTED, noId));
+        assertEquals(daiTracker.getVideoIdFromCore(), daiTracker.last("AD_START").get("adId"));
+
+        Ad csaiAd = ad(0);
+        when(csaiAd.getAdId()).thenReturn("ad-9");
+        csaiTracker.onAdEvent(event(AdEventType.STARTED, csaiAd));
+        assertFalse("ad-9".equals(csaiTracker.last("AD_START").get("adId")));
+    }
+
+    @Test
+    public void customAttributeSetOnAdTrackerReachesAdEvents() {
+        daiTracker.setAttribute("testRun", "run-1");
+        daiTracker.handleStreamAdEvent(event(AdEventType.STARTED, ad(0)));
+        assertEquals("run-1", daiTracker.last("AD_START").get("testRun"));
     }
 
     // ---- lifecycle ----

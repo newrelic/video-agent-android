@@ -13,6 +13,7 @@ import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.ima.BuildConfig;
 
 import java.lang.reflect.Method;
+import java.util.regex.Pattern;
 import java.util.Map;
 
 import static com.newrelic.videoagent.core.NRDef.*;
@@ -53,6 +54,7 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     private Long renditionHeight = null;
     private Long renditionWidth = null;
     private Long duration = null;
+    private String imaAdId = null;
 
     /** Value of the {@code adStreamType} attribute for IMA DAI events. */
     public static final String AD_STREAM_TYPE_DAI = "DAI";
@@ -81,7 +83,8 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
         lastErrorType = (dai && adError != null && adError.getErrorType() != null)
                 ? adError.getErrorType().name() : null;
         if (adError != null) {
-            sendError(adError.getErrorCodeNumber(), adError.getMessage());
+            String message = adError.getMessage();
+            sendError(adError.getErrorCodeNumber(), dai ? redactUrlQueries(message) : message);
         } else {
             sendError(null, "Unknown IMA error");
         }
@@ -165,7 +168,29 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
         }
     }
 
+    private static final Pattern URL_QUERY = Pattern.compile("(https?://[^\\s?\"'<>]+)\\?[^\\s\"'<>]*");
+
+    /**
+     * IMA DAI errors quote the stream request URL, whose query carries the advertising id,
+     * correlator and session ids. Keeps scheme, host and path and drops the query.
+     */
+    static String redactUrlQueries(String message) {
+        if (message == null) return null;
+        return URL_QUERY.matcher(message).replaceAll("$1?<redacted>");
+    }
+
+    /**
+     * DAI: IMA's own ad id. The core derives {@code adId} from the media src, which a
+     * stitched ad does not have, so every ad would otherwise share one hash.
+     */
+    @Override
+    public String getVideoId() {
+        String id = imaAdId;
+        return (dai && id != null && !id.isEmpty()) ? id : super.getVideoId();
+    }
+
     private void clearAdAttributes() {
+        imaAdId = null;
         adPosition = null;
         creativeId = null;
         title = null;
@@ -193,6 +218,7 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
         creativeId = ad.getCreativeId();
         title = ad.getTitle();
         if (dai) {
+            imaAdId = ad.getAdId();
             // Stitched ads carry no VAST media info on some streams; report absence
             // rather than 0 / -1.
             int br = ad.getVastMediaBitrate();
