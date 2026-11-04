@@ -269,9 +269,17 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
             }
             if (AD_ERROR.equals(action) && lastErrorType != null) {
                 attributes.put("adErrorType", lastErrorType);
+                attributes.put("errorName", errorNameFor(lastErrorType));
             }
         }
         return super.preSend(action, attributes);
+    }
+
+    /** Same names as the iOS tracker: IMA_AD_LOADING_FAILED / IMA_AD_PLAYING_FAILED / IMA_AD_UNKNOWN_ERROR. */
+    static String errorNameFor(String adErrorType) {
+        if ("LOAD".equals(adErrorType)) return "IMA_AD_LOADING_FAILED";
+        if ("PLAY".equals(adErrorType)) return "IMA_AD_PLAYING_FAILED";
+        return "IMA_AD_UNKNOWN_ERROR";
     }
 
     /**

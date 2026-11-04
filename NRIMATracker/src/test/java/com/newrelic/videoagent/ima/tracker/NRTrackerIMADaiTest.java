@@ -324,6 +324,7 @@ public class NRTrackerIMADaiTest {
         assertEquals("Stream request failed", err.get("errorMessage"));
         assertEquals("DAI", err.get("adStreamType"));
         assertEquals("LOAD", err.get("adErrorType"));
+        assertEquals("IMA_AD_LOADING_FAILED", err.get("errorName"));
     }
 
     @Test
@@ -395,6 +396,7 @@ public class NRTrackerIMADaiTest {
         for (Map<String, Object> m : csaiTracker.attrs) {
             assertFalse(m.containsKey("adStreamType"));
             assertFalse(m.containsKey("adErrorType"));
+            assertFalse(m.containsKey("errorName"));
         }
         assertEquals(1009, csaiTracker.last("AD_ERROR").get("errorCode"));
     }
