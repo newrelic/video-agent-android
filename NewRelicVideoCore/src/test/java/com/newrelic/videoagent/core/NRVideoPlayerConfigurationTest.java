@@ -126,13 +126,13 @@ public class NRVideoPlayerConfigurationTest {
     @Test
     public void testDaiAdConfig() {
         NRVideoPlayerConfiguration config = new NRVideoPlayerConfiguration(
-            "TestPlayer", mockPlayer, NRAdConfig.dai(), null);
+            "TestPlayer", mockPlayer, NRAdConfig.ssaiIma(), null);
 
-        assertEquals(NRAdConfig.Type.DAI, config.getAdConfig().type);
+        assertEquals(NRAdConfig.Type.SSAI_IMA, config.getAdConfig().type);
         assertNull(config.getAdConfig().adSegmentPrefix);
         assertNull(config.getAdConfig().trackingUrl);
         assertNotEquals(NRAdConfig.csai(), config.getAdConfig());
-        assertEquals(NRAdConfig.dai(), config.getAdConfig());
+        assertEquals(NRAdConfig.ssaiIma(), config.getAdConfig());
         assertTrue(config.isAdEnabled());
     }
 

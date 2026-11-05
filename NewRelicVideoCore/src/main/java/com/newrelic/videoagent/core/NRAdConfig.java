@@ -12,8 +12,8 @@ import androidx.annotation.Nullable;
  *   // Google IMA / any CSAI framework
  *   NRAdConfig.csai()
  *
- *   // Google IMA DAI (dynamic ad insertion, ads stitched into the stream)
- *   NRAdConfig.dai()
+ *   // Google IMA Dynamic Ad Insertion (DAI), server-side ads stitched into the stream
+ *   NRAdConfig.ssaiIma()
  *
  *   // AWS MediaTailor — standard AWS hostnames
  *   NRAdConfig.mediaTailor()
@@ -53,8 +53,8 @@ public final class NRAdConfig {
         CSAI,
         /** Server-side ad insertion — AWS Elemental MediaTailor. */
         SSAI_MT,
-        /** Server-side ad insertion — Google IMA DAI (StreamManager events). */
-        DAI
+        /** Server-side ad insertion — Google IMA Dynamic Ad Insertion (DAI), StreamManager events. */
+        SSAI_IMA
     }
 
     /** Internal tracker type — set by the factory method, not by the customer. */
@@ -110,16 +110,16 @@ public final class NRAdConfig {
     }
 
     /**
-     * Google IMA DAI (dynamic ad insertion / SSAI).
+     * Google IMA Dynamic Ad Insertion (DAI), server-side ad insertion.
      *
-     * <p>Uses the same IMA ad tracker as {@link #csai()} but in DAI mode: ad
+     * <p>Uses the same IMA ad tracker as {@link #csai()} but in SSAI_IMA mode: ad
      * break boundaries come from {@code AD_BREAK_STARTED}/{@code AD_BREAK_ENDED},
      * skipped ads are reported, and ad events and errors carry
-     * {@code adStreamType=DAI}. Feed it with {@code NRTrackerIMA.registerStreamManager}
+     * {@code adStreamType=SSAI_IMA}. Feed it with {@code NRTrackerIMA.registerStreamManager}
      * or {@code handleStreamAdEvent}/{@code handleStreamAdError}.</p>
      */
-    public static NRAdConfig dai() {
-        return new NRAdConfig(Type.DAI, null, null);
+    public static NRAdConfig ssaiIma() {
+        return new NRAdConfig(Type.SSAI_IMA, null, null);
     }
 
     /**
@@ -194,8 +194,8 @@ public final class NRAdConfig {
         if (type == Type.CSAI) {
             return "NRAdConfig{csai}";
         }
-        if (type == Type.DAI) {
-            return "NRAdConfig{dai}";
+        if (type == Type.SSAI_IMA) {
+            return "NRAdConfig{ssaiIma}";
         }
         StringBuilder sb = new StringBuilder("NRAdConfig{mediaTailor");
         if (adSegmentPrefix != null) sb.append(", adSegmentPrefix='").append(adSegmentPrefix).append("'");

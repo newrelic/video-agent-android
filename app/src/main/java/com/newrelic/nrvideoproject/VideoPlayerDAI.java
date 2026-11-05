@@ -28,9 +28,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Google IMA DAI (dynamic ad insertion / SSAI) sample.
+ * Google IMA Dynamic Ad Insertion (DAI, SSAI_IMA) sample.
  *
- * <p>Wiring: {@link NRAdConfig#dai()} on the player configuration, then forward the IMA DAI
+ * <p>Wiring: {@link NRAdConfig#ssaiIma()} on the player configuration, then forward the IMA DAI
  * AdEvent / AdErrorEvent callbacks to {@link NRTrackerIMA#handleStreamAdEvent} /
  * {@link NRTrackerIMA#handleStreamAdError}. Media3's {@code ImaServerSideAdInsertionMediaSource}
  * owns the StreamManager and does not expose it, so the Media3 builder listeners are the
@@ -92,7 +92,7 @@ public class VideoPlayerDAI extends AppCompatActivity
         custom.put("testRun", testRun != null ? testRun : "dai-sample");
         trackerId = NRVideo.addPlayer(new NRVideoPlayerConfiguration(
                 "dai-player", player, NRVideoPlayerConfiguration.PLAYER_TYPE_EXO,
-                NRAdConfig.dai(), custom));
+                NRAdConfig.ssaiIma(), custom));
         adTracker = (NRTrackerIMA) NewRelicVideoAgent.getInstance().getAdTracker(trackerId);
 
         player.setMediaItem(MediaItem.fromUri(streamUri));

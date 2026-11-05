@@ -80,7 +80,7 @@ public class NRTrackerIMADaiTest {
 
     @Before
     public void setUp() {
-        daiTracker = link(NRAdConfig.dai());
+        daiTracker = link(NRAdConfig.ssaiIma());
         csaiTracker = link(NRAdConfig.csai());
     }
 
@@ -129,11 +129,11 @@ public class NRTrackerIMADaiTest {
 
     @Test
     public void daiConfigIsDaiAndCsaiIsNot() {
-        assertEquals(NRAdConfig.Type.DAI, NRAdConfig.dai().type);
+        assertEquals(NRAdConfig.Type.SSAI_IMA, NRAdConfig.ssaiIma().type);
         assertTrue(daiTracker.isDai());
         assertFalse(csaiTracker.isDai());
-        assertEquals("NRAdConfig{dai}", NRAdConfig.dai().toString());
-        assertFalse(NRAdConfig.dai().equals(NRAdConfig.csai()));
+        assertEquals("NRAdConfig{ssaiIma}", NRAdConfig.ssaiIma().toString());
+        assertFalse(NRAdConfig.ssaiIma().equals(NRAdConfig.csai()));
     }
 
 
@@ -212,7 +212,7 @@ public class NRTrackerIMADaiTest {
         assertNull(daiTracker.getAdPosition());
         assertNull(daiTracker.getAdCreativeId());
         assertNull(daiTracker.getTitle());
-        assertEquals("DAI", breakStart.get("adStreamType"));
+        assertEquals("SSAI_IMA", breakStart.get("adStreamType"));
     }
 
     @Test
@@ -236,7 +236,7 @@ public class NRTrackerIMADaiTest {
                 "AD_QUARTILE", "AD_QUARTILE", "AD_QUARTILE", "AD_END", "AD_BREAK_END"), seen);
 
         Map<String, Object> start = daiTracker.last("AD_START");
-        assertEquals("DAI", start.get("adStreamType"));
+        assertEquals("SSAI_IMA", start.get("adStreamType"));
         assertEquals("pre", start.get("adPosition"));
         assertEquals("creative-1", start.get("adCreativeId"));
         assertEquals("Ad title", start.get("adTitle"));
@@ -322,7 +322,7 @@ public class NRTrackerIMADaiTest {
         Map<String, Object> err = daiTracker.last("AD_ERROR");
         assertEquals(1005, err.get("errorCode"));
         assertEquals("Stream request failed", err.get("errorMessage"));
-        assertEquals("DAI", err.get("adStreamType"));
+        assertEquals("SSAI_IMA", err.get("adStreamType"));
         assertEquals("LOAD", err.get("adErrorType"));
         assertEquals("IMA_AD_LOADING_FAILED", err.get("errorName"));
     }
@@ -331,7 +331,7 @@ public class NRTrackerIMADaiTest {
     public void nullErrorStillReportsUnknown() {
         daiTracker.handleStreamAdError(mock(AdErrorEvent.class));
         assertEquals("Unknown IMA error", daiTracker.last("AD_ERROR").get("errorMessage"));
-        assertEquals("DAI", daiTracker.last("AD_ERROR").get("adStreamType"));
+        assertEquals("SSAI_IMA", daiTracker.last("AD_ERROR").get("adStreamType"));
     }
 
     // ---- state retained after the event object is gone ----
@@ -394,7 +394,7 @@ public class NRTrackerIMADaiTest {
         assertEquals(1, csaiTracker.count("AD_END"));
         assertEquals(1, csaiTracker.count("AD_BREAK_END"));
         for (Map<String, Object> m : csaiTracker.attrs) {
-            assertFalse(m.containsKey("adStreamType"));
+            assertEquals("CSAI", m.get("adStreamType"));
             assertFalse(m.containsKey("adErrorType"));
             assertFalse(m.containsKey("errorName"));
         }

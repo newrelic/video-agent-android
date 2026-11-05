@@ -29,12 +29,12 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
 
     /**
      * Create a new IMA tracker for the given ad configuration. Created by
-     * {@code NRVideo.addPlayer}: {@link NRAdConfig#dai()} puts the tracker in DAI mode,
+     * {@code NRVideo.addPlayer}: {@link NRAdConfig#ssaiIma()} puts the tracker in Google IMA DAI (SSAI_IMA) mode,
      * anything else keeps the CSAI behaviour.
      */
     public NRTrackerIMA(NRVideoConfiguration configuration, NRAdConfig adConfig) {
         super(configuration);
-        this.dai = adConfig != null && adConfig.type == NRAdConfig.Type.DAI;
+        this.dai = adConfig != null && adConfig.type == NRAdConfig.Type.SSAI_IMA;
     }
 
     /**
@@ -56,8 +56,11 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     private Long duration = null;
     private String imaAdId = null;
 
-    /** Value of the {@code adStreamType} attribute for IMA DAI events. */
-    public static final String AD_STREAM_TYPE_DAI = "DAI";
+    /** {@code adStreamType} value for client-side IMA ads. */
+    public static final String AD_STREAM_TYPE_CSAI = "CSAI";
+
+    /** {@code adStreamType} value for Google IMA Dynamic Ad Insertion (DAI) ads. */
+    public static final String AD_STREAM_TYPE_SSAI_IMA = "SSAI_IMA";
 
     // DAI state. Plain strong references: unlike the iOS delegate, IMA Android hands us
     // objects that stay valid after the callback returns, but we cache the fields anyway.
@@ -67,7 +70,7 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     private volatile String lastErrorType = null;
 
     /**
-     * True when the tracker reports IMA DAI ads (set by {@link NRAdConfig#dai()}, by
+     * True when the tracker reports IMA DAI ads (set by {@link NRAdConfig#ssaiIma()}, by
      * {@link #registerStreamManager}, or by the first {@link #handleStreamAdEvent} call).
      */
     public boolean isDai() {
@@ -253,9 +256,9 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     }
 
     /**
-     * Adds the DAI-only attributes just before the event is recorded: {@code adStreamType}
-     * on every ad and ad error event, {@code adSkipped} on ad events and {@code adErrorType}
-     * on errors. CSAI events are left untouched.
+     * Adds attributes just before the event is recorded: {@code adStreamType} ({@code CSAI} or
+     * {@code SSAI_IMA}) on every ad and ad error event, {@code adSkipped} on ad events, and
+     * the DAI-only {@code adErrorType} and {@code errorName} on errors.
      */
     @Override
     public boolean preSend(String action, Map<String, Object> attributes) {
@@ -263,10 +266,10 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
             // CSAI and DAI both report adSkipped (iOS parity); reset on every STARTED.
             attributes.put("adSkipped", skipped ? 1L : 0L);
         }
+        if (attributes != null && action != null && action.startsWith("AD_")) {
+            attributes.put("adStreamType", dai ? AD_STREAM_TYPE_SSAI_IMA : AD_STREAM_TYPE_CSAI);
+        }
         if (dai && attributes != null) {
-            if (action != null && action.startsWith("AD_")) {
-                attributes.put("adStreamType", AD_STREAM_TYPE_DAI);
-            }
             if (AD_ERROR.equals(action) && lastErrorType != null) {
                 attributes.put("adErrorType", lastErrorType);
                 attributes.put("errorName", errorNameFor(lastErrorType));
