@@ -140,7 +140,7 @@ An Attribute is a piece of data associated with an event. Attributes provide add
 | adQuartile               | Quartile of the ad. 0 before first, 1 after first quartile, 2 after midpoint, 3 after third quartile, 4 when completed.                            |
 | adPosition               | The position of the ad.                                                                                                                            |
 | adCreativeId             | The creative ID of the ad.                                                                                                                         |
-| adStreamType             | Ad delivery type, set on all `AD_*` events and `AD_ERROR`: `CSAI` (client-side IMA), `SSAI_IMA` (Google IMA Dynamic Ad Insertion, DAI) or `SSAI_MT` (AWS MediaTailor). |
+| adStreamType             | `SSAI_IMA` on `AD_*` events and `AD_ERROR` for Google IMA Dynamic Ad Insertion (DAI) ads. Absent for CSAI and MediaTailor.                |
 | adSkipped                | `1` if the ad was skipped (`AD_END` after a skip), else `0`. Reset on every `AD_START`. IMA CSAI and DAI.                                              |
 | adErrorType              | IMA `AdError.AdErrorType` name (`LOAD` or `PLAY`) on `AD_ERROR`. IMA CSAI and DAI.                                                                     |
 | adPartner                | The ad partner, e.g., ima, freewheel, aws-mediatailor.                                                                                             |

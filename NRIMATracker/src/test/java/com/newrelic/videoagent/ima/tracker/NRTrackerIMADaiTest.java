@@ -394,7 +394,7 @@ public class NRTrackerIMADaiTest {
         assertEquals(1, csaiTracker.count("AD_END"));
         assertEquals(1, csaiTracker.count("AD_BREAK_END"));
         for (Map<String, Object> m : csaiTracker.attrs) {
-            assertEquals("CSAI", m.get("adStreamType"));
+            assertFalse(m.containsKey("adStreamType"));
             assertFalse(m.containsKey("adErrorType"));
             assertFalse(m.containsKey("errorName"));
         }

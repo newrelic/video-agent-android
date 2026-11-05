@@ -56,9 +56,6 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     private Long duration = null;
     private String imaAdId = null;
 
-    /** {@code adStreamType} value for client-side IMA ads. */
-    public static final String AD_STREAM_TYPE_CSAI = "CSAI";
-
     /** {@code adStreamType} value for Google IMA Dynamic Ad Insertion (DAI) ads. */
     public static final String AD_STREAM_TYPE_SSAI_IMA = "SSAI_IMA";
 
@@ -256,9 +253,9 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     }
 
     /**
-     * Adds attributes just before the event is recorded: {@code adStreamType} ({@code CSAI} or
-     * {@code SSAI_IMA}) on every ad and ad error event, {@code adSkipped} on ad events, and
-     * the DAI-only {@code adErrorType} and {@code errorName} on errors.
+     * Adds attributes just before the event is recorded: {@code adSkipped} on ad events and, in
+     * SSAI_IMA mode only, {@code adStreamType} on every ad and ad error event plus
+     * {@code adErrorType} and {@code errorName} on errors. CSAI events get no new keys.
      */
     @Override
     public boolean preSend(String action, Map<String, Object> attributes) {
@@ -266,10 +263,10 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
             // CSAI and DAI both report adSkipped (iOS parity); reset on every STARTED.
             attributes.put("adSkipped", skipped ? 1L : 0L);
         }
-        if (attributes != null && action != null && action.startsWith("AD_")) {
-            attributes.put("adStreamType", dai ? AD_STREAM_TYPE_SSAI_IMA : AD_STREAM_TYPE_CSAI);
-        }
         if (dai && attributes != null) {
+            if (action != null && action.startsWith("AD_")) {
+                attributes.put("adStreamType", AD_STREAM_TYPE_SSAI_IMA);
+            }
             if (AD_ERROR.equals(action) && lastErrorType != null) {
                 attributes.put("adErrorType", lastErrorType);
                 attributes.put("errorName", errorNameFor(lastErrorType));

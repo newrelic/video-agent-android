@@ -292,7 +292,7 @@ plus rich VAST metadata (see [DATAMODEL.md](./DATAMODEL.md)).
 
 Use `NRAdConfig.ssaiIma()` for Google IMA Dynamic Ad Insertion (DAI), where ads are stitched into the
 stream. It uses the same `NRIMATracker` module and ad vocabulary as CSAI; ad breaks come from
-`AD_BREAK_STARTED` / `AD_BREAK_ENDED`, and every ad event carries `adStreamType` (`CSAI`, `SSAI_IMA` or `SSAI_MT`).
+`AD_BREAK_STARTED` / `AD_BREAK_ENDED`, and SSAI_IMA ad events carry `adStreamType=SSAI_IMA` (absent for CSAI and MediaTailor).
 
 ```java
 Integer trackerId = NRVideo.addPlayer(new NRVideoPlayerConfiguration(

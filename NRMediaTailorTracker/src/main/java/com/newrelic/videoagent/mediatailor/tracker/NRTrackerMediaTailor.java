@@ -129,9 +129,6 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
 
     private int nonLinearAvailsCount = 0;
 
-    /** {@code adStreamType} value for AWS MediaTailor server-side ads. */
-    public static final String AD_STREAM_TYPE_SSAI_MT = "SSAI_MT";
-
     /**
      * Primary constructor — called by {@link com.newrelic.videoagent.core.NRVideo#addPlayer}
      * when the customer passes {@link NRAdConfig#mediaTailor()}.
@@ -1024,7 +1021,6 @@ public class NRTrackerMediaTailor extends NRVideoTracker implements Player.Liste
     @Override
     public java.util.Map<String, Object> getAttributes(String action, java.util.Map<String, Object> attributes) {
         java.util.Map<String, Object> attr = super.getAttributes(action, attributes);
-        if (action != null && action.startsWith("AD_")) attr.put("adStreamType", AD_STREAM_TYPE_SSAI_MT);
         if (currentAdBreak == null) return attr;
 
         String adSystem = pick(currentAdPod != null ? currentAdPod.adSystem : null, currentAdBreak.adSystem);
