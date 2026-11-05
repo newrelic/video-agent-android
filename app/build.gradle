@@ -11,14 +11,12 @@ if (localPropertiesFile.exists()) {
 }
 def applicationToken = localProperties.getProperty('nr.applicationToken', "")
 def qoeAggregateEnabled = localProperties.getProperty('nr.qoeAggregate', "true").toBoolean()
-def collectorAddress = localProperties.getProperty('nr.collectorAddress', "staging-mobile-collector.newrelic.com")
 def theoLicenseKey = localProperties.getProperty('theoplayer.licenseKey', "")
 
 android {
     compileSdk 36
     defaultConfig {
         buildConfigField "String", "NR_APPLICATION_TOKEN", "\"${applicationToken}\""
-        buildConfigField "String", "NR_COLLECTOR_ADDRESS", "\"${collectorAddress}\""
         buildConfigField "boolean", "QOE_AGGREGATE_DEFAULT", "${qoeAggregateEnabled}"
         manifestPlaceholders = [theoplayerLicenseKey: theoLicenseKey]
         applicationId "com.newrelic.nrvideoproject"

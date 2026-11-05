@@ -1,21 +1,3 @@
-## [Unreleased]
-
-### New features
-
-- **Google IMA DAI (dynamic ad insertion / SSAI) support in `NRIMATracker`:** pass
-  `NRAdConfig.dai()` and forward the DAI `AdEvent` / `AdErrorEvent` callbacks to
-  `NRTrackerIMA.handleStreamAdEvent()` / `handleStreamAdError()`, or bind a
-  `StreamManager` with `NRTrackerIMA.registerStreamManager()`. DAI emits the same
-  ad events as CSAI (`AD_REQUEST`, `AD_START`, `AD_QUARTILE`, `AD_END`, `AD_CLICK`,
-  `AD_BREAK_START`, `AD_BREAK_END`, `AD_ERROR`); ad breaks come from
-  `AD_BREAK_STARTED` / `AD_BREAK_ENDED`. DAI events carry `adStreamType=DAI` and
-  `adSkipped`, and `AD_ERROR` also carries `adErrorType`. CSAI behaviour is unchanged.
-
-### Bug fixes
-
-- **Core:** `NRVideoTracker` threw a `NullPointerException` on `AD_BREAK_*` events when the
-  linked content tracker had no playhead yet.
-
 ## [5.0.2](https://github.com/newrelic/video-agent-android/compare/v5.0.1...v5.0.2) (2026-10-14)
 
 ### Bug fixes
