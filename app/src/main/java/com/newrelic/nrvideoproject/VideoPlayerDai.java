@@ -33,7 +33,8 @@ import com.newrelic.videoagent.ima.tracker.NRTrackerIMA;
 @OptIn(markerClass = UnstableApi.class)
 public class VideoPlayerDai extends AppCompatActivity implements AdErrorEvent.AdErrorListener, AdEvent.AdEventListener {
 
-    // Google's public DAI sample streams (no network code).
+    // Google's public DAI sample streams.
+    private static final String VOD_NETWORK_CODE = "21775744923";
     private static final String VOD_CONTENT_SOURCE_ID = "2548831";
     private static final String VOD_VIDEO_ID = "tears-of-steel";
     private static final String LIVE_ASSET_KEY = "c-rArva4ShKVIAkNfy6HUQ";
@@ -70,7 +71,8 @@ public class VideoPlayerDai extends AppCompatActivity implements AdErrorEvent.Ad
         if (live) {
             uriBuilder.setAssetKey(LIVE_ASSET_KEY);
         } else {
-            uriBuilder.setContentSourceId(VOD_CONTENT_SOURCE_ID).setVideoId(VOD_VIDEO_ID);
+            uriBuilder.setContentSourceId(VOD_CONTENT_SOURCE_ID).setVideoId(VOD_VIDEO_ID)
+                    .setNetworkCode(VOD_NETWORK_CODE);
         }
         Uri uri = uriBuilder.build();
         player.setMediaItem(MediaItem.fromUri(uri));
