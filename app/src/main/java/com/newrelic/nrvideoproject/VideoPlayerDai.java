@@ -34,7 +34,7 @@ import com.newrelic.videoagent.ima.tracker.NRTrackerIMA;
 public class VideoPlayerDai extends AppCompatActivity implements AdErrorEvent.AdErrorListener, AdEvent.AdEventListener {
 
     // Google's public DAI sample streams (no network code).
-    private static final String VOD_CONTENT_SOURCE_ID = "2528370";
+    private static final String VOD_CONTENT_SOURCE_ID = "2548831";
     private static final String VOD_VIDEO_ID = "tears-of-steel";
     private static final String LIVE_ASSET_KEY = "c-rArva4ShKVIAkNfy6HUQ";
 

@@ -182,6 +182,26 @@ public class NRTrackerIMATest {
         assertEquals("[AD_REQUEST, AD_START, AD_END]", tracker.actions.toString());
     }
 
+    @Test
+    public void breakEndClosesAnAdThatWasCutShort() {
+        init(NRAdConfig.imaDai());
+        send(AdEvent.AdEventType.AD_BREAK_STARTED);
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, ad(0)));
+        send(AdEvent.AdEventType.AD_BREAK_ENDED);
+        assertEquals("[AD_BREAK_START, AD_REQUEST, AD_START, AD_END, AD_BREAK_END]",
+                tracker.actions.toString());
+    }
+
+    @Test
+    public void csaiResumeRequestAfterCompletedDoesNotEndTwice() {
+        send(AdEvent.AdEventType.CONTENT_PAUSE_REQUESTED);
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, ad(0)));
+        send(AdEvent.AdEventType.COMPLETED);
+        send(AdEvent.AdEventType.CONTENT_RESUME_REQUESTED);
+        assertEquals("[AD_BREAK_START, AD_REQUEST, AD_START, AD_END, AD_BREAK_END]",
+                tracker.actions.toString());
+    }
+
     // ---- Errors ----
 
     @Test

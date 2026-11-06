@@ -99,6 +99,7 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
             case CONTENT_RESUME_REQUESTED:
             case AD_BREAK_ENDED:
             case AD_PERIOD_ENDED:
+                endOpenAd();
                 sendAdBreakEnd();
                 break;
             case STARTED:
@@ -147,6 +148,17 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
             case SKIPPABLE_STATE_CHANGED:
             default:
                 break;
+        }
+    }
+
+    /**
+     * An ad can be cut short (error, stream ended it) and the break ends with no COMPLETED or
+     * SKIPPED. Close it first, so the ad does not stay open and keep sending heartbeats.
+     */
+    private void endOpenAd() {
+        if (getState().isStarted) {
+            sendEnd();
+            quartile = null;
         }
     }
 
