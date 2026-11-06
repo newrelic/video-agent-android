@@ -51,6 +51,13 @@ public class NRTimeSince {
     }
 
     /**
+     * Clear the timestamp, so timeSince reports null until the action happens again.
+     */
+    public void reset() {
+        timestamp = 0;
+    }
+
+    /**
      * Get current timeSince value.
      *
      * @return Time since.

@@ -276,7 +276,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
             if (action.startsWith("AD_BREAK_")) {
                 if (linkedTracker instanceof NRVideoTracker) {
                     Long playhead = ((NRVideoTracker) linkedTracker).getPlayhead();
-                    if (playhead < 100) {
+                    if (playhead != null && playhead < 100) {
                         attr.put("adPosition", "pre");
                     }
                 }
@@ -864,8 +864,18 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         if (state.isAd && state.goAdBreakStart()) {
             adBreakIdIndex++;
             totalAdPlaytime = 0L;
+            resetAdTimeSince();
             sendVideoAdEvent(AD_BREAK_START);
         }
+    }
+
+    /**
+     * The per-ad timeSince values must not carry over from the previous break: AD_BREAK_START
+     * is sent before the new ad's own AD_REQUEST, which is what rebuilds the table.
+     */
+    private void resetAdTimeSince() {
+        resetTimeSinceAttributes("timeSinceAdRequested", "timeSinceAdStarted",
+                "timeSinceLastAdHeartbeat", "timeSinceLastAdQuartile");
     }
 
     /**
