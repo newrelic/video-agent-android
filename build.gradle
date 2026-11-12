@@ -40,7 +40,7 @@ allprojects {
             // 2. Runtime NoSuchMethodError if stdlib is forced lower than the compiler version
             // At 1.9.22, jdk7/jdk8 artifacts are empty shims — no duplicates and compiler-safe.
             force 'org.jetbrains.kotlin:kotlin-stdlib:1.9.22'
-            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.22'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.4.21'
             force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'
         }
     }
