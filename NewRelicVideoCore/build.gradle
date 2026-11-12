@@ -48,7 +48,7 @@ android {
 }
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.1.0'
-    implementation 'com.google.android.material:material:1.1.0'
+    implementation 'com.google.android.material:material:1.14.0'
 
     // Add androidx.leanback for accurate Android TV detection
 //    implementation 'androidx.leanback:leanback:1.0.0'
