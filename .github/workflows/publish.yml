@@ -65,6 +65,7 @@ jobs:
       - name: Trigger Release Notes Docs PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.create_release.outputs.tag }}
         run: |
-          gh workflow run release-notes-docs-pr.yml --ref master --field tag=${{ steps.create_release.outputs.tag }} --field dry_run=false
-          echo "Triggered release-notes-docs-pr.yml for ${{ steps.create_release.outputs.tag }}"
+          gh workflow run release-notes-docs-pr.yml --ref master --field tag="$RELEASE_TAG" --field dry_run=false
+          echo "Triggered release-notes-docs-pr.yml for $RELEASE_TAG"
