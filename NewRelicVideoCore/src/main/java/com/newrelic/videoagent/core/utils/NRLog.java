@@ -9,6 +9,8 @@ import java.util.function.Supplier;
 public class NRLog {
     private static final String TAG = "NRVideo";
     private static boolean logging = false;
+    // null means no filtering (all levels, including debug)
+    private static volatile NRLogLevel minLevel = null;
 
     /**
      * Print debug message.
@@ -16,7 +18,7 @@ public class NRLog {
      * @param s Message.
      */
     public static void d(String s) {
-        if (logging) {
+        if (logging && minLevel == null) {
             Log.d(TAG, s);
         }
     }
@@ -28,7 +30,7 @@ public class NRLog {
      * @param supplier Message supplier.
      */
     public static void d(Supplier<String> supplier) {
-        if (logging) {
+        if (logging && minLevel == null) {
             Log.d(TAG, supplier.get());
         }
     }
@@ -39,7 +41,7 @@ public class NRLog {
      * @param s Message.
      */
     public static void i(String s) {
-        if (logging) {
+        if (logging && isLevelEnabled(NRLogLevel.INFO)) {
             Log.i(TAG, s);
         }
     }
@@ -50,7 +52,7 @@ public class NRLog {
      * @param s Message.
      */
     public static void e(String s) {
-        if (logging) {
+        if (logging && isLevelEnabled(NRLogLevel.ERROR)) {
             Log.e(TAG, s);
         }
     }
@@ -61,7 +63,7 @@ public class NRLog {
      * @param s Message.
      */
     public static void e(String s, Exception e) {
-        if (logging) {
+        if (logging && isLevelEnabled(NRLogLevel.ERROR)) {
             Log.e(TAG, s, e);
         }
     }
@@ -72,7 +74,7 @@ public class NRLog {
      * @param s Message.
      */
     public static void w(String s) {
-        if (logging) {
+        if (logging && isLevelEnabled(NRLogLevel.WARNING)) {
             Log.w(TAG, s);
         }
     }
@@ -89,6 +91,20 @@ public class NRLog {
      */
     public static void disable() {
         logging = false;
+    }
+
+    /**
+     * Set the minimum level to log. Debug messages are suppressed while a level is set.
+     *
+     * @param level Minimum level, or null to log everything.
+     */
+    public static void setLevel(NRLogLevel level) {
+        minLevel = level;
+    }
+
+    private static boolean isLevelEnabled(NRLogLevel level) {
+        NRLogLevel min = minLevel;
+        return min == null || level.ordinal() >= min.ordinal();
     }
 
     private NRLog() {}

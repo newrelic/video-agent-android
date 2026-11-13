@@ -4,6 +4,7 @@ import android.app.ActivityManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import com.newrelic.videoagent.core.utils.NRLog;
+import com.newrelic.videoagent.core.utils.NRLogLevel;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import java.util.ArrayList;
@@ -47,6 +48,7 @@ public final class NRVideoConfiguration {
     private final int maxDeadLetterSize;
     private final boolean memoryOptimized;
     private final boolean debugLoggingEnabled;
+    private final NRLogLevel loggingLevel;
     private final boolean isTV;
     private final String collectorAddress;
     private final int qoeAggregateIntervalMultiplier;
@@ -93,6 +95,7 @@ public final class NRVideoConfiguration {
         this.maxDeadLetterSize = builder.maxDeadLetterSize;
         this.memoryOptimized = builder.memoryOptimized;
         this.debugLoggingEnabled = builder.debugLoggingEnabled;
+        this.loggingLevel = builder.loggingLevel;
         this.isTV = builder.isTV;
         this.collectorAddress = builder.collectorAddress;
         this.qoeAggregateIntervalMultiplier = builder.qoeAggregateIntervalMultiplier;
@@ -117,6 +120,7 @@ public final class NRVideoConfiguration {
     public int getMaxDeadLetterSize() { return maxDeadLetterSize; }
     public boolean isMemoryOptimized() { return memoryOptimized; }
     public boolean isDebugLoggingEnabled() { return debugLoggingEnabled; }
+    public NRLogLevel getLoggingLevel() { return loggingLevel; }
     public boolean isTV() { return isTV; }
     public String getCollectorAddress() { return collectorAddress; }
     public int getQoeAggregateIntervalMultiplier() { return qoeAggregateIntervalMultiplier; }
@@ -246,6 +250,7 @@ public final class NRVideoConfiguration {
         private int maxDeadLetterSize = DEFAULT_MAX_DEAD_LETTER_SIZE;
         private boolean memoryOptimized = true;
         private boolean debugLoggingEnabled = false;
+        private NRLogLevel loggingLevel = null;
         private boolean isTV = false;
         private String collectorAddress = null;
         private boolean qoeAggregateEnabled = true; // Default enabled
@@ -326,6 +331,28 @@ public final class NRVideoConfiguration {
 
         public Builder enableLogging() {
             this.debugLoggingEnabled = true;
+            this.loggingLevel = null;
+            return this;
+        }
+
+        /**
+         * Enable or disable agent logging to Logcat (default: disabled).
+         * @param enabled true to enable logging of everything
+         */
+        public Builder enableLogging(boolean enabled) {
+            return enableLogging(enabled, null);
+        }
+
+        /**
+         * Enable or disable agent logging to Logcat with a minimum level (INFO, WARNING or ERROR).
+         * When a level is set, debug messages are suppressed. Event buffers log INFO at 85% full,
+         * WARNING at 90% full and ERROR for every dropped event.
+         * @param enabled true to enable logging
+         * @param level minimum level to log, or null to log everything
+         */
+        public Builder enableLogging(boolean enabled, NRLogLevel level) {
+            this.debugLoggingEnabled = enabled;
+            this.loggingLevel = level;
             return this;
         }
 
@@ -487,6 +514,7 @@ public final class NRVideoConfiguration {
                 ", memoryOptimized=" + memoryOptimized +
                 ", isTV=" + isTV +
                 ", debugLogging=" + debugLoggingEnabled +
+                ", loggingLevel=" + loggingLevel +
                 '}';
     }
 }

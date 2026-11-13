@@ -6,6 +6,7 @@ import com.newrelic.videoagent.core.harvest.DeadLetterEventBuffer;
 import com.newrelic.videoagent.core.harvest.HttpClientInterface;
 import com.newrelic.videoagent.core.harvest.EventBufferInterface;
 import com.newrelic.videoagent.core.harvest.DefaultSizeEstimator;
+import com.newrelic.videoagent.core.utils.BufferDropLogger;
 import com.newrelic.videoagent.core.utils.NRLog;
 
 import java.util.ArrayList;
@@ -36,12 +37,15 @@ public class IntegratedDeadLetterHandler {
     private final AtomicLong totalEventsBackedUp = new AtomicLong(0);
 
     // Thread safety
+    // Evictions only: fill thresholds for the in-memory queue are logged by DeadLetterEventBuffer itself
+    private final BufferDropLogger dropLogger;
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
 
     public IntegratedDeadLetterHandler(CrashSafeEventBuffer mainBuffer,
                                      HttpClientInterface httpClient,
                                      NRVideoConfiguration configuration) {
         this.inMemoryQueue = new DeadLetterEventBuffer(configuration.isTV());
+        this.dropLogger = new BufferDropLogger("Dead letter retry", configuration.getMaxDeadLetterSize());
         this.mainBuffer = mainBuffer;
         this.httpClient = httpClient;
         this.configuration = configuration;
@@ -168,6 +172,7 @@ public class IntegratedDeadLetterHandler {
                     List<Map<String, Object>> removed = inMemoryQueue.pollBatchByPriority(
                         1, new DefaultSizeEstimator(), NRVideoConstants.EVENT_TYPE_ONDEMAND);
                     if (removed.isEmpty()) break;
+                    dropLogger.recordDrop();
                 }
             }
             inMemoryQueue.addEvent(event);

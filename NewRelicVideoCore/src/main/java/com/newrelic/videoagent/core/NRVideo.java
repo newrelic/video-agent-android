@@ -280,6 +280,7 @@ public final class NRVideo {
                 NRLog.d("Lifecycle observer created and registered with crash-safe storage");
             }
             if (config.isDebugLoggingEnabled()) {
+                NRLog.setLevel(config.getLoggingLevel());
                 NRLog.enable();
             }
             if (config.isTV()) {
