@@ -1,6 +1,7 @@
 package com.newrelic.videoagent.core.model;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -36,6 +37,20 @@ public class NRTimeSinceTable {
      */
     public void addEntry(NRTimeSince ts) {
         timeSinceTable.add(ts);
+    }
+
+    /**
+     * Clear the timestamp of every entry for the given attributes, so they report
+     * null until their action happens again.
+     *
+     * @param attributes Attribute names.
+     */
+    public void resetAttributes(Collection<String> attributes) {
+        for (NRTimeSince ts : timeSinceTable) {
+            if (attributes.contains(ts.getAttribute())) {
+                ts.reset();
+            }
+        }
     }
 
     /**

@@ -4,6 +4,7 @@ import com.google.ads.interactivemedia.v3.api.Ad;
 import com.google.ads.interactivemedia.v3.api.AdError;
 import com.google.ads.interactivemedia.v3.api.AdErrorEvent;
 import com.google.ads.interactivemedia.v3.api.AdEvent;
+import com.newrelic.videoagent.core.NRAdConfig;
 import com.newrelic.videoagent.core.NRVideoConfiguration;
 import com.newrelic.videoagent.core.tracker.NRVideoTracker;
 import com.newrelic.videoagent.core.utils.NRLog;
@@ -13,7 +14,21 @@ import java.lang.reflect.Method;
 
 import static com.newrelic.videoagent.core.NRDef.*;
 
+/**
+ * Tracker for Google IMA, for client-side ads (CSAI) and Dynamic Ad Insertion (DAI).
+ * It only observes: the app keeps its own IMA listeners and the tracker is added next
+ * to them (or called from them via {@link #handleAdEvent} / {@link #handleAdError}).
+ */
 public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdErrorListener, AdEvent.AdEventListener {
+
+    /**
+     * Create a new IMA tracker from the player's ad configuration.
+     * {@link NRAdConfig#imaDai()} selects Dynamic Ad Insertion.
+     */
+    public NRTrackerIMA(NRVideoConfiguration configuration, NRAdConfig adConfig) {
+        super(configuration);
+        this.isDai = adConfig != null && adConfig.type == NRAdConfig.Type.IMA_DAI;
+    }
 
     /**
      * Create a new IMA tracker with configuration.
@@ -31,6 +46,8 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
         super();
     }
 
+    /** True for Dynamic Ad Insertion: breaks come from the stream's own ad break events. */
+    private boolean isDai = false;
     private String adPosition = null;
     private String creativeId = null;
     private Long quartile = null;
@@ -47,6 +64,7 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
         NRLog.d("AdErrorEvent = " + adErrorEvent);
         AdError adError = adErrorEvent.getError();
         if (adError != null) {
+            // sendError substitutes a placeholder for a null/empty message.
             sendError(adError.getErrorCodeNumber(), adError.getMessage());
         } else {
             sendError(null, "Unknown IMA error");
@@ -61,13 +79,27 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
             NRLog.d("AdEvent = " + adEvent);
         }
 
+        AdEvent.AdEventType type = adEvent.getType();
+        if (type == null) return;
+
+        // DAI: a new break starts clean, so it does not report the previous break's ad.
+        if (isDai && type == AdEvent.AdEventType.AD_BREAK_STARTED) {
+            clearAdAttributes();
+        }
         fillAdAttributes(adEvent.getAd());
 
-        switch (adEvent.getType()) {
+        // Break start/end are idempotent in the core, so overlapping signals
+        // (e.g. AD_BREAK_* and AD_PERIOD_*) do not produce duplicates.
+        switch (type) {
             case CONTENT_PAUSE_REQUESTED:
+            case AD_BREAK_STARTED:
+            case AD_PERIOD_STARTED:
                 sendAdBreakStart();
                 break;
             case CONTENT_RESUME_REQUESTED:
+            case AD_BREAK_ENDED:
+            case AD_PERIOD_ENDED:
+                endOpenAd();
                 sendAdBreakEnd();
                 break;
             case STARTED:
@@ -102,22 +134,60 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
             case RESUMED:
                 sendResume();
                 break;
+            // Known IMA events that are not part of the ad lifecycle we report today.
+            case AD_BREAK_READY:
+            case AD_BREAK_FETCH_ERROR:
+            case AD_BUFFERING:
+            case AD_PROGRESS:
+            case ALL_ADS_COMPLETED:
+            case CUEPOINTS_CHANGED:
+            case ICON_FALLBACK_IMAGE_CLOSED:
+            case ICON_TAPPED:
+            case LOADED:
+            case LOG:
+            case SKIPPABLE_STATE_CHANGED:
+            default:
+                break;
         }
+    }
+
+    /**
+     * An ad can be cut short (error, stream ended it) and the break ends with no COMPLETED or
+     * SKIPPED. Close it first, so the ad does not stay open and keep sending heartbeats.
+     */
+    private void endOpenAd() {
+        if (getState().isStarted) {
+            sendEnd();
+            quartile = null;
+        }
+    }
+
+    private void clearAdAttributes() {
+        adPosition = null;
+        creativeId = null;
+        title = null;
+        bitrate = null;
+        renditionHeight = null;
+        renditionWidth = null;
+        duration = null;
     }
 
     private void fillAdAttributes(Ad ad) {
         if (ad == null) return;
 
-        switch (ad.getAdPodInfo().getPodIndex()) {
-            case 0:
-                adPosition = "pre";
-            break;
-            case -1:
-                adPosition = "post";
-            break;
-            default:
-                adPosition = "mid";
-            break;
+        // DAI ads can come without pod info.
+        if (ad.getAdPodInfo() != null) {
+            switch (ad.getAdPodInfo().getPodIndex()) {
+                case 0:
+                    adPosition = "pre";
+                    break;
+                case -1:
+                    adPosition = "post";
+                    break;
+                default:
+                    adPosition = "mid";
+                    break;
+            }
         }
         creativeId = ad.getCreativeId();
         title = ad.getTitle();

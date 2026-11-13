@@ -340,6 +340,7 @@ public final class NRVideo {
                 className = "com.newrelic.videoagent.mediatailor.tracker.NRTrackerMediaTailor";
                 break;
             case CSAI:
+            case IMA_DAI:
             default:
                 className = "com.newrelic.videoagent.ima.tracker.NRTrackerIMA";
                 break;

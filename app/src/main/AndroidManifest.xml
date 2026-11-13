@@ -16,6 +16,11 @@
             android:theme="@style/Theme.NRVideoProject.NoActionBar"
             android:exported="false"></activity>
         <activity
+            android:name=".VideoPlayerDai"
+            android:label="@string/title_activity_video_player_dai"
+            android:theme="@style/Theme.NRVideoProject.NoActionBar"
+            android:exported="false" />
+        <activity
             android:name=".VideoPlayer"
             android:theme="@style/Theme.NRVideoProject.NoActionBar"
             android:exported="false" />
