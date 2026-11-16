@@ -11,6 +11,7 @@ import com.newrelic.videoagent.core.utils.NRLog;
 import com.newrelic.videoagent.ima.BuildConfig;
 
 import java.lang.reflect.Method;
+import java.util.Map;
 
 import static com.newrelic.videoagent.core.NRDef.*;
 
@@ -56,6 +57,10 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     private Long renditionHeight = null;
     private Long renditionWidth = null;
     private Long duration = null;
+    /** IMA's own id of the current ad; null when IMA gives none (the core's value is used then). */
+    private String adId = null;
+    /** 1 when the current ad ended via SKIPPED, reset to 0 at every ad start. */
+    private long adSkipped = 0L;
 
     @Override
     public void onAdError(AdErrorEvent adErrorEvent) {
@@ -104,11 +109,13 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
                 break;
             case STARTED:
                 quartile = 0L;
+                adSkipped = 0L;
                 sendRequest();
                 sendStart();
                 break;
             case COMPLETED:
             case SKIPPED:
+                adSkipped = type == AdEvent.AdEventType.SKIPPED ? 1L : 0L;
                 sendEnd();
                 quartile = null;
                 break;
@@ -182,6 +189,8 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
         renditionHeight = null;
         renditionWidth = null;
         duration = null;
+        adId = null;
+        adSkipped = 0L;
     }
 
     private void fillAdAttributes(Ad ad) {
@@ -206,7 +215,30 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
         bitrate = (long)ad.getVastMediaBitrate() * 1000;
         renditionHeight = (long)ad.getVastMediaHeight();
         renditionWidth = (long)ad.getVastMediaWidth();
+        // Each ad takes its own id, so a missing one never keeps the previous ad's id.
+        String id = ad.getAdId();
+        adId = (id != null && !id.isEmpty()) ? id : null;
         duration = Math.max((long)ad.getDuration(), 0L);
+    }
+
+    /**
+     * Ad id: IMA's own id for the ad, else the core's value (hash of the source).
+     */
+    @Override
+    public String getVideoId() {
+        if (getState().isAd && adId != null) {
+            return adId;
+        }
+        return super.getVideoId();
+    }
+
+    @Override
+    public Map<String, Object> getAttributes(String action, Map<String, Object> attributes) {
+        Map<String, Object> attr = super.getAttributes(action, attributes);
+        if (getState().isAd) {
+            attr.put("adSkipped", adSkipped);
+        }
+        return attr;
     }
 
     /**
@@ -292,6 +324,15 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
      */
     @Override
     public Long getBitrate() {
+        // IMA cannot report a bitrate for stitched (DAI) ads: VAST media bitrate is 0.
+        // Use the playing content rendition's bitrate when known. Not getBitrate(): on ExoPlayer that is
+        // the measured segment download throughput, not the rendition being played.
+        if (isDai && (bitrate == null || bitrate <= 0) && linkedTracker instanceof NRVideoTracker) {
+            Long contentBitrate = ((NRVideoTracker) linkedTracker).getRenditionBitrate();
+            if (contentBitrate != null && contentBitrate > 0) {
+                return contentBitrate;
+            }
+        }
         return bitrate;
     }
 

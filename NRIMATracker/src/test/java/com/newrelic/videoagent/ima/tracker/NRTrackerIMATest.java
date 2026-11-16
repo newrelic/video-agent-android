@@ -1,6 +1,8 @@
 package com.newrelic.videoagent.ima.tracker;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -34,6 +36,7 @@ public class NRTrackerIMATest {
     /** Records the emitted ad events instead of sending them. */
     static class RecordingTracker extends NRTrackerIMA {
         final List<String> actions = new ArrayList<>();
+        final List<Map<String, Object>> sent = new ArrayList<>();
 
         RecordingTracker(NRAdConfig adConfig) {
             super(new NRVideoConfiguration.Builder("TOKEN").build(), adConfig);
@@ -42,6 +45,7 @@ public class NRTrackerIMATest {
         @Override
         public void sendVideoAdEvent(String action, Map<String, Object> attributes) {
             actions.add(action);
+            sent.add(getAttributes(action, attributes));
         }
 
         @Override
@@ -324,5 +328,123 @@ public class NRTrackerIMATest {
         when(errorEvent.getError()).thenReturn(error);
         tracker.onAdError(errorEvent);
         assertEquals("[AD_ERROR]", tracker.actions.toString());
+    }
+
+    // ---- adId, adSkipped, bitrate ----
+
+    private static Ad adWith(String id, int bitrateKbps, int width, int height) {
+        Ad ad = ad(0);
+        when(ad.getAdId()).thenReturn(id);
+        when(ad.getVastMediaBitrate()).thenReturn(bitrateKbps);
+        when(ad.getVastMediaWidth()).thenReturn(width);
+        when(ad.getVastMediaHeight()).thenReturn(height);
+        return ad;
+    }
+
+    private Object lastSent(String key) {
+        return tracker.sent.get(tracker.sent.size() - 1).get(key);
+    }
+
+    @Test
+    public void adIdIsTheImaIdAndDiffersBetweenAds() {
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("ad-1", 0, 0, 0)));
+        assertEquals("ad-1", lastSent("adId"));
+        send(AdEvent.AdEventType.COMPLETED);
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("ad-2", 0, 0, 0)));
+        assertEquals("ad-2", lastSent("adId"));
+    }
+
+    @Test
+    public void adIdFallsBackWhenNullOrEmptyAndNeverReusesThePreviousAd() {
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("ad-1", 0, 0, 0)));
+        send(AdEvent.AdEventType.COMPLETED);
+        String fallback = new NRVideoTracker().getVideoId();
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith(null, 0, 0, 0)));
+        assertEquals(fallback, lastSent("adId"));
+        send(AdEvent.AdEventType.COMPLETED);
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("", 0, 0, 0)));
+        assertEquals(fallback, lastSent("adId"));
+        assertNotEquals("ad-1", lastSent("adId"));
+    }
+
+    @Test
+    public void adSkippedIsOneAfterSkipZeroOnNextAdAndZeroOnComplete() {
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("a", 0, 0, 0)));
+        assertEquals(0L, lastSent("adSkipped"));
+        send(AdEvent.AdEventType.SKIPPED);
+        assertEquals("AD_END", tracker.actions.get(tracker.actions.size() - 1));
+        assertEquals(1L, lastSent("adSkipped"));
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("b", 0, 0, 0)));
+        assertEquals(0L, lastSent("adSkipped"));
+        send(AdEvent.AdEventType.COMPLETED);
+        assertEquals(0L, lastSent("adSkipped"));
+    }
+
+    @Test
+    public void daiSkipDoesNotMarkTheNextBreak() {
+        init(NRAdConfig.imaDai());
+        send(AdEvent.AdEventType.AD_BREAK_STARTED);
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("a", 0, 0, 0)));
+        send(AdEvent.AdEventType.SKIPPED);
+        assertEquals(1L, lastSent("adSkipped"));
+        send(AdEvent.AdEventType.AD_BREAK_STARTED);
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("b", 0, 0, 0)));
+        assertEquals(0L, lastSent("adSkipped"));
+    }
+
+    private void linkContentBitrate(Long bitrate) {
+        content.dispose();
+        content = new NRVideoTracker() {
+            @Override
+            public Long getRenditionBitrate() {
+                return bitrate;
+            }
+        };
+        tracker.linkedTracker = content;
+    }
+
+    @Test
+    public void daiAdUsesTheContentBitrateWhenImaGivesNone() {
+        init(NRAdConfig.imaDai());
+        linkContentBitrate(2500000L);
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("a", 0, 0, 0)));
+        assertEquals(Long.valueOf(2500000L), tracker.getBitrate());
+        assertEquals(2500000L, lastSent("adBitrate"));
+    }
+
+    @Test
+    public void daiAdKeepsItsOwnPositiveBitrate() {
+        init(NRAdConfig.imaDai());
+        linkContentBitrate(2500000L);
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("a", 800, 0, 0)));
+        assertEquals(Long.valueOf(800000L), tracker.getBitrate());
+    }
+
+    @Test
+    public void daiAdKeepsCurrentValueWhenContentBitrateIsUnknown() {
+        init(NRAdConfig.imaDai());
+        linkContentBitrate(null);
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("a", 0, 0, 0)));
+        assertEquals(Long.valueOf(0L), tracker.getBitrate());
+        linkContentBitrate(0L);
+        assertEquals(Long.valueOf(0L), tracker.getBitrate());
+    }
+
+    @Test
+    public void csaiBitrateIgnoresTheContentBitrate() {
+        linkContentBitrate(2500000L);
+        tracker.onAdEvent(event(AdEvent.AdEventType.LOADED, adWith("a", 0, 0, 0)));
+        assertEquals(Long.valueOf(0L), tracker.getBitrate());
+        tracker.onAdEvent(event(AdEvent.AdEventType.LOADED, adWith("a", 800, 640, 360)));
+        assertEquals(Long.valueOf(800000L), tracker.getBitrate());
+        assertEquals(Long.valueOf(640L), tracker.getRenditionWidth());
+        assertEquals(Long.valueOf(360L), tracker.getRenditionHeight());
+    }
+
+    @Test
+    public void noAdMeansNoBitrate() {
+        init(NRAdConfig.imaDai());
+        linkContentBitrate(null);
+        assertNull(tracker.getBitrate());
     }
 }
