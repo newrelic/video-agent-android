@@ -225,7 +225,8 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
         // Each ad takes its own id, so a missing one never keeps the previous ad's id.
         String id = ad.getAdId();
         adId = (id != null && !id.isEmpty()) ? id : null;
-        duration = Math.max((long)ad.getDuration(), 0L);
+        // IMA reports seconds as a double; adDuration is in ms (DATAMODEL.md).
+        duration = Math.max(Math.round(ad.getDuration() * 1000), 0L);
     }
 
     /**

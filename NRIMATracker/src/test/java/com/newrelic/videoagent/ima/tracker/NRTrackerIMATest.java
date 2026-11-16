@@ -345,6 +345,46 @@ public class NRTrackerIMATest {
         return tracker.sent.get(tracker.sent.size() - 1).get(key);
     }
 
+    // ---- adDuration is in milliseconds ----
+
+    private static Ad adOfSeconds(double seconds) {
+        Ad ad = ad(0);
+        when(ad.getDuration()).thenReturn(seconds);
+        return ad;
+    }
+
+    @Test
+    public void csaiAdDurationIsReportedInMilliseconds() {
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adOfSeconds(10.0)));
+        assertEquals(10000L, lastSent("adDuration"));
+        send(AdEvent.AdEventType.COMPLETED);
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adOfSeconds(15.5)));
+        assertEquals(15500L, lastSent("adDuration"));
+    }
+
+    @Test
+    public void daiAdDurationIsReportedInMilliseconds() {
+        init(NRAdConfig.imaDai());
+        send(AdEvent.AdEventType.AD_BREAK_STARTED);
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adOfSeconds(10.0)));
+        assertEquals(10000L, lastSent("adDuration"));
+    }
+
+    @Test
+    public void adDurationRoundsFractionalMilliseconds() {
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adOfSeconds(10.0004)));
+        assertEquals(10000L, tracker.getDuration().longValue());
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adOfSeconds(10.0006)));
+        assertEquals(10001L, tracker.getDuration().longValue());
+    }
+
+    @Test
+    public void adDurationIsZeroWhenImaReportsNegativeAndNullWithoutAnAd() {
+        assertNull(tracker.getDuration());
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adOfSeconds(-1.0)));
+        assertEquals(0L, tracker.getDuration().longValue());
+    }
+
     @Test
     public void adIdIsTheImaIdAndDiffersBetweenAds() {
         tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("ad-1", 0, 0, 0)));
