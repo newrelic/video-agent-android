@@ -117,16 +117,25 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
                 sendAdClick();
                 break;
             case FIRST_QUARTILE:
-                quartile = 1L;
-                sendAdQuartile();
+                // Dropped when no ad was started (e.g. a live DAI join mid-ad): no AD_START, no adId.
+                if (getState().isStarted) {
+                    quartile = 1L;
+                    sendAdQuartile();
+                }
                 break;
             case MIDPOINT:
-                quartile = 2L;
-                sendAdQuartile();
+                // Dropped when no ad was started (e.g. a live DAI join mid-ad): no AD_START, no adId.
+                if (getState().isStarted) {
+                    quartile = 2L;
+                    sendAdQuartile();
+                }
                 break;
             case THIRD_QUARTILE:
-                quartile = 3L;
-                sendAdQuartile();
+                // Dropped when no ad was started (e.g. a live DAI join mid-ad): no AD_START, no adId.
+                if (getState().isStarted) {
+                    quartile = 3L;
+                    sendAdQuartile();
+                }
                 break;
             case PAUSED:
                 sendPause();

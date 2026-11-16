@@ -202,6 +202,63 @@ public class NRTrackerIMATest {
                 tracker.actions.toString());
     }
 
+    // ---- Quartiles only count while an ad is in flight ----
+
+    private void sendAllQuartiles() {
+        send(AdEvent.AdEventType.FIRST_QUARTILE);
+        send(AdEvent.AdEventType.MIDPOINT);
+        send(AdEvent.AdEventType.THIRD_QUARTILE);
+    }
+
+    @Test
+    public void csaiQuartilesWithoutStartedAreDropped() {
+        sendAllQuartiles();
+        assertEquals("[]", tracker.actions.toString());
+    }
+
+    @Test
+    public void daiQuartilesWithoutStartedAreDropped() {
+        init(NRAdConfig.imaDai());
+        send(AdEvent.AdEventType.AD_BREAK_STARTED);
+        sendAllQuartiles();
+        assertEquals("[AD_BREAK_START]", tracker.actions.toString());
+    }
+
+    @Test
+    public void quartilesAfterStartedStillSend() {
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, ad(0)));
+        sendAllQuartiles();
+        assertEquals("[AD_REQUEST, AD_START, AD_QUARTILE, AD_QUARTILE, AD_QUARTILE]", tracker.actions.toString());
+    }
+
+    @Test
+    public void strayQuartileAfterCompletedIsDropped() {
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, ad(0)));
+        send(AdEvent.AdEventType.COMPLETED);
+        send(AdEvent.AdEventType.MIDPOINT);
+        assertEquals("[AD_REQUEST, AD_START, AD_END]", tracker.actions.toString());
+    }
+
+    @Test
+    public void strayQuartileAfterBreakEndIsDropped() {
+        init(NRAdConfig.imaDai());
+        send(AdEvent.AdEventType.AD_BREAK_STARTED);
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, ad(0)));
+        send(AdEvent.AdEventType.AD_BREAK_ENDED);
+        send(AdEvent.AdEventType.THIRD_QUARTILE);
+        assertEquals("[AD_BREAK_START, AD_REQUEST, AD_START, AD_END, AD_BREAK_END]", tracker.actions.toString());
+    }
+
+    @Test
+    public void newStartedRearmsQuartiles() {
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, ad(0)));
+        send(AdEvent.AdEventType.COMPLETED);
+        send(AdEvent.AdEventType.FIRST_QUARTILE);
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, ad(0)));
+        send(AdEvent.AdEventType.FIRST_QUARTILE);
+        assertEquals("[AD_REQUEST, AD_START, AD_END, AD_REQUEST, AD_START, AD_QUARTILE]", tracker.actions.toString());
+    }
+
     // ---- Errors ----
 
     @Test
