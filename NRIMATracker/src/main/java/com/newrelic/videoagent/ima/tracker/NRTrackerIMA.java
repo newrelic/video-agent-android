@@ -57,7 +57,7 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     private Long renditionHeight = null;
     private Long renditionWidth = null;
     private Long duration = null;
-    /** IMA's own id of the current ad; null when IMA gives none (the core's value is used then). */
+    /** IMA's own id of the current ad; null before the first ad of a break or when IMA gives none. */
     private String adId = null;
     /** 1 when the current ad ended via SKIPPED, reset to 0 at every ad start. */
     private long adSkipped = 0L;
@@ -90,6 +90,12 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
         // DAI: a new break starts clean, so it does not report the previous break's ad.
         if (isDai && type == AdEvent.AdEventType.AD_BREAK_STARTED) {
             clearAdAttributes();
+        }
+        // A break that opens with no ad yet must not report the previous ad's id (a Live DAI break
+        // starts from period events, which skip the reset above). Not when a break is already open.
+        if ((type == AdEvent.AdEventType.AD_BREAK_STARTED || type == AdEvent.AdEventType.AD_PERIOD_STARTED)
+                && !getState().isAdBreak) {
+            adId = null;
         }
         fillAdAttributes(adEvent.getAd());
 
@@ -222,11 +228,12 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     }
 
     /**
-     * Ad id: IMA's own id for the ad, else the core's value (hash of the source).
+     * Ad id: IMA's own id for the ad. Null when there is no ad yet (AD_BREAK_START) or IMA gives
+     * none: the core's value would hash the empty source and repeat for every ad.
      */
     @Override
     public String getVideoId() {
-        if (getState().isAd && adId != null) {
+        if (getState().isAd) {
             return adId;
         }
         return super.getVideoId();

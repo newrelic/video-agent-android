@@ -355,16 +355,57 @@ public class NRTrackerIMATest {
     }
 
     @Test
-    public void adIdFallsBackWhenNullOrEmptyAndNeverReusesThePreviousAd() {
+    public void adIdIsNullWhenNullOrEmptyAndNeverReusesThePreviousAdOrTheHash() {
         tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("ad-1", 0, 0, 0)));
         send(AdEvent.AdEventType.COMPLETED);
-        String fallback = new NRVideoTracker().getVideoId();
         tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith(null, 0, 0, 0)));
-        assertEquals(fallback, lastSent("adId"));
+        assertNull(lastSent("adId"));
         send(AdEvent.AdEventType.COMPLETED);
         tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("", 0, 0, 0)));
-        assertEquals(fallback, lastSent("adId"));
-        assertNotEquals("ad-1", lastSent("adId"));
+        assertNull(lastSent("adId"));
+    }
+
+    @Test
+    public void adIdIsNullAtVodBreakStartAndTheLastAdAtBreakEnd() {
+        init(NRAdConfig.imaDai());
+        send(AdEvent.AdEventType.AD_BREAK_STARTED);
+        assertEquals("AD_BREAK_START", tracker.actions.get(tracker.actions.size() - 1));
+        assertNull(lastSent("adId"));
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("ad-1", 0, 0, 0)));
+        assertEquals("ad-1", lastSent("adId"));
+        send(AdEvent.AdEventType.COMPLETED);
+        send(AdEvent.AdEventType.AD_BREAK_ENDED);
+        assertEquals("AD_BREAK_END", tracker.actions.get(tracker.actions.size() - 1));
+        assertEquals("ad-1", lastSent("adId"));
+        send(AdEvent.AdEventType.AD_BREAK_STARTED);
+        assertEquals("AD_BREAK_START", tracker.actions.get(tracker.actions.size() - 1));
+        assertNull(lastSent("adId"));
+    }
+
+    @Test
+    public void adIdIsNullAtSecondPeriodBreakStartAndTheLastAdAtBreakEnd() {
+        init(NRAdConfig.imaDai());
+        send(AdEvent.AdEventType.AD_PERIOD_STARTED);
+        assertNull(lastSent("adId"));
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("ad-1", 0, 0, 0)));
+        send(AdEvent.AdEventType.COMPLETED);
+        send(AdEvent.AdEventType.AD_PERIOD_ENDED);
+        assertEquals("AD_BREAK_END", tracker.actions.get(tracker.actions.size() - 1));
+        assertEquals("ad-1", lastSent("adId"));
+        send(AdEvent.AdEventType.AD_PERIOD_STARTED);
+        assertEquals("AD_BREAK_START", tracker.actions.get(tracker.actions.size() - 1));
+        assertNull(lastSent("adId"));
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("ad-2", 0, 0, 0)));
+        assertEquals("ad-2", lastSent("adId"));
+    }
+
+    @Test
+    public void adIdIsKeptWhenABreakSignalArrivesInsideAnOpenBreak() {
+        init(NRAdConfig.imaDai());
+        send(AdEvent.AdEventType.AD_PERIOD_STARTED);
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("ad-1", 0, 0, 0)));
+        send(AdEvent.AdEventType.AD_PERIOD_STARTED);
+        assertEquals("ad-1", tracker.getVideoId());
     }
 
     @Test
