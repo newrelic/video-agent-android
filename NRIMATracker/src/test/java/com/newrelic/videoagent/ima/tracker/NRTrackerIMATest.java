@@ -488,4 +488,40 @@ public class NRTrackerIMATest {
         linkContentBitrate(null);
         assertNull(tracker.getBitrate());
     }
+
+    private void linkContentSrc(String src) {
+        content.dispose();
+        content = new NRVideoTracker() {
+            @Override
+            public String getSrc() {
+                return src;
+            }
+        };
+        tracker.linkedTracker = content;
+    }
+
+    @Test
+    public void daiAdSrcIsTheStitchedStreamAndPartnerIsGoogleDai() {
+        init(NRAdConfig.imaDai());
+        linkContentSrc("https://dai.example.com/stream/master.m3u8");
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("a", 0, 0, 0)));
+        assertEquals("https://dai.example.com/stream/master.m3u8", lastSent("adSrc"));
+        assertEquals("google-dai", lastSent("adPartner"));
+    }
+
+    @Test
+    public void csaiAdSrcAndPartnerAreUnchanged() {
+        linkContentSrc("https://content.example.com/video.m3u8");
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("a", 0, 0, 0)));
+        assertNull(lastSent("adSrc"));
+        assertNull(lastSent("adPartner"));
+    }
+
+    @Test
+    public void daiAdSrcIsNullWhenTheContentSrcIsUnknown() {
+        init(NRAdConfig.imaDai());
+        linkContentSrc(null);
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("a", 0, 0, 0)));
+        assertNull(lastSent("adSrc"));
+    }
 }

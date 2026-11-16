@@ -49,6 +49,7 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
 
     /** True for Dynamic Ad Insertion: breaks come from the stream's own ad break events. */
     private boolean isDai = false;
+    private static final String AD_PARTNER_DAI = "google-dai";
     private String adPosition = null;
     private String creativeId = null;
     private Long quartile = null;
@@ -246,6 +247,24 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
             attr.put("adSkipped", adSkipped);
         }
         return attr;
+    }
+
+    /**
+     * Ad source. For DAI the ad is part of the stitched stream the player plays, so it is the
+     * content tracker's source, as the stream URL is on web. Not set for client-side ads.
+     */
+    @Override
+    public String getSrc() {
+        if (isDai && linkedTracker instanceof NRVideoTracker) {
+            return ((NRVideoTracker) linkedTracker).getSrc();
+        }
+        return null;
+    }
+
+    /** Ad partner: Google DAI. Not set for client-side ads. */
+    @Override
+    public String getAdPartner() {
+        return isDai ? AD_PARTNER_DAI : null;
     }
 
     /**
