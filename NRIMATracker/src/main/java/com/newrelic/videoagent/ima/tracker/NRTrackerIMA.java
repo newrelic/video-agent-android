@@ -114,7 +114,10 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
                 break;
             case TAPPED:
             case CLICKED:
-                sendAdClick();
+                // Dropped when no ad was started (e.g. a live DAI join mid-ad): no AD_START, no adId.
+                if (getState().isStarted) {
+                    sendAdClick();
+                }
                 break;
             case FIRST_QUARTILE:
                 // Dropped when no ad was started (e.g. a live DAI join mid-ad): no AD_START, no adId.

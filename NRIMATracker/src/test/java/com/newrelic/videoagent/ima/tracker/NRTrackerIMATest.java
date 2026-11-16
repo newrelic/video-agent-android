@@ -259,6 +259,62 @@ public class NRTrackerIMATest {
         assertEquals("[AD_REQUEST, AD_START, AD_END, AD_REQUEST, AD_START, AD_QUARTILE]", tracker.actions.toString());
     }
 
+    // ---- Clicks only count while an ad is in flight ----
+
+    private void sendClickAndTap() {
+        send(AdEvent.AdEventType.CLICKED);
+        send(AdEvent.AdEventType.TAPPED);
+    }
+
+    @Test
+    public void csaiClicksWithoutStartedAreDropped() {
+        sendClickAndTap();
+        assertEquals("[]", tracker.actions.toString());
+    }
+
+    @Test
+    public void daiClicksWithoutStartedAreDropped() {
+        init(NRAdConfig.imaDai());
+        send(AdEvent.AdEventType.AD_BREAK_STARTED);
+        sendClickAndTap();
+        assertEquals("[AD_BREAK_START]", tracker.actions.toString());
+    }
+
+    @Test
+    public void clicksAfterStartedStillSend() {
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, ad(0)));
+        sendClickAndTap();
+        assertEquals("[AD_REQUEST, AD_START, AD_CLICK, AD_CLICK]", tracker.actions.toString());
+    }
+
+    @Test
+    public void strayClickAfterCompletedIsDropped() {
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, ad(0)));
+        send(AdEvent.AdEventType.COMPLETED);
+        sendClickAndTap();
+        assertEquals("[AD_REQUEST, AD_START, AD_END]", tracker.actions.toString());
+    }
+
+    @Test
+    public void strayClickAfterBreakEndIsDropped() {
+        init(NRAdConfig.imaDai());
+        send(AdEvent.AdEventType.AD_BREAK_STARTED);
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, ad(0)));
+        send(AdEvent.AdEventType.AD_BREAK_ENDED);
+        sendClickAndTap();
+        assertEquals("[AD_BREAK_START, AD_REQUEST, AD_START, AD_END, AD_BREAK_END]", tracker.actions.toString());
+    }
+
+    @Test
+    public void newStartedRearmsClicks() {
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, ad(0)));
+        send(AdEvent.AdEventType.COMPLETED);
+        send(AdEvent.AdEventType.CLICKED);
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, ad(0)));
+        send(AdEvent.AdEventType.CLICKED);
+        assertEquals("[AD_REQUEST, AD_START, AD_END, AD_REQUEST, AD_START, AD_CLICK]", tracker.actions.toString());
+    }
+
     // ---- Errors ----
 
     @Test
