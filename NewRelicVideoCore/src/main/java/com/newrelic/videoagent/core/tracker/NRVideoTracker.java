@@ -352,10 +352,14 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
      */
     public void sendRequest() {
         if (state.goRequest()) {
-            // Reset the timeSince table at every new session boundary so timestamps
-            // from the previous session do not bleed into
-            // the first events of the new session.
-            generateTimeSinceTable();
+            // Rebuild the table only at a new content session, so timestamps from the
+            // previous session do not bleed in. An ad request must not wipe the
+            // break and tracker-ready timers; it only clears the per-ad ones.
+            if (state.isAd) {
+                resetAdTimeSince();
+            } else {
+                generateTimeSinceTable();
+            }
             playtimeSinceLastEventTimestamp = 0L;
 
             if (state.isAd) {

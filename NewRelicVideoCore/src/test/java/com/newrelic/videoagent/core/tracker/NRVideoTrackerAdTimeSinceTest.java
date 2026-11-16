@@ -99,4 +99,56 @@ public class NRVideoTrackerAdTimeSinceTest {
         assertTrue(end.containsKey("timeSinceAdRequested"));
         assertTrue(end.containsKey("timeSinceAdStarted"));
     }
+
+    @Test
+    public void adBreakEndCarriesTimeSinceAdBreakBegin() throws InterruptedException {
+        playOneAdBreak();
+
+        assertTrue(ad.last("AD_BREAK_END").attributes.containsKey("timeSinceAdBreakBegin"));
+    }
+
+    @Test
+    public void timeSinceTrackerReadySurvivesAdRequest() {
+        ad.trackerReady();
+        ad.sendAdBreakStart();
+        ad.sendRequest();
+        ad.sendStart();
+
+        assertTrue(ad.last("AD_REQUEST").attributes.containsKey("timeSinceTrackerReady"));
+        assertTrue(ad.last("AD_START").attributes.containsKey("timeSinceTrackerReady"));
+    }
+
+    @Test
+    public void secondAdRequestHasNoPerAdTimersFromTheFirstAd() throws InterruptedException {
+        ad.sendAdBreakStart();
+        ad.sendRequest();
+        ad.sendStart();
+        Thread.sleep(20);
+        ad.sendAdQuartile();
+        ad.sendEnd();
+
+        ad.sendRequest();
+
+        Map<String, Object> second = ad.last("AD_REQUEST").attributes;
+        assertFalse(second.containsKey("timeSinceAdRequested"));
+        assertFalse(second.containsKey("timeSinceAdStarted"));
+        assertFalse(second.containsKey("timeSinceLastAdHeartbeat"));
+        assertFalse(second.containsKey("timeSinceLastAdQuartile"));
+    }
+
+    @Test
+    public void contentRequestStillRebuildsTheTable() {
+        CapturingTracker video = new CapturingTracker();
+        video.trackerReady();
+        video.sendRequest();
+        video.sendStart();
+        video.sendEnd();
+
+        video.sendRequest();
+
+        Map<String, Object> second = video.last("CONTENT_REQUEST").attributes;
+        assertFalse(second.containsKey("timeSinceTrackerReady"));
+        assertFalse(second.containsKey("timeSinceStarted"));
+        video.dispose();
+    }
 }
