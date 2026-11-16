@@ -250,15 +250,35 @@ public class NRTrackerIMA extends NRVideoTracker implements AdErrorEvent.AdError
     }
 
     /**
-     * Ad source. For DAI the ad is part of the stitched stream the player plays, so it is the
-     * content tracker's source, as the stream URL is on web. Not set for client-side ads.
+     * Ad source. For DAI the ad is part of the stitched stream the player plays, so it is that
+     * stream's master playlist URL, as on web and iOS. Until the player has loaded the manifest
+     * it is the content tracker's source (the Media3 request URI). Not set for client-side ads.
      */
     @Override
     public String getSrc() {
-        if (isDai && linkedTracker instanceof NRVideoTracker) {
-            return ((NRVideoTracker) linkedTracker).getSrc();
+        if (!isDai || !(linkedTracker instanceof NRVideoTracker)) return null;
+        String stream = stitchedStreamUrl();
+        return stream != null ? stream : ((NRVideoTracker) linkedTracker).getSrc();
+    }
+
+    /**
+     * Master playlist URL of the stream being played, from the player's current HLS manifest.
+     * Reached by reflection: this module depends on neither the ExoPlayer tracker nor the HLS
+     * module. Null when the player is not ExoPlayer, has no manifest yet, or anything differs.
+     */
+    private String stitchedStreamUrl() {
+        try {
+            Object player = linkedTracker.getClass().getMethod("getPlayer").invoke(linkedTracker);
+            if (player == null) return null;
+            Object manifest = player.getClass().getMethod("getCurrentManifest").invoke(player);
+            if (manifest == null) return null;
+            Object playlist = manifest.getClass().getField("multivariantPlaylist").get(manifest);
+            if (playlist == null) return null;
+            Object baseUri = playlist.getClass().getField("baseUri").get(playlist);
+            return baseUri instanceof String && !((String) baseUri).isEmpty() ? (String) baseUri : null;
+        } catch (Exception e) {
+            return null;
         }
-        return null;
     }
 
     /** Ad partner: Google DAI. Not set for client-side ads. */

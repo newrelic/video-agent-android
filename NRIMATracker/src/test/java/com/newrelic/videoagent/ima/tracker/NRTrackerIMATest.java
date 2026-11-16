@@ -524,4 +524,62 @@ public class NRTrackerIMATest {
         tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("a", 0, 0, 0)));
         assertNull(lastSent("adSrc"));
     }
+
+    /** Stand-ins for ExoPlayer's HlsManifest chain, found by the tracker through reflection. */
+    public static class FakePlaylist {
+        public final String baseUri;
+        public FakePlaylist(String baseUri) { this.baseUri = baseUri; }
+    }
+
+    public static class FakeManifest {
+        public final FakePlaylist multivariantPlaylist;
+        public FakeManifest(String masterUrl) { multivariantPlaylist = new FakePlaylist(masterUrl); }
+    }
+
+    public static class FakePlayer {
+        private final Object manifest;
+        public FakePlayer(Object manifest) { this.manifest = manifest; }
+        public Object getCurrentManifest() { return manifest; }
+    }
+
+    public static class FakeContentTracker extends NRVideoTracker {
+        private final FakePlayer player;
+        private final String src;
+        public FakeContentTracker(FakePlayer player, String src) { this.player = player; this.src = src; }
+        public FakePlayer getPlayer() { return player; }
+        @Override
+        public String getSrc() { return src; }
+    }
+
+    private void linkFakeContent(Object manifest, String src) {
+        content.dispose();
+        content = new FakeContentTracker(new FakePlayer(manifest), src);
+        tracker.linkedTracker = content;
+    }
+
+    @Test
+    public void daiAdSrcIsTheStitchedMasterPlaylistWhenTheManifestIsLoaded() {
+        init(NRAdConfig.imaDai());
+        linkFakeContent(new FakeManifest("https://dai.example.com/stream/abc/master.m3u8"),
+                "ssai://dai.example.com?adsId=x");
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("a", 0, 0, 0)));
+        assertEquals("https://dai.example.com/stream/abc/master.m3u8", lastSent("adSrc"));
+    }
+
+    @Test
+    public void daiAdSrcFallsBackToTheContentSrcWhenThereIsNoManifestYet() {
+        init(NRAdConfig.imaDai());
+        linkFakeContent(null, "ssai://dai.example.com?adsId=x");
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("a", 0, 0, 0)));
+        assertEquals("ssai://dai.example.com?adsId=x", lastSent("adSrc"));
+        linkFakeContent(new Object(), "ssai://dai.example.com?adsId=x");
+        assertEquals("ssai://dai.example.com?adsId=x", tracker.getSrc());
+    }
+
+    @Test
+    public void csaiAdSrcIgnoresTheManifest() {
+        linkFakeContent(new FakeManifest("https://dai.example.com/stream/abc/master.m3u8"), "https://c/v.m3u8");
+        tracker.onAdEvent(event(AdEvent.AdEventType.STARTED, adWith("a", 0, 0, 0)));
+        assertNull(lastSent("adSrc"));
+    }
 }
