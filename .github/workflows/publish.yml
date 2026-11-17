@@ -74,6 +74,12 @@ jobs:
         run: |
           mkdir -p release
           find "$RUNNER_TEMP/m2/com/github/newrelic" -type f \( -name '*.aar' -o -name '*.pom' -o -name '*.module' \) -exec cp {} release/ \;
+          # Fail if a module is missing or an unexpected file appears (5 modules x 3 files).
+          for m in NRIMATracker NRMediaTailorTracker NRExoPlayerTracker NRTHEOPlayerTracker NewRelicVideoCore; do
+            for e in aar pom module; do echo "$m-$VERSION.$e"; done
+          done | sort > "$RUNNER_TEMP/expected-files.txt"
+          (cd release && ls) | sort > "$RUNNER_TEMP/collected-files.txt"
+          diff "$RUNNER_TEMP/expected-files.txt" "$RUNNER_TEMP/collected-files.txt"
           node .github/scripts/generate-integrity-manifest.mjs release "$VERSION" "$COMMIT" release/*
           cat release/SHA256SUMS
 
@@ -98,6 +104,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
           TAG_NAME: ${{ steps.version.outputs.tag }}
+          COMMIT: ${{ github.event.pull_request.merge_commit_sha }}
         run: |
           # 1. Version and tag come from the "Read version" step
           
@@ -125,8 +132,8 @@ jobs:
             --draft \
             --title "$TAG_NAME" \
             --notes "$NOTES" \
-            --target ${{ github.base_ref }}
-          gh release upload "$TAG_NAME" release/* --clobber
+            --target "$COMMIT"
+          gh release upload "$TAG_NAME" release/*
 
           # Check what is on the draft matches the verified files before publishing.
           gh api "repos/$GITHUB_REPOSITORY/releases" --paginate | jq -r --arg t "$TAG_NAME" '.[] | select(.tag_name == $t) | .assets[] | "\(.name) \(.digest // "")"' | sort > "$RUNNER_TEMP/uploaded.txt"
