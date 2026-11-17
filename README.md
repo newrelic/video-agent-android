@@ -132,7 +132,7 @@ The Video Agent is composed of five modules:
 | **NewRelicVideoCore** | Base classes for tracker management, event generation, and data harvesting. Depends on the New Relic Android Agent. | Yes |
 | **NRExoPlayerTracker** | Video tracker for ExoPlayer (Media3). Automatically hooks into player lifecycle events. | Yes (for ExoPlayer) |
 | **NRTHEOPlayerTracker** | Video tracker for THEOplayer (Dolby OptiView). Hooks into THEOplayer event listeners for lifecycle, QoE, rendition changes, and DRM errors. | Yes (for THEOplayer) |
-| **NRIMATracker** | Ad tracker for the Google IMA SDK (client-side ad insertion / CSAI). Captures ad lifecycle events including quartiles, breaks, and errors. | Optional |
+| **NRIMATracker** | Ad tracker for the Google IMA SDK (client-side ads / CSAI and Dynamic Ad Insertion / DAI). Captures ad lifecycle events including quartiles, breaks, and errors. | Optional |
 | **NRMediaTailorTracker** | Ad tracker for AWS Elemental MediaTailor (server-side ad insertion / SSAI). Supports DASH and HLS, explicit and implicit session init, live + VOD, with rich VAST metadata. | Optional |
 
 ## Usage
@@ -320,6 +320,28 @@ protected void onDestroy() {
 }
 ```
 
+### Setup with ExoPlayer and IMA Dynamic Ad Insertion (DAI)
+
+DAI uses the same `NRIMATracker` module. Select it with `NRAdConfig.imaDai()` and give the
+tracker's listeners to the DAI ads loader. The tracker only observes, so your own IMA
+listeners keep working. Ad breaks come from the stream's ad break events, so there is nothing
+else to call.
+
+```java
+ImaServerSideAdInsertionMediaSource.AdsLoader adsLoader =
+        new ImaServerSideAdInsertionMediaSource.AdsLoader.Builder(this, playerView)
+                .setAdEventListener(this)   // forwards to NRTrackerIMA.handleAdEvent(...)
+                .setAdErrorListener(this)   // forwards to NRTrackerIMA.handleAdError(...)
+                .build();
+// ... build the player with ImaServerSideAdInsertionMediaSource.Factory, then:
+NRVideoPlayerConfiguration playerConfig =
+        new NRVideoPlayerConfiguration("my-player", player, NRAdConfig.imaDai(), null);
+Integer trackerId = NRVideo.addPlayer(playerConfig);
+```
+
+See `VideoPlayerDai` in the sample app. Known limitations: `adPlayhead` is not reported for
+DAI, and `AD_BREAK_START` carries no ad details or `adPosition` for mid/post breaks.
+
 ## Best Practices
 
 ### 1. Setting `contentTitle`
@@ -433,7 +455,7 @@ if (shouldEnable) {
 | `playerName` | `String` | Unique identifier for the video player. Used to distinguish between multiple players. |
 | `player` | `ExoPlayer` / `THEOplayerView` | The player instance to track. |
 | `playerType` | `String` | `NRVideoPlayerConfiguration.PLAYER_TYPE_EXO` (`"exo"`) or `PLAYER_TYPE_THEO` (`"theo"`). Always set this explicitly — omitting it triggers a warning log and falls back to ExoPlayer for backward compatibility only. |
-| `adConfig` | `NRAdConfig` | Ad framework configuration. Pass `NRAdConfig.csai()` for IMA, `NRAdConfig.mediaTailor()` for MediaTailor, or `null` for no ad tracking. |
+| `adConfig` | `NRAdConfig` | Ad framework configuration. Pass `NRAdConfig.csai()` for IMA, `NRAdConfig.imaDai()` for IMA Dynamic Ad Insertion, `NRAdConfig.mediaTailor()` for MediaTailor, or `null` for no ad tracking. |
 | `customAttributes` | `Map<String, Object>` | Custom attributes to attach to all events from this player. |
 
 > **Upgrading from v4.2.0?** The old `boolean isAdEnabled` and `AdTrackerType` constructors are still supported but deprecated. They compile without changes — `true` maps to `NRAdConfig.csai()`, `AdTrackerType.IMA` maps to `NRAdConfig.csai()`, `AdTrackerType.MEDIA_TAILOR` maps to `NRAdConfig.mediaTailor()`. Migrate at your own pace.
