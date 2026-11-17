@@ -1,7 +1,14 @@
 ## [5.1.0](https://github.com/newrelic/video-agent-android/compare/v5.0.2...v5.1.0) (2026-11-17)
-- **New feature: add INFO tier and dead letter drop logging, mirror iOS enableLogging API**
-- **New feature: log buffer near-capacity and dropped events with log level filter**
-- **Bug fix: log dead-letter fill lines once and log QOE_AGGREGATE values like iOS (NR-583829)**
+
+### New features
+
+- **New feature: Google IMA DAI (dynamic ad insertion) support in NRTrackerIMA**
+- **New feature: enable logging with INFO level, and log buffer near-capacity and dropped events, mirroring the iOS enableLogging API**
+
+### Bug fixes
+
+- **Bug fix: fix IMA ad tracking, so ads cut short by a break end are closed, stray quartile and click events are ignored, per-ad timers no longer carry into the next break, and ad duration is reported in milliseconds**
+
 ## [5.0.2](https://github.com/newrelic/video-agent-android/compare/v5.0.1...v5.0.2) (2026-10-14)
 
 ### Bug fixes
