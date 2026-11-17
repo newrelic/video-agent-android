@@ -17,6 +17,7 @@ jobs:
   publish-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
+    environment: android-release
     # Run only if merged AND has 'release' label
     if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release')
     steps:
