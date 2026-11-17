@@ -36,7 +36,7 @@ android {
 }
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.2.0'
-    implementation 'com.google.android.material:material:1.2.1'
+    implementation 'com.google.android.material:material:1.14.0'
     implementation project(path: ':NewRelicVideoCore')
     // Both player SDKs are compileOnly — NOT bundled in the AAR.
     // The host app provides its own player SDK dependency:
