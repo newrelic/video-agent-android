@@ -23,6 +23,7 @@ The New Relic Video Agent for Android provides comprehensive video analytics for
   - [Option 1: JitPack (Recommended)](#option-1-install-via-jitpack-recommended)
   - [Option 2: Manual AAR Files](#option-2-install-manually-using-aar-files)
   - [Option 3: Source Code](#option-3-install-manually-using-source-code)
+- [Verifying a release (security)](#verifying-a-release-security)
 - [Prerequisites](#prerequisites)
 - [Modules](#modules)
 - [Usage](#usage)
@@ -35,6 +36,8 @@ The New Relic Video Agent for Android provides comprehensive video analytics for
 - [License](#license)
 
 ## Installation
+
+> **Security:** to check that the files you downloaded from a release are the ones we built, see [Verifying a release](#verifying-a-release-security).
 
 ### Option 1: Install via JitPack (Recommended)
 
@@ -110,6 +113,114 @@ dependencies {
     implementation project(":NRMediaTailorTracker")   // optional — SSAI ads
 }
 ```
+
+## Verifying a release (security)
+
+Every release published by our release automation is **signed**, and ships with a list of file fingerprints. You can check that the files you downloaded are exactly the ones we built, and that they were built by this repository's release automation and not by someone else.
+
+> Releases published before this was added have no files or signatures. A release that has them lists 17 files under **Assets**.
+
+> **JitPack:** when you add the library through JitPack (Option 1 above), JitPack builds its own files from the version tag. Those files are made by JitPack, not by our release automation, so the signatures below do not cover them. To use signed files, download them from the release page.
+
+### What we publish and sign
+
+Each release has 17 files. **All 17 are signed.**
+
+| File | What it is |
+| --- | --- |
+| `NewRelicVideoCore-<version>.aar`, `NRExoPlayerTracker-<version>.aar`, `NRTHEOPlayerTracker-<version>.aar`, `NRIMATracker-<version>.aar`, `NRMediaTailorTracker-<version>.aar` | One library file per module |
+| The same five names ending in `.pom` and `.module` | The Maven and Gradle description of each module (its dependencies and version) |
+| `SHA256SUMS` | The fingerprint (SHA-256 checksum) of each of the 15 module files |
+| `integrity-manifest.json` | The version, the commit the files were built from, and the fingerprints in a machine-readable form |
+
+**Fingerprint.** A short code worked out from a file. If even one byte of the file changes, the code changes.
+
+**Signature (GitHub calls it an attestation).** A tamper-proof stamp, made by GitHub when our release automation (`.github/workflows/publish.yml`) built the files. It says which repository and which automation produced a file with that exact fingerprint. It is recorded in a public log, and nobody can create a valid one for a file we did not build.
+
+### How to verify (3 steps)
+
+You need the [GitHub CLI](https://cli.github.com/) version 2.53 or newer (older versions miss some of the options below), logged in once with `gh auth login`.
+
+```bash
+# 1. Download the release (use a version that lists 17 files, for example vX.Y.Z)
+VERSION=vX.Y.Z
+gh release download "$VERSION" -R newrelic/video-agent-android -D release-files
+cd release-files
+
+# 2. Check the fingerprints: every line must say OK
+shasum -a 256 -c SHA256SUMS          # on Linux: sha256sum -c SHA256SUMS
+
+# 3. Check the signatures: every file must pass
+for f in *; do
+  gh attestation verify "$f" \
+    --repo newrelic/video-agent-android \
+    --signer-workflow newrelic/video-agent-android/.github/workflows/publish.yml \
+    || echo "FAILED: $f"
+done
+```
+
+- A passing file prints `Verification succeeded` and the command exits with code `0`. Any failure exits with a non-zero code, so you can use the check in a script.
+- `--signer-workflow` is important: it only accepts signatures made by our release automation, not by any other workflow in the repository.
+- To check only the files you use, run step 3 for those files (and for `SHA256SUMS`).
+
+If **any** check fails, do not use the files. Report it as described in [A note about vulnerabilities](#a-note-about-vulnerabilities).
+
+### See what the signature says
+
+```bash
+gh attestation verify NRIMATracker-X.Y.Z.aar \
+  --repo newrelic/video-agent-android \
+  --signer-workflow newrelic/video-agent-android/.github/workflows/publish.yml \
+  --format json
+```
+
+The result lists the repository, the release automation that made the file, the commit that automation ran from, and the public log entry.
+
+### The manifest and the commit
+
+`integrity-manifest.json` is signed too, so you can trust what it says:
+
+```json
+{
+  "version": "X.Y.Z",
+  "commit": "<commit the files were built from>",
+  "files": {
+    "NRIMATracker-X.Y.Z.aar": {
+      "sha256": "<hex fingerprint>",
+      "sha384": "sha384-<base64 fingerprint>"
+    }
+  }
+}
+```
+
+The `commit` is the merged release commit, and the release's version label (tag) points to the same commit. To check it yourself:
+
+```bash
+jq -r .commit integrity-manifest.json
+git ls-remote https://github.com/newrelic/video-agent-android.git "refs/tags/$VERSION"   # prints the same commit
+```
+
+### Verifying without internet access
+
+On a connected machine, download the signature and the trusted keys. Then check on the offline machine:
+
+```bash
+# connected machine
+gh attestation download NRIMATracker-X.Y.Z.aar -R newrelic/video-agent-android
+gh attestation trusted-root > trusted_root.jsonl
+
+# offline machine (the .jsonl file name starts with sha256:)
+gh attestation verify NRIMATracker-X.Y.Z.aar \
+  --bundle sha256:<digest>.jsonl \
+  --custom-trusted-root trusted_root.jsonl \
+  --repo newrelic/video-agent-android \
+  --signer-workflow newrelic/video-agent-android/.github/workflows/publish.yml
+```
+
+### What a signature does and does not tell you
+
+- **It does:** the files are byte-for-byte what our release automation built, in this repository, and they were not swapped or changed afterwards.
+- **It does not:** say the code is free of bugs or vulnerabilities. It proves where the files came from, not that the code is safe.
 
 ## Prerequisites
 

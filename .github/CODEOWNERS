@@ -1,0 +1,12 @@
+# Changes to CI workflows, build tooling and dependency manifests must be
+# reviewed by the owning team before merging.
+.github/                  @newrelic/vertsol
+build.gradle              @newrelic/vertsol
+gradle.properties         @newrelic/vertsol
+settings.gradle           @newrelic/vertsol
+gradlew                   @newrelic/vertsol
+gradlew.bat               @newrelic/vertsol
+jitpack.yml               @newrelic/vertsol
+.releaserc.json           @newrelic/vertsol
+gradle/                   @newrelic/vertsol
+scripts/                  @newrelic/vertsol
