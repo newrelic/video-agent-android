@@ -488,4 +488,17 @@ public class NRVideoTrackerQoeTest {
         assertEquals(0L, lng(after, "totalRenditions"));
         assertFalse("download rate cleared", after.containsKey("avgDownloadRate"));
     }
+
+    @Test
+    public void formatQoeKpisMatchesIosShape() {
+        Map<String, Object> kpis = new HashMap<>();
+        kpis.put("totalPlaytime", 1200L);
+        kpis.put("startupTime", 350L);
+        kpis.put("hadStartupError", false);
+        kpis.put("unrelated", "skipped");
+
+        assertEquals("[QOE_AGGREGATE] => {startupTime=350, totalPlaytime=1200, hadStartupError=false}",
+                NRVideoTracker.formatQoeKpis(kpis));
+        assertEquals("[QOE_AGGREGATE] => {}", NRVideoTracker.formatQoeKpis(null));
+    }
 }

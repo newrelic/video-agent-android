@@ -98,7 +98,9 @@ public class VideoPlayerAds extends AppCompatActivity implements AdErrorEvent.Ad
 
         // Create the MediaItem to play, specifying the content URI and ad tag URI.
         Uri contentUri = Uri.parse(videoUrl);
-        Uri adTagUri = Uri.parse(getString(R.string.ad_tag_url));
+        // "Kite" plays Google's single skippable preroll, to exercise the skip path.
+        boolean skippable = "Kite".equals(getIntent().getStringExtra("video"));
+        Uri adTagUri = Uri.parse(getString(skippable ? R.string.ad_tag_url_skippable : R.string.ad_tag_url));
         MediaItem mediaItem = new MediaItem.Builder().setUri(contentUri).setAdTagUri(adTagUri).build();
         // Prepare the content and ad to be played with the ExoPlayer.
         player.setMediaItem(mediaItem);

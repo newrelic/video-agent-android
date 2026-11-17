@@ -120,6 +120,16 @@ public class NRTracker {
     }
 
     /**
+     * Clear the timeSince values of the given attributes, so they report null
+     * until their action happens again.
+     *
+     * @param attributes Attribute names.
+     */
+    public void resetTimeSinceAttributes(String... attributes) {
+        timeSinceTable.resetAttributes(java.util.Arrays.asList(attributes));
+    }
+
+    /**
      * Generate table of timeSince attributes.
      */
     public void generateTimeSinceTable() {

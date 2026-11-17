@@ -280,6 +280,7 @@ public final class NRVideo {
                 NRLog.d("Lifecycle observer created and registered with crash-safe storage");
             }
             if (config.isDebugLoggingEnabled()) {
+                NRLog.setLevel(config.getLoggingLevel());
                 NRLog.enable();
             }
             if (config.isTV()) {
@@ -340,6 +341,7 @@ public final class NRVideo {
                 className = "com.newrelic.videoagent.mediatailor.tracker.NRTrackerMediaTailor";
                 break;
             case CSAI:
+            case IMA_DAI:
             default:
                 className = "com.newrelic.videoagent.ima.tracker.NRTrackerIMA";
                 break;

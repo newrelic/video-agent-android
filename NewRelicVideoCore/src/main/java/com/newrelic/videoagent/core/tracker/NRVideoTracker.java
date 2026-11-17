@@ -276,7 +276,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
             if (action.startsWith("AD_BREAK_")) {
                 if (linkedTracker instanceof NRVideoTracker) {
                     Long playhead = ((NRVideoTracker) linkedTracker).getPlayhead();
-                    if (playhead < 100) {
+                    if (playhead != null && playhead < 100) {
                         attr.put("adPosition", "pre");
                     }
                 }
@@ -352,10 +352,14 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
      */
     public void sendRequest() {
         if (state.goRequest()) {
-            // Reset the timeSince table at every new session boundary so timestamps
-            // from the previous session do not bleed into
-            // the first events of the new session.
-            generateTimeSinceTable();
+            // Rebuild the table only at a new content session, so timestamps from the
+            // previous session do not bleed in. An ad request must not wipe the
+            // break and tracker-ready timers; it only clears the per-ad ones.
+            if (state.isAd) {
+                resetAdTimeSince();
+            } else {
+                generateTimeSinceTable();
+            }
             playtimeSinceLastEventTimestamp = 0L;
 
             if (state.isAd) {
@@ -472,7 +476,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                         NRVideo.getInstance().getHarvestManager().unregisterQoeProvider(this);
                     }
                     qoeProviderRegistered = false;
-                    NRLog.d("Final QOE_AGGREGATE recorded to crash-safe buffer at CONTENT_END");
+                    NRLog.d("Final QOE_AGGREGATE recorded to crash-safe buffer at CONTENT_END " + formatQoeKpis(finalQoe));
                 }
             }
 
@@ -601,6 +605,26 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
      * Note: QoE metrics are currently limited to content-related events only, not ad events.
      * This design choice focuses QoE measurement on the primary content viewing experience.
      */
+    private static final String[] QOE_LOG_KEYS = {
+            "startupTime", "peakBitrate", "averageBitrate", "totalPlaytime", "totalRebufferingTime",
+            "rebufferingRatio", "hadStartupError", "hadPlaybackError", "avgDownloadRate",
+            "minDownloadRate", "maxDownloadRate", "totalSwitchUps", "totalSwitchDowns",
+            "totalPauseTime", "totalRenditions", "qoeAggregateVersion"
+    };
+
+    /** Debug-log shape matching iOS: "[QOE_AGGREGATE] => {startupTime=..., peakBitrate=..., ...}". */
+    static String formatQoeKpis(Map<String, Object> qoeEvent) {
+        StringBuilder sb = new StringBuilder("[QOE_AGGREGATE] => {");
+        boolean first = true;
+        for (String key : QOE_LOG_KEYS) {
+            if (qoeEvent == null || !qoeEvent.containsKey(key)) continue;
+            if (!first) sb.append(", ");
+            sb.append(key).append('=').append(qoeEvent.get(key));
+            first = false;
+        }
+        return sb.append('}').toString();
+    }
+
     /**
      * Implementation of QoeProvider interface.
      * Called by HarvestManager during harvest to generate QOE_AGGREGATE events.
@@ -638,7 +662,7 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
                     // Update snapshot for next dirty check
                     lastSentQoeKpis = new HashMap<>(currentKpis);
 
-                    NRLog.d("QOE_AGGREGATE generated for harvest cycle " + harvestCycleNumber + " (KPIs changed)");
+                    NRLog.d("QOE_AGGREGATE generated for harvest cycle " + harvestCycleNumber + " (KPIs changed) " + formatQoeKpis(qoeEvent));
                     return qoeEvent;
                 } else {
                     NRLog.d("QOE_AGGREGATE skipped for harvest cycle " + harvestCycleNumber + " (no KPI changes)");
@@ -864,8 +888,18 @@ public class NRVideoTracker extends NRTracker implements QoeProvider {
         if (state.isAd && state.goAdBreakStart()) {
             adBreakIdIndex++;
             totalAdPlaytime = 0L;
+            resetAdTimeSince();
             sendVideoAdEvent(AD_BREAK_START);
         }
+    }
+
+    /**
+     * The per-ad timeSince values must not carry over from the previous break: AD_BREAK_START
+     * is sent before the new ad's own AD_REQUEST, which is what rebuilds the table.
+     */
+    private void resetAdTimeSince() {
+        resetTimeSinceAttributes("timeSinceAdRequested", "timeSinceAdStarted",
+                "timeSinceLastAdHeartbeat", "timeSinceLastAdQuartile");
     }
 
     /**

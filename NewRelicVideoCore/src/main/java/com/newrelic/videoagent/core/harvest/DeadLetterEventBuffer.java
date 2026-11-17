@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import com.newrelic.videoagent.core.utils.BufferDropLogger;
 
 /**
  * Specialized event buffer for dead letter queue - retry events only
@@ -15,11 +16,13 @@ public class DeadLetterEventBuffer implements EventBufferInterface {
     private final ConcurrentLinkedQueue<Map<String, Object>> retryEvents = new ConcurrentLinkedQueue<>();
     private final int maxCapacity;
     private final boolean isAndroidTVDevice;
+    private final BufferDropLogger dropLogger;
 
     public DeadLetterEventBuffer(boolean isTV) {
         this.isAndroidTVDevice = isTV;
         // Smaller capacity for dead letter queue - it's just for retries
         this.maxCapacity = isTV ? 200 : 100;
+        this.dropLogger = new BufferDropLogger("Dead letter", maxCapacity);
     }
 
     @Override
@@ -31,8 +34,9 @@ public class DeadLetterEventBuffer implements EventBufferInterface {
 
         // Simple overflow protection - remove oldest if over capacity
         while (retryEvents.size() > maxCapacity) {
-            retryEvents.poll();
+            if (retryEvents.poll() != null) dropLogger.recordDrop();
         }
+        dropLogger.checkFill(retryEvents.size());
     }
 
     @Override
@@ -57,6 +61,7 @@ public class DeadLetterEventBuffer implements EventBufferInterface {
             currentSize += eventSize;
         }
 
+        dropLogger.checkFill(retryEvents.size());
         return batch;
     }
 
@@ -73,6 +78,7 @@ public class DeadLetterEventBuffer implements EventBufferInterface {
     @Override
     public void cleanup() {
         retryEvents.clear();
+        dropLogger.checkFill(0);
     }
 
     // Dead letter queues don't need callbacks - they're just retry storage
