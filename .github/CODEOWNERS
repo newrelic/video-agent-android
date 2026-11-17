@@ -7,3 +7,6 @@ settings.gradle           @newrelic/vertsol
 gradlew                   @newrelic/vertsol
 gradlew.bat               @newrelic/vertsol
 jitpack.yml               @newrelic/vertsol
+.releaserc.json           @newrelic/vertsol
+gradle/                   @newrelic/vertsol
+scripts/                  @newrelic/vertsol
