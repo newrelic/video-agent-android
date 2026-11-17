@@ -10,23 +10,31 @@ on:
 permissions:
   contents: write
   actions: write
+  id-token: write
+  attestations: write
 
 jobs:
   publish-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
+    environment: android-release
     # Run only if merged AND has 'release' label
     if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release')
     steps:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
 
-      - name: Create Release and Tag
-        id: create_release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up JDK 17
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Read version
+        id: version
         run: |
-          # 1. Extract Version
           VERSION=$(grep "^GLOBAL_VERSION_NAME=" gradle.properties | cut -d'=' -f2)
 
           if [ -z "$VERSION" ]; then
@@ -35,7 +43,71 @@ jobs:
           fi
 
           echo "Detected Version: $VERSION"
-          TAG_NAME="v$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      # A published release is immutable, so a re-run can only continue from a draft.
+      - name: Stop if this version is already published
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ steps.version.outputs.tag }}
+        run: |
+          EXISTING=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate | jq -r --arg t "$TAG_NAME" '.[] | select(.tag_name == $t) | "\(.id) \(.draft)"')
+          if [ -z "$EXISTING" ]; then
+            echo "No release for $TAG_NAME yet."
+            exit 0
+          fi
+          read -r ID DRAFT <<< "$EXISTING"
+          if [ "$DRAFT" != "true" ]; then
+            echo "::error::$TAG_NAME is already published and cannot be changed. Bump the version and release again."
+            exit 1
+          fi
+          echo "Deleting the leftover draft for $TAG_NAME from an earlier failed run."
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$ID"
+
+      - name: Build release files
+        run: ./gradlew --no-daemon publishToMavenLocal -Dmaven.repo.local="$RUNNER_TEMP/m2"
+
+      - name: Collect files and write checksums and manifest
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          COMMIT: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          mkdir -p release
+          find "$RUNNER_TEMP/m2/com/github/newrelic" -type f \( -name '*.aar' -o -name '*.pom' -o -name '*.module' \) -exec cp {} release/ \;
+          # Fail if a module is missing or an unexpected file appears (5 modules x 3 files).
+          for m in NRIMATracker NRMediaTailorTracker NRExoPlayerTracker NRTHEOPlayerTracker NewRelicVideoCore; do
+            for e in aar pom module; do echo "$m-$VERSION.$e"; done
+          done | sort > "$RUNNER_TEMP/expected-files.txt"
+          (cd release && ls) | sort > "$RUNNER_TEMP/collected-files.txt"
+          diff "$RUNNER_TEMP/expected-files.txt" "$RUNNER_TEMP/collected-files.txt"
+          node .github/scripts/generate-integrity-manifest.mjs release "$VERSION" "$COMMIT" release/*
+          cat release/SHA256SUMS
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: release/*
+
+      - name: Verify checksums and attestations
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd release
+          sha256sum -c SHA256SUMS
+          for f in *; do
+            gh attestation verify "$f" --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish.yml"
+          done
+
+      - name: Create Release and Tag
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG_NAME: ${{ steps.version.outputs.tag }}
+          COMMIT: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          # 1. Version and tag come from the "Read version" step
           
           # 2. Extract Changelog for this version
           # We initialize NOTES as empty
@@ -55,10 +127,23 @@ jobs:
 
           # 4. Create the GitHub Release AND Tag
           # We use the extracted "$NOTES" here
+          # Draft first, upload every file, then publish: files cannot be added once published
+          # (immutable releases).
           gh release create "$TAG_NAME" \
+            --draft \
             --title "$TAG_NAME" \
             --notes "$NOTES" \
-            --target ${{ github.base_ref }}
+            --target "$COMMIT"
+          gh release upload "$TAG_NAME" release/*
+
+          # Check what is on the draft matches the verified files before publishing.
+          gh api "repos/$GITHUB_REPOSITORY/releases" --paginate | jq -r --arg t "$TAG_NAME" '.[] | select(.tag_name == $t) | .assets[] | "\(.name) \(.digest // "")"' | sort > "$RUNNER_TEMP/uploaded.txt"
+          (cd release && for f in *; do echo "$f sha256:$(sha256sum "$f" | cut -d' ' -f1)"; done) | sort > "$RUNNER_TEMP/expected.txt"
+          # Older API responses have no digest; compare names only in that case.
+          if ! grep -q 'sha256:' "$RUNNER_TEMP/uploaded.txt"; then sed -i 's/ sha256:.*//' "$RUNNER_TEMP/expected.txt"; sed -i 's/ *$//' "$RUNNER_TEMP/uploaded.txt"; fi
+          diff "$RUNNER_TEMP/expected.txt" "$RUNNER_TEMP/uploaded.txt"
+
+          gh release edit "$TAG_NAME" --draft=false
 
           echo "tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
 
